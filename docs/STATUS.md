@@ -6,10 +6,16 @@
 
 ## Next
 The next unticked items in [PLAN.md](PLAN.md), M0:
-1. CI green on GitHub (Linux + Windows), then GitHub milestones and issues
-2. Demo service + fake payments SDK
-3. Benchmark v0 (10 tasks), split, preflight, run records
-4. Stock-agent overhead + baselines (needs U-002: your logins)
+1. You: free RAM to >= 11-12 GB (close heavy apps; `python bench/preflight.py --model qwen3.5:4b` must say "ready")
+2. Prompt overhead of each stock agent at 64K context (Ollama's own minimum for these agents), then baselines on
+   qwen3.5:4b and qwen3:8b: `python bench/run.py --agent bench/configs/<agent>.toml --model <model>`
+3. Kill check 1, then release v0.0 + post 1 (lock file of tested versions first)
+
+## Bench tools
+- `bench/bench.py` (tasks, grading, validate) · `bench/proxy.py` (logs every model call) ·
+  `bench/preflight.py` (refuses unready runs) · `bench/run.py` (one agent x tasks, records in `results/runs/`)
+- Stock agents installed: Claude Code 2.1.310, Codex 0.162.1, OpenCode 1.17.8, dsh 0.1.5-rc.1, Aider 0.86.2
+  (uv tool, Python 3.12), deepagents-code 0.2.1 (uv tool, Python 3.14, Ollama extra)
 
 ## Machine
 - GPU: NVIDIA GeForce RTX 5050 Laptop, 8 GB (8151 MiB), driver 610.47; `nvidia-smi` power limit N/A (default 80 W)
