@@ -8,7 +8,7 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
-| - | - | - | (none yet) | - | - | - |
+| F-001 | 2026-10-24 | E-004 | Remove stray brainstorm code from `_cmd_recommend` | `app/main.py` | CI lint gate (F82) | works |
 
 ## Entry template
 
@@ -26,3 +26,15 @@ again.
 ```
 
 ## Entries
+
+### F-001: Remove stray brainstorm code from `_cmd_recommend`
+
+- **Date:** 2026-10-24 · **Fixes:** E-004 · **Milestone:** M0 · **Result:** works
+
+**Change:** deleted the 7 unreachable-intent lines after the advisor's apply/skip branch; `_cmd_brainstorm` (the real
+copy) is unchanged.
+**Files:** `app/main.py` (end of `_cmd_recommend`)
+**Regression test:** `ruff check .` with rules E9/F63/F7/F82 in `pyproject.toml`, run in CI; it reported F821 before the
+fix and passes after. Full suite: 561 passed.
+**Tried and rejected:** none.
+**Lesson:** L-018.

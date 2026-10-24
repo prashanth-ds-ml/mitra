@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-004 | 2026-10-24 | M0 | Medium | lint (F821) on import | Model-advisor command crashes after finishing: stray copy of brainstorm code with undefined `raw`, `llm` | closed | F-001 |
 | E-003 | 2026-10-24 | review | Medium | local-codex review | Shell allowlist checks only the program name; path checks pass when no workspace is set | open (fix in M1) | - |
 | E-002 | 2026-10-24 | review | Medium | local-codex review | Agent loops run `while True` with no step limit | open (fix in M1) | - |
 | E-001 | 2026-10-24 | review | High | local-codex review | Repair loop stops early: `edit_file` missing from `mutating_tools` | open (fix in M1) | - |
@@ -29,6 +30,17 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-004: Model-advisor command crashes after finishing
+
+- **Date found:** 2026-10-24 · **Milestone:** M0 · **Severity:** Medium · **Found by:** lint (ruff F821) when importing local-codex · **Status:** closed
+
+**What happened:** `_cmd_recommend` in `app/main.py` ended with 7 lines copied from the start of `_cmd_brainstorm`
+(`topic = raw.strip()[11:]...`). They ran after every advisor run and raised `NameError: raw`. No test covered the command.
+**Root cause:** a paste left in the wrong function; the original repo had no lint gate for undefined names.
+**Fix:** F-001.
+**Regression test:** CI lint gate `ruff check` with F82 (undefined names) fails without the fix.
+**Lesson?** L-018 (lint gate for undefined names from day 1).
 
 ### E-003: Shell allowlist checks only the program name; path checks pass when no workspace is set
 

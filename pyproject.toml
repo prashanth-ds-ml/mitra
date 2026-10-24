@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mitra"
+version = "0.0.0"
+description = "Local-first coding agent built for small models"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "rich",
+    "prompt-toolkit",
+    "langchain-ollama",
+    "langchain-core",
+    "langgraph",
+    "python-dotenv",
+    "tomli_w",
+    "typer",
+    "ollama",
+    "psutil",
+    "Pillow",
+    "numpy",
+    "PyYAML",
+    "requests",
+    "pydantic",
+    "tenacity"
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[project.scripts]
+mitra = "app.main:cli"
+codemitra = "app.main:cli"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["app*", "misc*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "test"]
+
+[tool.ruff.lint]
+# CI gate: syntax errors and undefined names only (real bugs, see E-004).
+# Style rules come later, file by file, as code is rewritten.
+select = ["E9", "F63", "F7", "F82"]

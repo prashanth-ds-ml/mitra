@@ -1,0 +1,555 @@
+"""Planner Agent — breaks a goal into ordered steps and orchestrates execution.
+
+The planner:
+  1. Takes a high-level goal and breaks it into concrete, actionable steps.
+  2. Writes the plan to .codemitra/plan.md.
+  3. On each turn, reads the plan, picks the next pending step, and routes it
+     to the appropriate agent (filesystem, shell, or reader).
+  4. Marks steps done, updates the plan file, and summarises progress.
+
+The planner itself does NOT execute code or touch files directly —
+it generates a plan and hands off each step to the correct agent.
+"""
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from datetime import datetime
+
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.tools import tool
+from rich.console import Console
+from rich.panel import Panel
+from rich.markdown import Markdown
+from rich.table import Table
+from rich.text import Text
+
+from app import memory, workflows
+
+
+# ─── Data model ───────────────────────────────────────────────────────────────
+
+@dataclass
+class Step:
+    index: int
+    text: str
+    done: bool = False
+
+
+@dataclass
+class Plan:
+    goal: str
+    steps: list[Step] = field(default_factory=list)
+
+    @property
+    def pending(self) -> list[Step]:
+        return [s for s in self.steps if not s.done]
+
+    @property
+    def completed(self) -> list[Step]:
+        return [s for s in self.steps if s.done]
+
+    @property
+    def is_done(self) -> bool:
+        return bool(self.steps) and all(s.done for s in self.steps)
+
+
+# ─── Parse plan.md into a Plan object ────────────────────────────────────────
+
+def _parse_plan(workspace: str) -> Plan | None:
+    raw = memory.load_plan(workspace)
+    if not raw:
+        return None
+
+    goal_match = re.search(r"## Goal\n(.+)", raw)
+    goal = goal_match.group(1).strip() if goal_match else "Unknown goal"
+
+    steps: list[Step] = []
+    for i, m in enumerate(re.finditer(r"- \[([ x])\] (.+)", raw)):
+        done = m.group(1) == "x"
+        text = m.group(2).strip()
+        steps.append(Step(index=i, text=text, done=done))
+
+    return Plan(goal=goal, steps=steps)
+
+
+# ─── Generate a plan via the LLM ─────────────────────────────────────────────
+
+_PLAN_PROMPT = """You are a senior software engineer creating an execution plan.
+
+Given the goal and clarifying context below, output a numbered list of concrete, atomic steps.
+Each step must:
+- Be a single action (create X, run Y, install Z, read A, test B)
+- Start with an imperative verb
+- Be completable by one tool call
+- Not exceed one sentence
+
+Work mode: {work_mode}
+Adapt the plan detail and communication style to this mode without changing the goal.
+
+Output ONLY the numbered list — no intro, no explanation, no markdown fences.
+Example:
+1. Create folder structure for the project
+2. Create main.py with the entry point
+3. Create requirements.txt with dependencies
+4. Create virtual environment
+5. Install packages from requirements.txt
+6. Run pytest to verify the setup
+
+Goal: {goal}
+
+Clarifying context (use this to make the steps specific, not generic):
+{context}
+"""
+
+
+def create_plan(llm, goal: str, workspace: str, context: str = "", work_mode: str = "builder") -> Plan:
+    """Ask the LLM to break a goal into steps, write plan.md, return Plan."""
+    response = llm.invoke([HumanMessage(content=_PLAN_PROMPT.format(
+        goal=goal,
+        context=context if context else "None provided.",
+        work_mode=work_mode,
+    ))])
+    raw = (response.content or "").strip()
+
+    # Parse numbered list
+    steps: list[str] = []
+    for line in raw.splitlines():
+        m = re.match(r"^\s*\d+[.)]\s+(.+)", line)
+        if m:
+            steps.append(m.group(1).strip())
+
+    if not steps:
+        # Fallback — treat each non-empty line as a step
+        steps = [l.strip() for l in raw.splitlines() if l.strip()]
+    if not steps:
+        steps = [f"Clarify or restate the goal: {goal}"]
+
+    memory.write_plan(workspace, goal, steps)
+    _reset_plan_execution_state(workspace, goal)
+    return Plan(goal=goal, steps=[Step(index=i, text=s) for i, s in enumerate(steps)])
+
+
+# ─── Render plan panel ────────────────────────────────────────────────────────
+
+def render(plan: Plan) -> Panel:
+    """Render the current plan as a Rich Panel."""
+    table = Table.grid(padding=(0, 1))
+    table.add_column(width=2)
+    table.add_column()
+
+    for step in plan.steps:
+        if step.done:
+            table.add_row("[green]✓[/green]", Text(step.text, style="dim strike"))
+        else:
+            table.add_row("[yellow]○[/yellow]", step.text)
+
+    pending = len(plan.pending)
+    done    = len(plan.completed)
+    footer  = f"[dim]{done}/{len(plan.steps)} steps done[/dim]"
+
+    from rich.console import Group
+    content = Group(
+        Text.from_markup(f"[bold]Goal:[/bold] {plan.goal}\n"),
+        table,
+        Text(""),
+        Text.from_markup(footer),
+    )
+
+    border = "green" if plan.is_done else "yellow"
+    title  = "[bold green]Plan complete ✓[/bold green]" if plan.is_done else "[bold yellow]Active Plan[/bold yellow]"
+    return Panel(content, title=title, border_style=border)
+
+
+def render_flow(plan: Plan, current_step: Step | None = None, blocked: int = 0) -> Panel:
+    """Render a compact task-flow panel for live execution updates."""
+    next_step = current_step.text if current_step else (plan.pending[0].text if plan.pending else "None")
+    total = len(plan.steps)
+    done = len(plan.completed)
+    doing = 1 if current_step else 0
+    planned = max(total - done - doing, 0)
+
+    stats = Table.grid(expand=True)
+    stats.add_column(justify="center")
+    stats.add_column(justify="center")
+    stats.add_column(justify="center")
+    stats.add_column(justify="center")
+    stats.add_row(
+        f"[cyan]Plan[/cyan]\n[bold]{planned}[/bold]",
+        f"[yellow]Doing[/yellow]\n[bold]{doing}[/bold]",
+        f"[green]Done[/green]\n[bold]{done}[/bold]",
+        f"[red]Blocked[/red]\n[bold]{blocked}[/bold]",
+    )
+
+    from rich.console import Group
+    content = Group(
+        stats,
+        Text(""),
+        Text.from_markup(f"[dim]Current:[/dim] {next_step}"),
+    )
+    return Panel(content, title="[bold cyan]Task Flow[/bold cyan]", border_style="cyan")
+
+
+def _reset_plan_execution_state(workspace: str, goal: str) -> None:
+    """Clear approval/progress metadata when a new plan replaces the old one."""
+    metadata = memory.ensure_session_metadata(workspace)
+    updated = {
+        **metadata,
+        "plan_execution": {
+            "goal": goal,
+            "approved": False,
+            "status": "draft",
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+        },
+    }
+    updated.pop("active_plan_step", None)
+    memory.save_session_metadata(workspace, updated)
+
+
+def approve_plan(workspace: str) -> str:
+    """Mark the current saved plan as approved for execution."""
+    plan = _parse_plan(workspace)
+    if plan is None:
+        return "No active plan. Use `/plan <goal>` to create one."
+    metadata = memory.ensure_session_metadata(workspace)
+    memory.save_session_metadata(
+        workspace,
+        {
+            **metadata,
+            "plan_execution": {
+                **dict(metadata.get("plan_execution") or {}),
+                "goal": plan.goal,
+                "approved": True,
+                "status": "approved",
+                "approved_at": datetime.now().isoformat(timespec="seconds"),
+            },
+        },
+    )
+    return f"Approved the active plan: {plan.goal}"
+
+
+def pause_plan(workspace: str) -> str:
+    """Mark active plan execution as paused without changing plan checkboxes."""
+    plan = _parse_plan(workspace)
+    if plan is None:
+        return "No active plan. Use `/plan <goal>` to create one."
+    metadata = memory.ensure_session_metadata(workspace)
+    active = dict(metadata.get("active_plan_step") or {})
+    if active:
+        active.update(
+            {
+                "status": "paused",
+                "paused_at": datetime.now().isoformat(timespec="seconds"),
+            }
+        )
+    memory.save_session_metadata(
+        workspace,
+        {
+            **metadata,
+            "plan_execution": {
+                **dict(metadata.get("plan_execution") or {}),
+                "goal": plan.goal,
+                "status": "paused",
+                "paused_at": datetime.now().isoformat(timespec="seconds"),
+            },
+            **({"active_plan_step": active} if active else {}),
+        },
+    )
+    return "Paused the active plan. Use `/plan next` to continue one step at a time."
+
+
+def is_plan_approved(workspace: str) -> bool:
+    """Return whether the current plan has been explicitly approved."""
+    plan = _parse_plan(workspace)
+    if plan is None:
+        return False
+    metadata = memory.ensure_session_metadata(workspace)
+    execution = metadata.get("plan_execution") or {}
+    return bool(execution.get("approved")) and execution.get("goal") == plan.goal
+
+
+def _set_active_step(workspace: str, plan: Plan, step: Step) -> None:
+    """Persist the currently executing plan step for resume/recovery UX."""
+    metadata = memory.ensure_session_metadata(workspace)
+    memory.save_session_metadata(
+        workspace,
+        {
+            **metadata,
+            "plan_execution": {
+                **dict(metadata.get("plan_execution") or {}),
+                "goal": plan.goal,
+                "approved": bool((metadata.get("plan_execution") or {}).get("approved")),
+                "status": "running",
+                "updated_at": datetime.now().isoformat(timespec="seconds"),
+            },
+            "active_plan_step": {
+                "goal": plan.goal,
+                "index": step.index,
+                "text": step.text,
+                "status": "running",
+                "started_at": datetime.now().isoformat(timespec="seconds"),
+            },
+        },
+    )
+
+
+def _finish_active_step(workspace: str, step: Step, status: str) -> None:
+    """Update the latest active-step checkpoint after a plan step finishes or blocks."""
+    metadata = memory.ensure_session_metadata(workspace)
+    active = dict(metadata.get("active_plan_step") or {})
+    if active.get("index") != step.index:
+        return
+    active.update(
+        {
+            "status": status,
+            "completed_at": datetime.now().isoformat(timespec="seconds"),
+        }
+    )
+    memory.save_session_metadata(
+        workspace,
+        {
+            **metadata,
+            "plan_execution": {
+                **dict(metadata.get("plan_execution") or {}),
+                "status": status,
+                "updated_at": datetime.now().isoformat(timespec="seconds"),
+            },
+            "active_plan_step": active,
+        },
+    )
+
+
+# ─── Step router ─────────────────────────────────────────────────────────────
+
+_ROUTER_PROMPT = """You are routing a single task step to the correct agent.
+
+Step: {step}
+Work mode: {work_mode}
+
+Reply with EXACTLY one word — the agent name — from this list:
+- filesystem  (create/write/delete/move files, install packages, git)
+- shell       (run scripts, tests, linters, servers)
+- reader      (read/search/analyse existing code without modifying)
+- direct      (the answer can be given directly without any tool)
+
+Reply with nothing else.
+"""
+
+
+def _route_step(llm, step_text: str, *, work_mode: str = "builder") -> str:
+    response = llm.invoke([HumanMessage(content=_ROUTER_PROMPT.format(step=step_text, work_mode=work_mode))])
+    word = (response.content or "").strip().lower().split()[0] if response.content else "direct"
+    return word if word in ("filesystem", "shell", "reader", "direct") else "direct"
+
+
+# ─── Execute one step ─────────────────────────────────────────────────────────
+
+def execute_step(
+    llm,
+    step: Step,
+    workspace: str,
+    console: Console | None = None,
+    codegen_llm=None,
+    reader_llm=None,
+    shell_llm=None,
+    direct_llm=None,
+    work_mode: str = "builder",
+) -> str:
+    """Route a single plan step to the right agent and return its summary."""
+    from app.agents import filesystem, shell as shell_agent, reader as reader_agent
+
+    try:
+        agent_name = _route_step(llm, step.text, work_mode=work_mode)
+    except TypeError:
+        agent_name = _route_step(llm, step.text)
+
+    if console:
+        console.print(
+            f"  [dim]Step {step.index + 1}: routing to [bold]{agent_name}[/bold] agent[/dim]"
+        )
+
+    if agent_name == "filesystem":
+        resp = filesystem.run(codegen_llm or llm, step.text, console=console)
+        return resp.summary
+
+    if agent_name == "shell":
+        from app.agents.shell import run_agent
+        return run_agent(shell_llm or llm, step.text, console=console)
+
+    if agent_name == "reader":
+        resp = reader_agent.run(reader_llm or llm, step.text, console=console)
+        return resp.summary
+
+    # direct — ask the LLM directly
+    response = (direct_llm or llm).invoke([HumanMessage(content=step.text)])
+    return (response.content or "").strip()
+
+
+# ─── Main plan runner ─────────────────────────────────────────────────────────
+
+def run_plan(
+    llm,
+    workspace: str,
+    console: Console | None = None,
+    max_steps: int | None = None,
+    codegen_llm=None,
+    reader_llm=None,
+    shell_llm=None,
+    direct_llm=None,
+    work_mode: str = "builder",
+) -> str:
+    """Execute all pending steps in the current plan. Returns a summary string."""
+    plan = _parse_plan(workspace)
+    if plan is None:
+        return "No active plan. Use /plan <goal> to create one."
+    if not plan.steps:
+        return "The active plan has no actionable steps yet. Regenerate it with /plan <goal>."
+
+    if plan.is_done:
+        return "All steps are already completed."
+
+    summaries: list[str] = []
+    steps_run = 0
+    workflow = workflows.WorkflowRun(
+        workspace,
+        "PlanWorkflow",
+        plan.goal,
+        limits=workflows.workflow_limits(max_iterations=max_steps),
+    )
+    halted_message: str | None = None
+
+    for step in plan.pending:
+        if max_steps and steps_run >= max_steps:
+            break
+
+        if console:
+            console.print(render_flow(plan, current_step=step))
+            console.print(
+                Panel(
+                    f"[bold]{step.text}[/bold]",
+                    title=f"[bold yellow]Step {step.index + 1} of {len(plan.steps)}[/bold yellow]",
+                    border_style="yellow",
+                )
+            )
+
+        try:
+            workflow.start_step(step.text)
+        except workflows.WorkflowLimitError as exc:
+            halted_message = str(exc)
+            break
+
+        _set_active_step(workspace, plan, step)
+        try:
+            result = execute_step(
+                llm,
+                step,
+                workspace,
+                console=console,
+                codegen_llm=codegen_llm,
+                reader_llm=reader_llm,
+                shell_llm=shell_llm,
+                direct_llm=direct_llm,
+                work_mode=work_mode,
+            )
+        except (Exception, KeyboardInterrupt):
+            _finish_active_step(workspace, step, "interrupted")
+            raise
+        summaries.append(f"Step {step.index + 1} ({step.text}): {result[:300]}")
+        memory.mark_step_done(workspace, step.index)
+        _finish_active_step(workspace, step, "completed")
+        steps_run += 1
+        try:
+            workflow.finish_step(
+                step.text,
+                detail=result[:300],
+                change_set=memory.load_last_change_set(workspace),
+            )
+        except workflows.WorkflowLimitError as exc:
+            halted_message = str(exc)
+            if console:
+                console.print(f"  [red]{halted_message}[/red]\n")
+            break
+
+        if console:
+            console.print(f"  [green]✓ Step {step.index + 1} done[/green]\n")
+
+    # Reload to get updated plan
+    updated_plan = _parse_plan(workspace)
+    if console and updated_plan:
+        console.print(render(updated_plan))
+
+    remaining = len(updated_plan.pending) if updated_plan else 0
+    done_count = steps_run
+    metadata = memory.ensure_session_metadata(workspace)
+    execution = dict(metadata.get("plan_execution") or {})
+    if updated_plan:
+        execution.update(
+            {
+                "goal": updated_plan.goal,
+                "approved": bool(execution.get("approved")),
+                "status": "completed" if updated_plan.is_done else "approved",
+                "updated_at": datetime.now().isoformat(timespec="seconds"),
+            }
+        )
+        memory.save_session_metadata(
+            workspace,
+            {
+                **metadata,
+                "plan_execution": execution,
+            },
+        )
+
+    if halted_message:
+        summary = (
+            f"Executed {done_count} step(s). "
+            f"{remaining} step(s) remaining.\n\n"
+            f"{halted_message}\n\n"
+            + "\n".join(summaries)
+        )
+        return summary
+
+    if updated_plan and updated_plan.is_done:
+        workflow.complete("PlanWorkflow finished all pending approved steps.")
+    elif steps_run > 0:
+        workflow.pause("operator_step_limit")
+
+    summary = (
+        f"Executed {done_count} step(s). "
+        f"{remaining} step(s) remaining.\n\n"
+        + "\n".join(summaries)
+    )
+    return summary
+
+
+# ─── Routing tool (for main LLM) ─────────────────────────────────────────────
+
+def make_routing_tool(
+    llm,
+    workspace: str,
+    console: Console | None = None,
+    codegen_llm=None,
+    reader_llm=None,
+    shell_llm=None,
+    direct_llm=None,
+    work_mode: str = "builder",
+):
+    """Return a LangChain tool the main LLM can call to continue the active plan."""
+    @tool
+    def execute_plan(request: str) -> str:
+        """
+        Execute the next step(s) of the active project plan.
+        Use when the user asks to continue, proceed, execute the plan,
+        or work on the next task. Pass the full user request unchanged.
+        """
+        return run_plan(
+            llm,
+            workspace,
+            console=console,
+            max_steps=1,
+            codegen_llm=codegen_llm,
+            reader_llm=reader_llm,
+            shell_llm=shell_llm,
+            direct_llm=direct_llm,
+            work_mode=work_mode,
+        )
+    return execute_plan

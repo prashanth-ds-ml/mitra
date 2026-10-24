@@ -1,0 +1,241 @@
+"""Tests for app/agents/reader.py — code reader tools."""
+import pathlib
+import zipfile
+import pytest
+from app.agents import reader as reader_agent
+
+
+@pytest.fixture(autouse=True)
+def reset_workspace(tmp_path):
+    reader_agent.configure(workspace=str(tmp_path))
+    yield
+    reader_agent.configure(workspace=None)
+
+
+# ── get_file_tree ─────────────────────────────────────────────────────────────
+
+class TestGetFileTree:
+    def test_shows_files(self, tmp_path):
+        (tmp_path / "main.py").write_text("x = 1")
+        (tmp_path / "utils.py").write_text("y = 2")
+        result = reader_agent.get_file_tree.invoke({"path": str(tmp_path)})
+        assert "main.py" in result
+        assert "utils.py" in result
+
+    def test_shows_subdirectory(self, tmp_path):
+        sub = tmp_path / "src"
+        sub.mkdir()
+        (sub / "app.py").write_text("")
+        result = reader_agent.get_file_tree.invoke({"path": str(tmp_path)})
+        assert "src" in result
+
+    def test_ignores_venv(self, tmp_path):
+        venv = tmp_path / ".venv"
+        venv.mkdir()
+        (venv / "pip.py").write_text("")
+        result = reader_agent.get_file_tree.invoke({"path": str(tmp_path)})
+        assert ".venv" not in result
+
+    def test_ignores_pycache(self, tmp_path):
+        cache = tmp_path / "__pycache__"
+        cache.mkdir()
+        (cache / "foo.pyc").write_text("")
+        result = reader_agent.get_file_tree.invoke({"path": str(tmp_path)})
+        assert "__pycache__" not in result
+
+    def test_nonexistent_path(self, tmp_path):
+        result = reader_agent.get_file_tree.invoke({"path": str(tmp_path / "nope")})
+        assert "✗" in result
+
+    def test_path_outside_workspace_denied(self, tmp_path):
+        result = reader_agent.get_file_tree.invoke({"path": "C:\\Windows"})
+        assert "Permission denied" in result or "✗" in result
+
+    def test_broken_entry_does_not_crash_tree(self, tmp_path, monkeypatch):
+        target = tmp_path / "ghost.txt"
+        target.write_text("x")
+        original_stat = pathlib.Path.stat
+
+        def flaky_stat(path_obj, *args, **kwargs):
+            if path_obj == target:
+                raise FileNotFoundError("broken junction target")
+            return original_stat(path_obj, *args, **kwargs)
+
+        monkeypatch.setattr(pathlib.Path, "stat", flaky_stat)
+        result = reader_agent.get_file_tree.invoke({"path": str(tmp_path)})
+        assert "ghost.txt" in result
+        assert "unavailable" in result
+
+
+# ── read_file ─────────────────────────────────────────────────────────────────
+
+class TestReadFile:
+    def test_reads_content(self, tmp_path):
+        p = tmp_path / "hello.py"
+        p.write_text("print('hello')")
+        result = reader_agent.read_file.invoke({"path": str(p)})
+        assert "print('hello')" in result
+
+    def test_includes_line_numbers(self, tmp_path):
+        p = tmp_path / "multi.py"
+        p.write_text("a = 1\nb = 2\nc = 3")
+        result = reader_agent.read_file.invoke({"path": str(p)})
+        assert "1 │" in result
+        assert "3 │" in result
+
+    def test_respects_line_range(self, tmp_path):
+        p = tmp_path / "long.py"
+        p.write_text("\n".join(f"line_{i}" for i in range(100)))
+        result = reader_agent.read_file.invoke({"path": str(p), "start_line": 5, "end_line": 10})
+        assert "line_4" in result   # 1-based → index 4
+        assert "line_9" in result
+        assert "line_0" not in result
+
+    def test_missing_file(self, tmp_path):
+        result = reader_agent.read_file.invoke({"path": str(tmp_path / "missing.py")})
+        assert "✗" in result
+
+    def test_outside_workspace_denied(self, tmp_path):
+        result = reader_agent.read_file.invoke({"path": "/etc/passwd"})
+        assert "Permission denied" in result or "✗" in result
+
+    def test_allowed_root_can_be_read(self, tmp_path):
+        extra = tmp_path.parent / "shared-reader"
+        extra.mkdir(exist_ok=True)
+        target = extra / "notes.txt"
+        target.write_text("hello", encoding="utf-8")
+        reader_agent.configure(workspace=str(tmp_path), allowed_roots=[str(extra)])
+        result = reader_agent.read_file.invoke({"path": str(target)})
+        assert "hello" in result
+
+
+# ── read_document ────────────────────────────────────────────────────────────
+
+class TestReadDocument:
+    def _make_docx(self, path: pathlib.Path, text: str) -> None:
+        xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>{text}</w:t></w:r></w:p>
+  </w:body>
+</w:document>
+"""
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("[Content_Types].xml", "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"></Types>")
+            archive.writestr("word/document.xml", xml)
+
+    def test_reads_docx_text(self, tmp_path):
+        target = tmp_path / "notes.docx"
+        self._make_docx(target, "Hello from DOCX")
+        result = reader_agent.read_document.invoke({"path": str(target)})
+        assert "Hello from DOCX" in result
+
+    def test_reads_pdf_text_best_effort(self, tmp_path):
+        target = tmp_path / "notes.pdf"
+        target.write_bytes(
+            b"%PDF-1.4\n"
+            b"1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n"
+            b"2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj\n"
+            b"3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >>endobj\n"
+            b"4 0 obj<< /Length 40 >>stream\nBT\n/F1 12 Tf\n(Hello PDF) Tj\nET\nendstream\nendobj\n"
+        )
+        result = reader_agent.read_document.invoke({"path": str(target)})
+        assert "Hello PDF" in result
+
+    def test_reads_image_metadata(self, tmp_path):
+        from PIL import Image
+
+        target = tmp_path / "cover.png"
+        Image.new("RGB", (32, 16), color="white").save(target)
+        result = reader_agent.read_document.invoke({"path": str(target)})
+        assert "Format" in result
+        assert "32 x 16" in result
+
+
+# ── search_in_files ───────────────────────────────────────────────────────────
+
+class TestSearchInFiles:
+    def test_finds_pattern(self, tmp_path):
+        (tmp_path / "a.py").write_text("def hello():\n    pass\n")
+        (tmp_path / "b.py").write_text("x = 1\n")
+        result = reader_agent.search_in_files.invoke({
+            "pattern": "def hello",
+            "path": str(tmp_path),
+            "file_glob": "*.py",
+        })
+        assert "a.py" in result
+        assert "def hello" in result.lower()
+
+    def test_no_matches_returns_friendly_message(self, tmp_path):
+        (tmp_path / "a.py").write_text("x = 1\n")
+        result = reader_agent.search_in_files.invoke({
+            "pattern": "NEVEREXISTS_XYZ",
+            "path": str(tmp_path),
+        })
+        assert "No matches" in result
+
+    def test_case_insensitive_by_default(self, tmp_path):
+        (tmp_path / "a.py").write_text("class FooBar:\n    pass\n")
+        result = reader_agent.search_in_files.invoke({
+            "pattern": "foobar",
+            "path": str(tmp_path),
+        })
+        assert "FooBar" in result
+
+    def test_invalid_regex_returns_error(self, tmp_path):
+        result = reader_agent.search_in_files.invoke({
+            "pattern": "[invalid((",
+            "path": str(tmp_path),
+        })
+        assert "✗" in result
+
+
+# ── find_definition ───────────────────────────────────────────────────────────
+
+class TestFindDefinition:
+    def test_finds_function(self, tmp_path):
+        (tmp_path / "utils.py").write_text("def compute(x):\n    return x * 2\n")
+        result = reader_agent.find_definition.invoke({
+            "name": "compute",
+            "path": str(tmp_path),
+        })
+        assert "utils.py" in result
+        assert "def compute" in result
+
+    def test_finds_class(self, tmp_path):
+        (tmp_path / "models.py").write_text("class Snake:\n    pass\n")
+        result = reader_agent.find_definition.invoke({
+            "name": "Snake",
+            "path": str(tmp_path),
+        })
+        assert "models.py" in result
+
+    def test_not_found_message(self, tmp_path):
+        (tmp_path / "a.py").write_text("x = 1\n")
+        result = reader_agent.find_definition.invoke({
+            "name": "NonExistentFn",
+            "path": str(tmp_path),
+        })
+        assert "No definition found" in result
+
+
+# ── grep_symbol ───────────────────────────────────────────────────────────────
+
+class TestGrepSymbol:
+    def test_finds_usages(self, tmp_path):
+        (tmp_path / "main.py").write_text("from utils import helper\nhelper()\n")
+        (tmp_path / "utils.py").write_text("def helper():\n    pass\n")
+        result = reader_agent.grep_symbol.invoke({
+            "symbol": "helper",
+            "path": str(tmp_path),
+        })
+        assert "main.py" in result
+        assert "utils.py" in result
+
+    def test_not_found_message(self, tmp_path):
+        (tmp_path / "a.py").write_text("x = 1\n")
+        result = reader_agent.grep_symbol.invoke({
+            "symbol": "completely_missing_xyz",
+            "path": str(tmp_path),
+        })
+        assert "No usages" in result

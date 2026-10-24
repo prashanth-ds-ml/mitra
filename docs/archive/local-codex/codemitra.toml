@@ -1,0 +1,18 @@
+model = ""                   # legacy fallback; prefer local_model
+local_model = "qwen3.5:latest"
+codegen_model = "qwen2.5-coder:14b"
+temperature = 0.2
+session_mode = "approve"
+show_reasoning = false
+memory_enabled = false
+require_diff_approval = true
+auto_compact_threshold = 120000
+num_ctx = 131072
+ollama_local_base_url = "http://localhost:11434"
+ollama_cloud_base_url = "https://ollama.com"
+allowed_roots = []
+disabled_tools = []
+disabled_commands = []
+policy_path = ""              # path to custom policy.yaml (empty = built-in default)
+instruction_files = ["AGENTS.md", ".codemitra/instructions.md", ".github/copilot-instructions.md"]
+skill_dirs = ["skills", ".codemitra/skills"]

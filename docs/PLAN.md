@@ -7,15 +7,15 @@ Every milestone ends with the "Every release" list at the bottom (public release
 **Rule for new ideas (D-011):** a new idea goes into "Ideas to test" in SCOPE.md, never straight into this plan. It
 becomes a milestone only after its impact score is agreed.
 
-**Progress:** Before starting 2/4 · Phase 1 0/5 · Phase 2 0/4 · Phase 3 0/3
+**Progress:** Before starting 4/4 · Phase 1 0/5 · Phase 2 0/4 · Phase 3 0/3
 
 ---
 
 ## Before starting
 - [x] Name decided: Mitra (D-006) (2026-10-24)
 - [x] Repo decided: new repo `prashanth-ds-ml/mitra`, local folder `portfolio/05-mitra` (D-007) (2026-10-24)
-- [ ] GPU, VRAM and power cap written in STATUS.md
-- [ ] "Go on M0" given
+- [x] GPU, VRAM and power cap written in STATUS.md (2026-10-24)
+- [x] "Go on M0" given (2026-10-24)
 
 ---
 
@@ -24,9 +24,9 @@ The one question: how much everyday coding work can a small local model do with 
 test-gated escalation to a frontier model cut cost without hurting the success rate?
 
 ## M0 Repo + measure the problem
-- [ ] Public repo created under prashanth-ds-ml, MIT licence, local-codex code imported with credit
-- [ ] local-codex test suite runs green in the root `.venv` (`uv pip`)
-- [ ] README v0: pitch, "building in public", link to this checklist, empty results table
+- [x] Public repo created under prashanth-ds-ml, MIT licence, local-codex code imported with credit (2026-10-24)
+- [x] local-codex test suite runs green in the root `.venv` (`uv pip`): 561 passed (2026-10-24)
+- [x] README v0: pitch, "building in public", link to this checklist, empty results table (2026-10-24)
 - [ ] CI on every push (tests + lint), secret scan, `.gitignore` checked
 - [ ] GitHub milestones M0-M8 and issues mirror this checklist
 - [ ] Demo service built: small FastAPI app on a fake payments SDK (paise ints, Result type, cursors, idempotency keys, rate limits, a deprecated method)
