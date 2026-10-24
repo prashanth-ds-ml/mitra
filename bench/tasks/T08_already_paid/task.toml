@@ -1,0 +1,15 @@
+id = "T08"
+title = "Paying a paid order returns 200"
+kind = "bug"
+split = "heldout"
+prompt = """
+Calling POST /orders/{id}/pay on an order that is already paid returns 200 again. It should return 409 with
+code "already_paid" and must not contact the payment provider.
+"""
+
+[[break]]
+file = "shop/payments.py"
+old = """    if order.status == "paid":
+        raise AlreadyPaid(order.id)
+"""
+new = ""

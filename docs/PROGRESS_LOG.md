@@ -10,6 +10,7 @@ decisions to [DECISIONS.md](DECISIONS.md).
 |---|---|---|---|
 | 2026-10-24 | Planning | local-codex reviewed (E-001..E-003); deepseek-harness, Harness², Uber Debug Assist, Deep Agents, bigtool studied; research on local-model support in coding agents; scope, checklist and impact scoring agreed (D-001..D-012); repo set up with docs only | - |
 | 2026-10-24 | M0 | Public repo created and pushed; local-codex (dd93fa6) imported, its docs archived; 561 tests pass in the shared venv; lint gate (undefined names) found and fixed E-004; CI added (Linux + Windows tests, gitleaks) | - |
+| 2026-10-24 | M0 | Benchmark v0: fake payments SDK + FastAPI shop, 10 tasks (5 tune / 5 held-out), visible + hidden tests, tamper check; all 10 validated; 17 harness tests | - |
 
 ## Scoreboard
 

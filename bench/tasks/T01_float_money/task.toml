@@ -1,0 +1,13 @@
+id = "T01"
+title = "Order totals off by a paisa"
+kind = "bug"
+split = "tune"
+prompt = """
+Customers report wrong totals: an order of 3 items at "0.29" each shows a total of "0.84" instead of "0.87".
+Amounts must be exact. Fix it.
+"""
+
+[[break]]
+file = "shop/app.py"
+old = """        return Money.from_rupees(value, currency)"""
+new = """        return Money(int(float(value) * 100), currency)"""

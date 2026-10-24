@@ -1,0 +1,24 @@
+id = "T06"
+title = "Add an endpoint listing an order's refunds"
+kind = "feature"
+split = "heldout"
+prompt = """
+Support needs to see refunds for an order. Add GET /orders/{order_id}/refunds returning
+{"total_refunded": "<rupees>", "refunds": [{"refund_id": "...", "amount": "<rupees>"}, ...]}.
+Unknown orders return 404 like the other order endpoints. An order that was never paid returns
+total "0.00" and an empty list.
+"""
+
+[[break]]
+file = "shop/app.py"
+old = """    @app.get("/orders/{order_id}/refunds")
+    def list_refunds(order_id: str):
+        order = get_order(order_id)
+        refunds = app.state.client.refunds.list_for_charge(order.charge_id) if order.charge_id else []
+        return {
+            "total_refunded": payments.refunded_total(app.state.client, order).rupees(),
+            "refunds": [{"refund_id": r.id, "amount": r.amount.rupees()} for r in refunds],
+        }
+
+"""
+new = ""

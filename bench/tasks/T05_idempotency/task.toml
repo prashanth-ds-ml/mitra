@@ -1,0 +1,17 @@
+id = "T05"
+title = "Duplicate charges after a lost response"
+kind = "bug"
+split = "tune"
+prompt = """
+We found duplicate charges. When the payment provider processes a charge but the response is lost (we get a
+rate-limit error), our retry charges the customer again. A customer must never be charged twice for one order.
+"""
+
+[[break]]
+file = "shop/payments.py"
+old = """    key = f"order-{order.id}"
+    for attempt in range(MAX_RETRIES + 1):
+        try:"""
+new = """    for attempt in range(MAX_RETRIES + 1):
+        key = f"order-{order.id}-attempt-{attempt}"
+        try:"""

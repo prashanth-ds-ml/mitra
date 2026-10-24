@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-005 | 2026-10-24 | M0 | Medium | CI (Linux) | local-codex is Windows-only: 8 tests fail on Linux (backslash paths, PowerShell commands, skill paths) | open (fix in M1); Linux CI non-blocking | - |
 | E-004 | 2026-10-24 | M0 | Medium | lint (F821) on import | Model-advisor command crashes after finishing: stray copy of brainstorm code with undefined `raw`, `llm` | closed | F-001 |
 | E-003 | 2026-10-24 | review | Medium | local-codex review | Shell allowlist checks only the program name; path checks pass when no workspace is set | open (fix in M1) | - |
 | E-002 | 2026-10-24 | review | Medium | local-codex review | Agent loops run `while True` with no step limit | open (fix in M1) | - |
@@ -30,6 +31,18 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-005: local-codex is Windows-only
+
+- **Date found:** 2026-10-24 · **Milestone:** M0 · **Severity:** Medium · **Found by:** first CI run on Linux · **Status:** open (fix in M1)
+
+**What happened:** 553 passed, 8 failed on ubuntu-latest (all pass on Windows): skill bodies not found
+(`Could not read skills\05-rag-pipeline\SKILL.md`), run hints mix `\` and `/`, intent routing returns Windows paths
+(`tests/test_main_ux.py`, `tests/test_skills.py`).
+**Root cause:** paths built and stored as Windows strings; PowerShell assumed for run commands.
+**Fix:** - (M1 rewrite uses `pathlib` relative paths and POSIX-safe commands). Until then the Linux CI job is non-blocking.
+**Regression test:** the Linux CI job becomes blocking again when fixed.
+**Lesson?** L-019.
 
 ### E-004: Model-advisor command crashes after finishing
 

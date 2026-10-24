@@ -1,0 +1,24 @@
+id = "T09"
+title = "Reject orders over ₹1,00,000"
+kind = "feature"
+split = "tune"
+prompt = """
+The payment provider declines charges above ₹1,00,000, so customers only find out at payment time.
+Reject such orders when they are created: POST /orders returns 422 with code "order_too_large" when the
+total is above ₹1,00,000 (exactly ₹1,00,000 is allowed), and the order is not saved.
+"""
+
+[[break]]
+file = "shop/app.py"
+old = """        if total.paise > MAX_ORDER_PAISE:
+            del app.state.store.orders[order.id]
+            raise HTTPException(422, {"code": "order_too_large"})
+"""
+new = ""
+
+[[break]]
+file = "shop/app.py"
+old = """
+MAX_ORDER_PAISE = 10_000_000  # ₹1,00,000
+"""
+new = ""

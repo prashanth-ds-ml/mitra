@@ -1,0 +1,36 @@
+id = "T04"
+title = "Pay fails immediately when rate limited"
+kind = "bug"
+split = "heldout"
+prompt = """
+When the payment provider rate-limits us, POST /orders/{id}/pay fails with 503 straight away.
+Follow the SDK guidance: retry up to 3 times (4 attempts in total), waiting `retry_after` seconds between
+attempts, and only return 503 if every attempt is rate limited.
+"""
+
+[[break]]
+file = "shop/payments.py"
+old = """    key = f"order-{order.id}"
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            result = client.charges.create(order_total(order), idempotency_key=key, description=f"order {order.id}")
+        except RateLimited as err:
+            if attempt == MAX_RETRIES:
+                raise
+            sleep(err.retry_after)
+            continue
+        if not result.ok:
+            raise PaymentFailed(result.error)
+        charge = result.value
+        order.status = "paid"
+        order.charge_id = charge.id
+        return charge
+    raise AssertionError("unreachable")"""
+new = """    key = f"order-{order.id}"
+    result = client.charges.create(order_total(order), idempotency_key=key, description=f"order {order.id}")
+    if not result.ok:
+        raise PaymentFailed(result.error)
+    charge = result.value
+    order.status = "paid"
+    order.charge_id = charge.id
+    return charge"""

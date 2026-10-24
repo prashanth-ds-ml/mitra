@@ -24,6 +24,7 @@ local-codex review and this project's planning. Add a lesson whenever an error c
 | L-016 | Planning | An idea is not a decision. New ideas go to "Ideas to test"; never record one as agreed without the user saying so | 05 planning, D-008 |
 | L-017 | Tooling | Long nested heredocs fail in the Bash tool; use Write/Edit. Never print `.env` unfiltered | Project 04 |
 | L-018 | Lint | Gate CI on syntax errors and undefined names (`ruff` E9/F63/F7/F82) from day 1; it finds crashes no test covers | E-004 |
+| L-019 | Portability | Build paths with `pathlib`, store them relative with `/`, never assume PowerShell; run CI on Linux and Windows from the first commit | E-005 |
 
 ## Template
 `| L-0nn | <area> | <the rule, one or two lines, written as an instruction> | <E-nnn / F-nnn / source> |`

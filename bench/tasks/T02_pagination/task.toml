@@ -1,0 +1,16 @@
+id = "T02"
+title = "Charge list stops at 100"
+kind = "bug"
+split = "heldout"
+prompt = """
+GET /charges reports only 100 charges even though there are more. Finance needs every charge in the list.
+"""
+
+[[break]]
+file = "shop/payments.py"
+old = """        charges.extend(page.items)
+        if page.next_cursor is None:
+            return charges
+        cursor = page.next_cursor"""
+new = """        charges.extend(page.items)
+        return charges"""

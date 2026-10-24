@@ -27,12 +27,12 @@ test-gated escalation to a frontier model cut cost without hurting the success r
 - [x] Public repo created under prashanth-ds-ml, MIT licence, local-codex code imported with credit (2026-10-24)
 - [x] local-codex test suite runs green in the root `.venv` (`uv pip`): 561 passed (2026-10-24)
 - [x] README v0: pitch, "building in public", link to this checklist, empty results table (2026-10-24)
-- [ ] CI on every push (tests + lint), secret scan, `.gitignore` checked
-- [ ] GitHub milestones M0-M8 and issues mirror this checklist
-- [ ] Demo service built: small FastAPI app on a fake payments SDK (paise ints, Result type, cursors, idempotency keys, rate limits, a deprecated method)
-- [ ] Benchmark v0: 10 tasks (planted bugs + small features), visible and hidden tests, test files hashed
-- [ ] Reference solutions pass every task; the unsolved repo fails every task
-- [ ] Benchmark split into a tuning half and a held-out half, fixed before any tuning (I-2, Harness²)
+- [x] CI on every push (tests + lint), secret scan, `.gitignore` checked; Windows blocking, Linux informational until E-005 (2026-10-24)
+- [x] GitHub milestones M0-M8 and tracking issues (checklist stays in this file) (2026-10-24)
+- [x] Demo service built: small FastAPI app on a fake payments SDK (paise ints, Result type, cursors, idempotency keys, rate limits, a deprecated method) (2026-10-24)
+- [x] Benchmark v0: 10 tasks (7 bugs, 3 features), visible and hidden tests, test files hashed (2026-10-24)
+- [x] Reference solutions pass every task; the unsolved repo fails every task (`bench.py validate`, 17 harness tests) (2026-10-24)
+- [x] Benchmark split into a tuning half and a held-out half, fixed before any tuning (I-2, Harness²): 5 + 5, no shared fix across halves (2026-10-24)
 - [ ] Bench preflight: Ollama up, model pulled, context length set, free RAM/GPU checked; refuses to run otherwise (Harness² `preflight`)
 - [ ] Run records: each run saves its trajectory (JSONL), result and a config fingerprint (agent version, model tag, prompt hash); a run counts only when the runner marks it complete; reruns skip completed runs (Harness² `runmark`)
 - [ ] Infra failures (dead Ollama, auth, crash, wall timeout) recorded separately from agent failures, never scored as a zero
@@ -56,6 +56,7 @@ test-gated escalation to a frontier model cut cost without hurting the success r
 - [ ] Step limit and repeat-call guard with a reminder at 3 repeats, stop at the limit (dsh `repeat-tool-reminder`; fixes E-002)
 - [ ] Fix E-001: `edit_file` added to mutating tools; test covers every tool in the set
 - [ ] Fix E-003: commands and edits confined to the task workspace; path checks fail closed
+- [ ] Fix E-005: paths via `pathlib` and stored relative with `/`; no PowerShell assumptions; Linux CI job blocking again
 - [ ] Tests run in a temp copy with a timeout; full output saved to a file, model sees head/tail + the path (dsh `spill-policy`)
 - [ ] Stable prompt prefix, append-only history inside a round, so Ollama reuses its prompt cache; prompt-eval time logged (dsh "KV cache effect")
 - [ ] Prompt tokens and context use logged on every call; warning before the context limit (L-001)

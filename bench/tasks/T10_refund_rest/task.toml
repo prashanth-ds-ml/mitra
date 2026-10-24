@@ -1,0 +1,32 @@
+id = "T10"
+title = "Refund the rest of an order"
+kind = "feature"
+split = "heldout"
+prompt = """
+Add "refund the rest": POST /orders/{id}/refunds with no "amount" in the body refunds everything that has
+not been refunded yet. If nothing is left to refund, return 409 with code "refund_exceeds_charge".
+Requests that include an amount keep working as today.
+"""
+
+[[break]]
+file = "shop/app.py"
+old = """    amount: str | None = None  # None refunds everything not yet refunded"""
+new = """    amount: str"""
+
+[[break]]
+file = "shop/app.py"
+old = """        amount = _parse_rupees(body.amount, order.currency) if body.amount is not None else None"""
+new = """        amount = _parse_rupees(body.amount, order.currency)"""
+
+[[break]]
+file = "shop/payments.py"
+old = """def refund_order(client: PaymentsClient, order: Order, amount: Money | None = None) -> Refund:
+    \"\"\"Refund `amount`, or everything not yet refunded when `amount` is None.\"\"\"
+    if amount is None:
+        amount = order_total(order) - refunded_total(client, order)
+        if amount.paise <= 0:
+            raise RefundRejected(RefundTooLarge("nothing left to refund"))
+"""
+new = """def refund_order(client: PaymentsClient, order: Order, amount: Money) -> Refund:
+    \"\"\"Refund `amount`.\"\"\"
+"""

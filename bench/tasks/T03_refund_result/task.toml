@@ -1,0 +1,17 @@
+id = "T03"
+title = "Over-refund crashes with 500"
+kind = "bug"
+split = "tune"
+prompt = """
+Refunding more than was paid crashes with a 500 error. It should be rejected with HTTP 409 and the
+SDK's error code in the response detail.
+"""
+
+[[break]]
+file = "shop/payments.py"
+old = """    result = client.refunds.create(order.charge_id, amount)
+    if not result.ok:
+        raise RefundRejected(result.error)
+    return result.value"""
+new = """    result = client.refunds.create(order.charge_id, amount)
+    return result.value"""

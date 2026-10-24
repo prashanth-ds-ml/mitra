@@ -1,0 +1,19 @@
+id = "T07"
+title = "Mixed-currency order crashes with 500"
+kind = "bug"
+split = "tune"
+prompt = """
+Creating an order whose items are in different currencies returns a 500 error. It should return 422 with
+code "currency_mismatch", and the bad order must not be saved.
+"""
+
+[[break]]
+file = "shop/app.py"
+old = """        try:
+            total = payments.order_total(order)
+        except CurrencyMismatch as exc:
+            del app.state.store.orders[order.id]
+            raise HTTPException(422, {"code": "currency_mismatch", "message": str(exc)}) from exc
+"""
+new = """        total = payments.order_total(order)
+"""
