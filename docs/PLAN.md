@@ -33,9 +33,9 @@ test-gated escalation to a frontier model cut cost without hurting the success r
 - [x] Benchmark v0: 10 tasks (7 bugs, 3 features), visible and hidden tests, test files hashed (2026-10-24)
 - [x] Reference solutions pass every task; the unsolved repo fails every task (`bench.py validate`, 17 harness tests) (2026-10-24)
 - [x] Benchmark split into a tuning half and a held-out half, fixed before any tuning (I-2, Harness²): 5 + 5, no shared fix across halves (2026-10-24)
-- [ ] Bench preflight: Ollama up, model pulled, context length set, free RAM/GPU checked; refuses to run otherwise (Harness² `preflight`)
-- [ ] Run records: each run saves its trajectory (JSONL), result and a config fingerprint (agent version, model tag, prompt hash); a run counts only when the runner marks it complete; reruns skip completed runs (Harness² `runmark`)
-- [ ] Infra failures (dead Ollama, auth, crash, wall timeout) recorded separately from agent failures, never scored as a zero
+- [x] Bench preflight: Ollama up, model pulled, context length set, free RAM/GPU checked; refuses to run otherwise (Harness² `preflight`) (`bench/preflight.py`, 2026-10-24)
+- [x] Run records: each run saves its trajectory (JSONL), result and a config fingerprint (agent version, model tag, prompt hash); a run counts only when the runner marks it complete; reruns skip completed runs (Harness² `runmark`) (`bench/run.py` + `bench/proxy.py`, 2026-10-24)
+- [x] Infra failures (dead Ollama, auth, crash, wall timeout) recorded separately from agent failures, never scored as a zero (2026-10-24)
 - [ ] Prompt overhead measured for each stock agent (Claude Code via Ollama, Codex `--oss`, Aider, deepagents-cli)
 - [ ] Ollama context set correctly for each (`OLLAMA_CONTEXT_LENGTH`); configs saved in `bench/configs/`
 - [ ] Baseline runs: stock agents × qwen 4B and 8B on benchmark v0; raw results in `results/`

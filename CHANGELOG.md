@@ -8,3 +8,4 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 - CI: tests on Linux and Windows, lint gate for syntax errors and undefined names, gitleaks secret scan.
 - Fixed: model-advisor command crashed after finishing (E-004).
 - Benchmark v0: fake payments SDK, demo shop service, 10 validated tasks with hidden tests (`bench/bench.py`).
+- Bench tooling: logging proxy, preflight, run recorder with completion markers (`bench/proxy.py`, `bench/preflight.py`, `bench/run.py`).
