@@ -1,0 +1,10 @@
+# Stock LangChain deepagents-code (`dcode`, successor of the deprecated deepagents-cli) on Ollama via
+# langchain-ollama, which reads OLLAMA_HOST (pointed at the bench proxy). Non-interactive mode, shell allowed
+# so it can run the tests like the other agents; no MCP, no LangSmith tracing.
+name = "deepagents-code"
+version_cmd = ["dcode", "--version"]
+timeout_s = 900
+cmd = ["dcode", "-n", "{prompt}", "-M", "ollama:{model}", "-S", "all", "--no-mcp", "--no-tracing", "-q"]
+
+[env]
+OLLAMA_HOST = "{proxy}"

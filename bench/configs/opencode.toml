@@ -1,0 +1,12 @@
+# Stock OpenCode on Ollama with the provider block from docs.ollama.com/integrations/opencode,
+# passed inline and pointed at the bench proxy. --pure skips external plugins; XDG dirs isolate user config.
+name = "opencode"
+version_cmd = ["opencode", "--version"]
+timeout_s = 900
+cmd = ["opencode", "run", "--pure", "-m", "ollama/{model}", "--format", "json", "{prompt}"]
+
+[env]
+OPENCODE_CONFIG_CONTENT = '{"$schema":"https://opencode.ai/config.json","permission":{"edit":"allow","bash":"allow","webfetch":"deny"},"provider":{"ollama":{"npm":"@ai-sdk/openai-compatible","name":"Ollama","options":{"baseURL":"{proxy}/v1"},"models":{"{model}":{"name":"{model}"}}}}}'
+XDG_CONFIG_HOME = "{home}/config"
+XDG_DATA_HOME = "{home}/data"
+XDG_STATE_HOME = "{home}/state"

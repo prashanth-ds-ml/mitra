@@ -27,6 +27,9 @@ FAKE_AGENT = textwrap.dedent(
         req = urllib.request.Request(proxy + "/api/chat", data=json.dumps(
             {"model": "m", "messages": [{"role": "user", "content": "x"}], "tools": [{"name": "edit"}]}).encode())
         urllib.request.urlopen(req, timeout=10).read()
+    if mode == "which":
+        import os, shutil
+        open("which_python.txt", "w").write(os.path.realpath(shutil.which("python")))
     if mode == "solve":
         for name in ("shop", "paysdk"):
             shutil.copytree(f"{base}/{name}", name, dirs_exist_ok=True)
@@ -135,6 +138,15 @@ def test_hang_is_timeout_and_children_are_killed(tmp_path, ollama, monkeypatch):
     result = run.run_one(_agent(tmp_path, "hang", timeout_s=5), _task(), "m:1", 1, ollama, {}, out_root=tmp_path / "runs")
     assert result["outcome"] == "timeout"
     assert not run.psutil.pid_exists(seen["pid"]) or run.psutil.Process(seen["pid"]).status() == "zombie"
+
+
+def test_agent_python_is_the_grader_python(tmp_path, ollama):
+    out = tmp_path / "runs"
+    run.run_one(_agent(tmp_path, "which"), _task(), "m:1", 1, ollama, {}, out_root=out)
+    patch = (out / "fake-which" / "m_1" / "T08" / "r1" / "diff.patch").read_text(encoding="utf-8")
+    assert "which_python.txt" in patch
+    expected = Path(sys.executable).resolve().parent.as_posix().lower()
+    assert expected in patch.replace("\\", "/").lower()
 
 
 def test_summarize_ignores_non_model_calls():

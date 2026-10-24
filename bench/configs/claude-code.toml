@@ -1,0 +1,19 @@
+# Stock Claude Code on Ollama, as documented at docs.ollama.com/integrations/claude-code
+# ({proxy} = bench logging proxy in front of Ollama). A clean CLAUDE_CONFIG_DIR per run keeps the
+# user's own plugins, MCP servers and settings out, so the prompt is the stock one.
+name = "claude-code"
+version_cmd = ["claude", "--version"]
+timeout_s = 900
+cmd = ["claude", "-p", "{prompt}", "--model", "{model}", "--dangerously-skip-permissions", "--output-format", "json", "--no-session-persistence"]
+unset_env = ["ANTHROPIC_API_KEY", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"]
+
+[env]
+ANTHROPIC_BASE_URL = "{proxy}"
+ANTHROPIC_AUTH_TOKEN = "ollama"
+ANTHROPIC_API_KEY = ""
+CLAUDE_CONFIG_DIR = "{home}/claude"
+# background calls (titles, summaries) would otherwise ask for a Claude model Ollama does not have
+ANTHROPIC_DEFAULT_HAIKU_MODEL = "{model}"
+ANTHROPIC_DEFAULT_SONNET_MODEL = "{model}"
+ANTHROPIC_DEFAULT_OPUS_MODEL = "{model}"
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"

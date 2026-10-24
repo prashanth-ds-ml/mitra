@@ -1,0 +1,21 @@
+# Stock Aider on Ollama (aider.chat/docs/llms/ollama.html), pointed at the bench proxy.
+# Aider cannot run shell commands from --message mode, so it gets its own documented way to run tests:
+# --test-cmd with --auto-test (it reruns and fixes after each edit). Edit format: Aider's default for the model.
+name = "aider"
+version_cmd = ["aider", "--version"]
+timeout_s = 900
+cmd = [
+  "aider",
+  "--model", "ollama_chat/{model}",
+  "--message", "{prompt}",
+  "--yes-always",
+  "--test-cmd", "python -m pytest -q",
+  "--auto-test",
+  "--no-check-update",
+  "--no-show-model-warnings",
+  "--analytics-disable",
+  "--no-pretty",
+]
+
+[env]
+OLLAMA_API_BASE = "{proxy}"

@@ -124,10 +124,12 @@ def _git(ws: Path, *args: str) -> str:
     return subprocess.run(["git", *args], cwd=ws, capture_output=True, text=True, timeout=60).stdout
 
 
-def _init_repo(ws: Path) -> None:
+def _init_repo(ws: Path) -> str:
+    """Commit the start state; returns its sha (agents such as Aider commit their own changes)."""
     _git(ws, "init", "-q", "-b", "main")
     _git(ws, "-c", "user.name=bench", "-c", "user.email=bench@localhost", "add", "-A")
     _git(ws, "-c", "user.name=bench", "-c", "user.email=bench@localhost", "commit", "-q", "-m", "task start")
+    return _git(ws, "rev-parse", "HEAD").strip()
 
 
 def _calls(log: Path) -> list[dict]:
@@ -137,10 +139,12 @@ def _calls(log: Path) -> list[dict]:
 
 
 def summarize_calls(calls: list[dict]) -> dict:
-    model_calls = [c for c in calls if c["method"] == "POST" and c["request"].get("n_messages") is not None]
+    attempts = [c for c in calls if c["method"] == "POST" and c["request"].get("n_messages") is not None]
+    model_calls = [c for c in attempts if c.get("status") == 200]
     first = model_calls[0] if model_calls else None
     return {
         "model_calls": len(model_calls),
+        "rejected_calls": len(attempts) - len(model_calls),  # e.g. 404 for a model name the agent assumed
         "upstream_errors": sum(1 for c in calls if c.get("status") is None or (c.get("status") or 0) >= 500),
         "first_call_prompt_tokens": first["response"]["prompt_tokens"] if first else None,
         "first_call_tools": first["request"]["n_tools"] if first else None,
@@ -187,7 +191,7 @@ def run_one(
         home = Path(tmp) / "home"  # clean per-run config dir for agents that support one
         home.mkdir()
         bench.prepare(task, ws)
-        _init_repo(ws)
+        start_sha = _init_repo(ws)
         log = out / "calls.jsonl"
         server = proxy.serve(0, ollama, log)
         values = {
@@ -200,6 +204,8 @@ def run_one(
         cmd = [_fill(part, values) for part in cfg.cmd]
         cmd[0] = shutil.which(cmd[0]) or cmd[0]
         env = {k: v for k, v in os.environ.items() if k not in cfg.unset_env}
+        # `python` in the agent's shell must be the interpreter the grader uses (pytest + fastapi installed)
+        env["PATH"] = str(Path(sys.executable).parent) + os.pathsep + env.get("PATH", "")
         env |= {k: _fill(v, values) for k, v in cfg.env.items()}
         started = time.time()
         timed_out, exit_code = False, None
@@ -210,7 +216,8 @@ def run_one(
                 se.write(f"could not start agent: {exc}\n")
         wall = round(time.time() - started, 1)
         server.shutdown()
-        (out / "diff.patch").write_text(_git(ws, "diff", "HEAD"), encoding="utf-8")
+        _git(ws, "add", "-A")  # include files the agent created, not only edits
+        (out / "diff.patch").write_text(_git(ws, "diff", "--cached", start_sha), encoding="utf-8")
         grade = bench.grade(task, ws)
 
     calls = summarize_calls(_calls(log))

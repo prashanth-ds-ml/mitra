@@ -25,6 +25,8 @@ local-codex review and this project's planning. Add a lesson whenever an error c
 | L-017 | Tooling | Long nested heredocs fail in the Bash tool; use Write/Edit. Never print `.env` unfiltered | Project 04 |
 | L-018 | Lint | Gate CI on syntax errors and undefined names (`ruff` E9/F63/F7/F82) from day 1; it finds crashes no test covers | E-004 |
 | L-019 | Portability | Build paths with `pathlib`, store them relative with `/`, never assume PowerShell; run CI on Linux and Windows from the first commit | E-005 |
+| L-020 | Benchmarks | The agent's environment must match the grader's: same `python` on PATH, same packages; check it with a test before any real run | E-006 |
+| L-021 | Git | `git diff` ignores untracked files; `git add -A` then `git diff --cached <start>` to capture everything an agent changed | E-007 |
 
 ## Template
 `| L-0nn | <area> | <the rule, one or two lines, written as an instruction> | <E-nnn / F-nnn / source> |`

@@ -12,6 +12,7 @@ decisions to [DECISIONS.md](DECISIONS.md).
 | 2026-10-24 | M0 | Public repo created and pushed; local-codex (dd93fa6) imported, its docs archived; 561 tests pass in the shared venv; lint gate (undefined names) found and fixed E-004; CI added (Linux + Windows tests, gitleaks) | - |
 | 2026-10-24 | M0 | Benchmark v0: fake payments SDK + FastAPI shop, 10 tasks (5 tune / 5 held-out), visible + hidden tests, tamper check; all 10 validated; 17 harness tests | - |
 | 2026-10-24 | M0 | Bench tooling: logging proxy (every model call, tokens from Ollama itself), preflight (blocks at 3.8 GB free RAM), run recorder (fresh git workspace, timeout with process-tree kill, diff, grading, fingerprinted completion marker, infra kept apart); 15 new tests, 593 total | - |
+| 2026-10-24 | M0 | Stock-agent configs from Ollama's own integration docs (Claude Code, Codex, OpenCode, Aider, deepagents-code; clean per-run config dirs); Ollama docs say these agents need >= 64K context; deepagents-cli found deprecated, replaced by deepagents-code; E-006/E-007 caught by tests before any real run | - |
 
 ## Scoreboard
 

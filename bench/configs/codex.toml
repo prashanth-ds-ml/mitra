@@ -1,0 +1,20 @@
+# Stock Codex CLI on Ollama, using the provider settings `ollama launch codex` writes
+# (docs.ollama.com/integrations/codex), pointed at the bench proxy. Clean CODEX_HOME per run.
+name = "codex"
+version_cmd = ["codex", "--version"]
+timeout_s = 900
+cmd = [
+  "codex", "exec",
+  "-c", 'model_provider="bench"',
+  "-c", 'model_providers.bench.name="Ollama"',
+  "-c", 'model_providers.bench.base_url="{proxy}/v1/"',
+  "-c", 'model_providers.bench.wire_api="responses"',
+  "-c", 'web_search="disabled"',
+  "-m", "{model}",
+  "--dangerously-bypass-approvals-and-sandbox",
+  "--skip-git-repo-check",
+  "{prompt}",
+]
+
+[env]
+CODEX_HOME = "{home}/codex"
