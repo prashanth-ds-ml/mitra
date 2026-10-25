@@ -15,6 +15,7 @@ decisions to [DECISIONS.md](DECISIONS.md).
 | 2026-10-24 | M0 | Stock-agent configs from Ollama's own integration docs (Claude Code, Codex, OpenCode, Aider, deepagents-code; clean per-run config dirs); Ollama docs say these agents need >= 64K context; deepagents-cli found deprecated, replaced by deepagents-code; E-006/E-007 caught by tests before any real run | - |
 | 2026-10-24 | M0 | Model choice made a measurement (D-014): `bench/model_screen.py` runs 12 native tool-call cases (exact `str_replace`, error recovery, no-tool restraint, ~10K-token prompt) plus speed and GPU fit on 13 local tools-capable models; 7 scorer tests | - |
 | 2026-10-25 | M0 | Screen not run: free RAM 2.7 GB even after stopping the Research Desk backend (9.6 GB); browsers and the ChatGPT app hold ~10 GB more. Blocker recorded as U-006 | - |
+| 2026-10-26 | M0 | Models picked from published benchmarks (D-015): qwen3.5:4b + qwen3.5:9b. Bench-owned Ollama server at 64K (D-016). Model check: 4B 9/12 at 81 tok/s, fully on GPU at 64K; 9B 11/12 at 20 tok/s, 64% on GPU. Prompt overhead of 5 stock agents: 2.7K-12.2K tokens. First real runs found 4 bench bugs (E-008 cut prompt in our own screen, E-009..E-011), all fixed with tests; README/SCOPE overhead claim corrected to measured numbers | - |
 
 ## Scoreboard
 
@@ -23,7 +24,7 @@ Filled from EVALS.md at each milestone.
 | Metric | Stock agents (best) | Mitra v0.1 | v0.2 | v0.3 |
 |---|---|---|---|---|
 | Pass rate, qwen 4B | - | - | - | - |
-| Pass rate, qwen 8B | - | - | - | - |
+| Pass rate, qwen 9B | - | - | - | - |
 | Fixed prompt + tools (tokens) | - | - | - | - |
 | Broken tool calls per task | - | - | - | - |
 | % solved locally (with escalation) | n/a | n/a | n/a | - |

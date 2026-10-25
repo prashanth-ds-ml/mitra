@@ -33,6 +33,16 @@ FAKE_AGENT = textwrap.dedent(
     if mode == "solve":
         for name in ("shop", "paysdk"):
             shutil.copytree(f"{base}/{name}", name, dirs_exist_ok=True)
+    if mode == "home":
+        import os
+        assert os.path.isdir(os.environ["AGENT_HOME"]), "config dir missing"
+    if mode == "leak":
+        import pathlib
+        print("config at", pathlib.Path.home() / "x", file=sys.stderr)
+    if mode == "loop":
+        while True:
+            urllib.request.urlopen(req, timeout=10).read()
+            time.sleep(0.2)
     if mode == "hang":
         import subprocess
         child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
@@ -149,18 +159,68 @@ def test_agent_python_is_the_grader_python(tmp_path, ollama):
     assert expected in patch.replace("\\", "/").lower()
 
 
-def test_summarize_ignores_non_model_calls():
+def test_overhead_stops_after_first_model_call(tmp_path, ollama):
+    result = run.measure_overhead(_agent(tmp_path, "loop", timeout_s=60), "m:1", ollama, {}, out_root=tmp_path / "oh")
+    assert result["ok"] and not result["timed_out"]
+    assert result["wall_seconds"] < 30
+    assert result["calls"]["first_call_prompt_tokens"] == 2500
+    assert (tmp_path / "oh" / "fake-loop" / "m_1" / "overhead.json").exists()
+
+
+def test_overhead_with_no_model_call_is_not_ok(tmp_path, ollama):
+    result = run.measure_overhead(_agent(tmp_path, "silent"), "m:1", ollama, {}, out_root=tmp_path / "oh")
+    assert not result["ok"]
+
+
+def test_saved_agent_output_has_no_home_path(tmp_path, ollama):
+    run.measure_overhead(_agent(tmp_path, "leak"), "m:1", ollama, {}, out_root=tmp_path / "oh")
+    err = (tmp_path / "oh" / "fake-leak" / "m_1" / "agent.err").read_text(encoding="utf-8")
+    assert "config at ~" in err and str(Path.home()) not in err
+
+
+def test_per_run_config_dirs_exist(tmp_path, ollama):
+    """E-010: Codex exits at once when CODEX_HOME does not exist."""
+    cfg = _agent(tmp_path, "home")
+    cfg.path.write_text(cfg.path.read_text(encoding="utf-8") + '\n[env]\nAGENT_HOME = "{home}/agent"\n', encoding="utf-8")
+    result = run.measure_overhead(run.AgentConfig.load(cfg.path), "m:1", ollama, {}, out_root=tmp_path / "oh")
+    assert result["exit_code"] == 0 or result["ok"]
+    assert "config dir missing" not in (tmp_path / "oh" / "fake-home" / "m_1" / "agent.err").read_text(encoding="utf-8")
+
+
+def _entry(path, n_tools, prompt_tokens, method="POST"):
+    return {
+        "method": method,
+        "path": path,
+        "status": 200,
+        "seconds": 1.0,
+        "request": {"n_messages": 2, "n_tools": n_tools, "tools_chars": 9 * n_tools, "system_chars": 40},
+        "response": {"prompt_tokens": prompt_tokens, "output_tokens": 10},
+    }
+
+
+def test_summarize_counts_only_generation_calls():
+    """E-011: Aider's POST /api/show is a lookup, not a model call; a title call is not the work call."""
     calls = [
-        {"method": "GET", "request": {"json": False}, "response": {"prompt_tokens": None}, "status": 200},
-        {
-            "method": "POST",
-            "status": 200,
-            "seconds": 1.5,
-            "request": {"n_messages": 2, "n_tools": 3, "tools_chars": 900, "system_chars": 40},
-            "response": {"prompt_tokens": 4000, "output_tokens": 10},
-        },
+        {"method": "GET", "path": "/api/tags", "status": 200, "request": {"json": False}, "response": {"prompt_tokens": None}},
+        _entry("/api/show", 0, None),
+        _entry("/v1/chat/completions", 0, 588),  # title
+        _entry("/v1/chat/completions?x=1", 3, 4000),
     ]
     s = run.summarize_calls(calls)
-    assert s["model_calls"] == 1
-    assert s["first_call_tools"] == 3
+    assert s["model_calls"] == 2
+    assert s["first_call_prompt_tokens"] == 588
+    assert s["first_tool_call_index"] == 1 and s["first_tool_call_prompt_tokens"] == 4000
+    assert s["first_tool_call_tools"] == 3
     assert json.dumps(s)
+
+
+def test_only_lookups_is_infra():
+    s = run.summarize_calls([_entry("/api/show", 0, None)])
+    assert s["model_calls"] == 0
+
+
+def test_proxy_reads_responses_api_requests():
+    """Codex sends `input` + `instructions` (OpenAI Responses), not `messages` + `system`."""
+    body = json.dumps({"model": "m", "instructions": "be brief", "input": [{"role": "user", "content": "hi"}], "tools": [{"name": "shell"}]})
+    d = run.proxy.describe_request(body.encode())
+    assert d["n_messages"] == 1 and d["system_chars"] == len("be brief") and d["n_tools"] == 1

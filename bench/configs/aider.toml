@@ -2,6 +2,7 @@
 # Aider cannot run shell commands from --message mode, so it gets its own documented way to run tests:
 # --test-cmd with --auto-test (it reruns and fixes after each edit). Edit format: Aider's default for the model.
 name = "aider"
+sends_tools = false  # edits come back as text blocks, not tool calls
 version_cmd = ["aider", "--version"]
 timeout_s = 900
 cmd = [

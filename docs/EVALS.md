@@ -38,7 +38,44 @@ Method and every result, whatever it shows. Raw results live in `results/` and a
 
 ## Results
 
-(none yet)
+### 2026-10-26 · M0 · Prompt overhead of each stock agent
+- **Commit:** see PROGRESS_LOG · **Model:** qwen3.5:4b (token counts are Ollama's own, Qwen3.5 tokenizer and template)
+- **Setup:** `python bench/run.py --agent bench/configs/<agent>.toml --model qwen3.5:4b --overhead`: each agent gets task
+  T01 in a fresh workspace with a clean config folder (no user plugins, skills or MCP servers) and is stopped after its
+  first answered call that carries tools (Aider sends none, so its first call). Bench server at 64K (D-016). Raw logs in
+  `results/overhead/`.
+- **Table:**
+
+| Agent | Version | Prompt tokens, first work call | Tools | Tool definitions (chars) | System prompt (chars) | Notes |
+|---|---|---|---|---|---|---|
+| Claude Code | 2.1.310 | 12,200 | 14 | 34,458 | 14,622 | |
+| deepagents-code | 0.2.1 | 12,230 | 14 | 14,367 | 35,650 | needed `colorama` added to its install to start on Windows |
+| OpenCode | 1.17.8 | 11,847 | 9 | 20,325 | 25,893 | sends a title call first: 588 prompt tokens, then 8,866 thinking/output tokens (~2 min) before work starts |
+| Codex | 0.162.1 | 4,621 | 8 | 18,784 | 0 | system text sent as a message in the Responses API, so not counted separately |
+| Aider | 0.86.2 | 2,714 | 0 | 0 | 1,203 | edits as text blocks, no tools; sets its own `num_ctx` (11,369 here), overriding the server's 64K |
+
+- **What it means:** three of five agents spend ~12K tokens, three times Ollama's 4K default context, before reading
+  any code; at the default they would be silently cut (L-001). With clean configs the overhead is lower than the
+  20-33K figures reported for setups with plugins and MCP servers, so README and SCOPE now quote our numbers. Prompt
+  size alone does not prove these agents fail on small models; the baselines (next) decide that. Mitra's target stays
+  ~3K (post 2 is now "~12K to ~3K").
+
+### 2026-10-26 · M0 · Model check on the two picks (D-015)
+- **Commit:** see PROGRESS_LOG · **Models:** qwen3.5:4b (Q4_K_M, 3.4 GB), qwen3.5:9b (`qwen3.5:latest`, Q4_K_M, 6.6 GB)
+- **Setup:** `bench/model_screen.py`, native `/api/chat` tool calls, 12 cases, num_ctx 32K, temperature 0, seed 0, thinking on
+  (Ollama default); bench Ollama server (D-016); RTX 5050 Laptop 8 GB; raw output `results/model_screen.json`
+- **Table:**
+
+| Model | Cases passed | Generation tok/s | Prompt tok/s | On GPU at 32K | On GPU at 64K | Failed cases |
+|---|---|---|---|---|---|---|
+| qwen3.5:4b | 9/12 | 81.4 | 3,143 | 100% | 100% (5.0 GB) | C05 read the test file, not the file in the traceback; C06 searched instead of editing; C07 answered in text instead of calling finish |
+| qwen3.5:9b | 11/12 | 19.6 | 1,402 | 76% | 64.5% (8.1 GB) | C12 read payments.py instead of the SDK file the search pointed to |
+
+- **What it means:** both models make native tool calls through Ollama (no calls written as text) and both did the exact
+  `str_replace` edit inside an 18K-token prompt. The 9B makes better choices (11 vs 9) but does not fit the 8 GB GPU even
+  at 32K, so it generates about 4x slower; at 64K a third of it runs on the CPU. The 4B fits fully at 64K. Both stay in
+  the baselines; speed per solved task decides which is the practical default. A first run of this check was wrong:
+  C09's prompt was cut by Ollama at 16K context (E-008).
 
 ## Result template
 

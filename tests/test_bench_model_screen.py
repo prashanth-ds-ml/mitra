@@ -57,4 +57,21 @@ def test_no_tool_case():
 
 def test_long_prompt_case_is_long():
     chars = sum(len(json.dumps(m)) for m in CASES["C09"].messages)
-    assert chars > 40_000  # roughly 10K tokens
+    assert chars > 40_000
+    assert CASES["C09"].min_prompt_tokens >= 10_000
+
+
+def test_cut_prompt_is_void_not_a_pass(monkeypatch):
+    """E-008: at a too-small num_ctx Ollama drops old messages silently; even a right answer must not count."""
+    good = {"path": "shop/payments.py", "old": 'key = f"order-{order.id}"', "new": 'key = f"order-{order.id}-v2"'}
+
+    def fake_post(path, payload, timeout=600):
+        return {"message": _call("str_replace", good), "prompt_eval_count": 710, "eval_count": 5}
+
+    monkeypatch.setattr(ms, "_post", fake_post)
+    monkeypatch.setattr(ms, "vram_fit", lambda model, ctx: {"num_ctx": ctx})
+    monkeypatch.setattr(ms, "unload", lambda model: None)
+    r = ms.screen("m")
+    c09 = next(c for c in r["cases"] if c["case"] == "C09")
+    assert not c09["passed"] and c09["why"].startswith("infra: prompt cut")
+    assert r["void_cases"] == 1

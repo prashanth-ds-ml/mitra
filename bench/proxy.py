@@ -5,7 +5,7 @@ what the agent sent (messages, tools, system prompt size) and what Ollama report
 Works for Ollama's native API (/api/chat), its OpenAI API (/v1/chat/completions) and its Anthropic API
 (/v1/messages), so every agent is measured the same way.
 
-    python bench/proxy.py --port 11500 --upstream http://127.0.0.1:11434 --log results/calls.jsonl
+    python bench/proxy.py --port 11500 --upstream http://127.0.0.1:11435 --log results/calls.jsonl
 """
 
 from __future__ import annotations
@@ -41,9 +41,11 @@ def describe_request(body: bytes) -> dict:
         data = json.loads(body or b"{}")
     except ValueError:
         return {"json": False, "bytes": len(body)}
-    messages = data.get("messages") or []
+    messages = data.get("messages") or data.get("input") or []  # Chat / Anthropic, or OpenAI Responses (Codex)
+    if isinstance(messages, str):
+        messages = [{"role": "user", "content": messages}]
     tools = data.get("tools") or []
-    system_chars = _text_len(data.get("system", ""))  # Anthropic style
+    system_chars = _text_len(data.get("system", "")) + _text_len(data.get("instructions", ""))  # Anthropic, Responses
     system_chars += sum(_text_len(m.get("content", "")) for m in messages if m.get("role") == "system")
     return {
         "json": True,
@@ -135,7 +137,7 @@ def serve(port: int, upstream: str, log_path: Path) -> ThreadingHTTPServer:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--port", type=int, default=11500)
-    parser.add_argument("--upstream", default="http://127.0.0.1:11434")
+    parser.add_argument("--upstream", default="http://127.0.0.1:11435")
     parser.add_argument("--log", type=Path, required=True)
     args = parser.parse_args()
     server = serve(args.port, args.upstream, args.log)

@@ -13,3 +13,6 @@ logs/
 # scratch copies made by benchmark runs; results/ IS committed
 bench/runs/
 ~$*
+
+# bench Ollama server log (local paths, not a result)
+results/ollama-bench.log

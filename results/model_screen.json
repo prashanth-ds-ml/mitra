@@ -1,0 +1,266 @@
+{
+  "qwen3.5:4b": {
+    "model": "qwen3.5:4b",
+    "passed": 9,
+    "total": 12,
+    "native_call_failures": 0,
+    "void_cases": 0,
+    "gen_tokens_per_s": 81.4,
+    "prompt_tokens_per_s": 3143.1,
+    "seconds": 24.6,
+    "vram": [
+      {
+        "num_ctx": 32768,
+        "size_gb": 3.93,
+        "gpu_share": 1.0
+      },
+      {
+        "num_ctx": 65536,
+        "size_gb": 4.99,
+        "gpu_share": 1.0
+      }
+    ],
+    "cases": [
+      {
+        "case": "C01",
+        "passed": true,
+        "why": "ok",
+        "seconds": 4.3,
+        "prompt_tokens": 574,
+        "output_tokens": 60,
+        "thinking_chars": 125
+      },
+      {
+        "case": "C02",
+        "passed": true,
+        "why": "ok",
+        "seconds": 1.0,
+        "prompt_tokens": 576,
+        "output_tokens": 68,
+        "thinking_chars": 175
+      },
+      {
+        "case": "C03",
+        "passed": true,
+        "why": "ok",
+        "seconds": 0.7,
+        "prompt_tokens": 577,
+        "output_tokens": 43,
+        "thinking_chars": 107
+      },
+      {
+        "case": "C04",
+        "passed": true,
+        "why": "ok",
+        "seconds": 1.6,
+        "prompt_tokens": 765,
+        "output_tokens": 110,
+        "thinking_chars": 111
+      },
+      {
+        "case": "C05",
+        "passed": false,
+        "why": "path='tests/test_t03.py' lacks 'payments.py'",
+        "seconds": 1.8,
+        "prompt_tokens": 659,
+        "output_tokens": 123,
+        "thinking_chars": 379
+      },
+      {
+        "case": "C06",
+        "passed": false,
+        "why": "wrong tool search (expected str_replace)",
+        "seconds": 1.2,
+        "prompt_tokens": 753,
+        "output_tokens": 71,
+        "thinking_chars": 197
+      },
+      {
+        "case": "C07",
+        "passed": false,
+        "why": "no tool call",
+        "seconds": 1.2,
+        "prompt_tokens": 689,
+        "output_tokens": 80,
+        "thinking_chars": 154
+      },
+      {
+        "case": "C08",
+        "passed": true,
+        "why": "ok",
+        "seconds": 1.7,
+        "prompt_tokens": 586,
+        "output_tokens": 122,
+        "thinking_chars": 444
+      },
+      {
+        "case": "C09",
+        "passed": true,
+        "why": "ok",
+        "seconds": 7.7,
+        "prompt_tokens": 18069,
+        "output_tokens": 126,
+        "thinking_chars": 168
+      },
+      {
+        "case": "C10",
+        "passed": true,
+        "why": "ok",
+        "seconds": 1.4,
+        "prompt_tokens": 582,
+        "output_tokens": 69,
+        "thinking_chars": 186
+      },
+      {
+        "case": "C11",
+        "passed": true,
+        "why": "ok",
+        "seconds": 1.0,
+        "prompt_tokens": 708,
+        "output_tokens": 59,
+        "thinking_chars": 106
+      },
+      {
+        "case": "C12",
+        "passed": true,
+        "why": "ok",
+        "seconds": 1.0,
+        "prompt_tokens": 660,
+        "output_tokens": 60,
+        "thinking_chars": 149
+      }
+    ]
+  },
+  "qwen3.5:latest": {
+    "model": "qwen3.5:latest",
+    "passed": 11,
+    "total": 12,
+    "native_call_failures": 0,
+    "void_cases": 0,
+    "gen_tokens_per_s": 19.6,
+    "prompt_tokens_per_s": 1402.1,
+    "seconds": 86.3,
+    "vram": [
+      {
+        "num_ctx": 32768,
+        "size_gb": 6.74,
+        "gpu_share": 0.76
+      },
+      {
+        "num_ctx": 65536,
+        "size_gb": 8.05,
+        "gpu_share": 0.645
+      }
+    ],
+    "cases": [
+      {
+        "case": "C01",
+        "passed": true,
+        "why": "ok",
+        "seconds": 13.2,
+        "prompt_tokens": 574,
+        "output_tokens": 57,
+        "thinking_chars": 118
+      },
+      {
+        "case": "C02",
+        "passed": true,
+        "why": "ok",
+        "seconds": 4.4,
+        "prompt_tokens": 576,
+        "output_tokens": 77,
+        "thinking_chars": 204
+      },
+      {
+        "case": "C03",
+        "passed": true,
+        "why": "ok",
+        "seconds": 2.6,
+        "prompt_tokens": 577,
+        "output_tokens": 43,
+        "thinking_chars": 107
+      },
+      {
+        "case": "C04",
+        "passed": true,
+        "why": "ok",
+        "seconds": 6.0,
+        "prompt_tokens": 765,
+        "output_tokens": 108,
+        "thinking_chars": 111
+      },
+      {
+        "case": "C05",
+        "passed": true,
+        "why": "ok",
+        "seconds": 4.4,
+        "prompt_tokens": 659,
+        "output_tokens": 78,
+        "thinking_chars": 180
+      },
+      {
+        "case": "C06",
+        "passed": true,
+        "why": "ok",
+        "seconds": 10.3,
+        "prompt_tokens": 753,
+        "output_tokens": 187,
+        "thinking_chars": 488
+      },
+      {
+        "case": "C07",
+        "passed": true,
+        "why": "ok",
+        "seconds": 3.6,
+        "prompt_tokens": 689,
+        "output_tokens": 61,
+        "thinking_chars": 48
+      },
+      {
+        "case": "C08",
+        "passed": true,
+        "why": "ok",
+        "seconds": 7.4,
+        "prompt_tokens": 586,
+        "output_tokens": 135,
+        "thinking_chars": 485
+      },
+      {
+        "case": "C09",
+        "passed": true,
+        "why": "ok",
+        "seconds": 21.0,
+        "prompt_tokens": 18069,
+        "output_tokens": 124,
+        "thinking_chars": 181
+      },
+      {
+        "case": "C10",
+        "passed": true,
+        "why": "ok",
+        "seconds": 7.3,
+        "prompt_tokens": 582,
+        "output_tokens": 131,
+        "thinking_chars": 459
+      },
+      {
+        "case": "C11",
+        "passed": true,
+        "why": "ok",
+        "seconds": 3.0,
+        "prompt_tokens": 708,
+        "output_tokens": 52,
+        "thinking_chars": 91
+      },
+      {
+        "case": "C12",
+        "passed": false,
+        "why": "path='shop/payments.py' lacks 'errors.py'",
+        "seconds": 3.1,
+        "prompt_tokens": 660,
+        "output_tokens": 56,
+        "thinking_chars": 112
+      }
+    ]
+  }
+}

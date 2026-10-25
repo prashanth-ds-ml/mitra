@@ -8,6 +8,10 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-011 | 2026-10-26 | M0 | High | live run (Aider overhead) | Bench counted lookups (`POST /api/show`) as model calls and took the first call (OpenCode's title call, 0 tools) as the work call; Codex's Responses-API requests showed 0 messages and 0 system chars | closed | F-007 |
+| E-010 | 2026-10-26 | M0 | High | live run (Codex overhead) | Codex exited at once: per-run `CODEX_HOME` folder was never created | closed | F-006 |
+| E-009 | 2026-10-26 | M0 | Medium | live run (second agent in a row) | Preflight blocked every run after the first: the loaded model's RAM was counted again as needed | closed | F-005 |
+| E-008 | 2026-10-26 | M0 | High | live run (token count check) | Model screen long-prompt case (C09) was silently cut by Ollama: 17K-token prompt at num_ctx 16K, so the model never saw the task and the case scored as a model failure | closed | F-004 |
 | E-007 | 2026-10-24 | M0 | Medium | runner test | `diff.patch` missed files the agent created (`git diff` ignores untracked files) | closed | F-003 |
 | E-006 | 2026-10-24 | M0 | High | config review | In agent workspaces `python` was the system Python 3.10 without pytest/FastAPI: every agent would have failed to run tests | closed | F-002 |
 | E-005 | 2026-10-24 | M0 | Medium | CI (Linux) | local-codex is Windows-only: 8 tests fail on Linux (backslash paths, PowerShell commands, skill paths) | open (fix in M1); Linux CI non-blocking | - |
@@ -33,6 +37,58 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-011: Lookups counted as model calls; title call taken as the work call; Codex requests unread
+
+- **Date found:** 2026-10-26 · **Milestone:** M0 · **Severity:** High · **Found by:** first live overhead runs
+- **Status:** closed
+
+**What happened:** Aider's only logged call was `POST /api/show` (model info), yet it counted as a model call, so a run
+that never generated would not be flagged infra. OpenCode's first call was a 588-token title request with 0 tools, which
+the overhead measure reported as its prompt cost. Codex's `/v1/responses` requests use `input` and `instructions`, which
+the proxy did not read.
+**Root cause:** "model call" was defined as "a POST whose body parses"; the fake agent in the tests only sent `/api/chat`.
+**Fix:** F-007.
+**Regression test:** `test_summarize_counts_only_generation_calls`, `test_only_lookups_is_infra`,
+`test_proxy_reads_responses_api_requests`.
+**Lesson?** L-023.
+
+### E-010: Codex exited at once; its per-run config folder did not exist
+
+- **Date found:** 2026-10-26 · **Milestone:** M0 · **Severity:** High · **Found by:** first live overhead run
+- **Status:** closed
+
+**What happened:** `Error finding codex home: CODEX_HOME points to ...\home/codex, but that path does not exist`.
+**Root cause:** configs point `CODEX_HOME`, `CLAUDE_CONFIG_DIR` and `XDG_*` at `{home}/...`; only `{home}` was created.
+Claude Code and OpenCode create theirs, Codex does not.
+**Fix:** F-006.
+**Regression test:** `test_per_run_config_dirs_exist`.
+**Lesson?** L-023.
+
+### E-009: Preflight counted a loaded model's RAM twice
+
+- **Date found:** 2026-10-26 · **Milestone:** M0 · **Severity:** Medium · **Found by:** second agent run in a row
+- **Status:** closed
+
+**What happened:** `free RAM 5.5 GB < 6.2 GB needed for qwen3.5:4b` while qwen3.5:4b was already loaded.
+**Root cause:** the new RAM rule (model file + 3 GB) did not allow for the model already holding its memory.
+**Fix:** F-005.
+**Regression test:** `test_loaded_model_needs_only_headroom`.
+**Lesson?** none (one-off).
+
+### E-008: Model screen's long-prompt case was silently cut by Ollama
+
+- **Date found:** 2026-10-26 · **Milestone:** M0 · **Severity:** High · **Found by:** live run (prompt tokens looked wrong)
+- **Status:** closed
+
+**What happened:** on qwen3.5:4b, C09 ("same exact edit inside a long prompt") reported 710 prompt tokens, fewer than
+C04 (765), which holds a subset of its messages. The model answered `read_file` and the case scored as a model failure.
+**Root cause:** the filler is ~17K tokens (the comment said ~10K; never measured) and the screen ran at `num_ctx` 16384.
+Ollama drops the oldest messages to fit, with no error, so the task message was gone. The L-001 failure, inside our own
+tool.
+**Fix:** F-004.
+**Regression test:** `test_cut_prompt_is_void_not_a_pass` (tests/test_bench_model_screen.py).
+**Lesson?** L-022.
 
 ### E-005: local-codex is Windows-only
 

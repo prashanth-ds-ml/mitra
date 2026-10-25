@@ -19,8 +19,8 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-OLLAMA = "http://127.0.0.1:11434"
-SCREEN_CTX = 16384
+OLLAMA = "http://127.0.0.1:11435"  # bench server (bench/ollama_server.py)
+SCREEN_CTX = 32768  # must exceed the longest case (C09, ~17K tokens); Ollama drops old messages silently (E-008)
 SYSTEM = (
     "You are a coding agent working in a Python repository. Use the tools to inspect and change code. "
     "Call exactly one tool per step. When the task is done, call finish."
@@ -87,6 +87,7 @@ class Case:
     expect_tool: str | None  # None = no tool call expected
     check: dict  # arg name -> required substring (or exact text for str_replace "old")
     exact: tuple[str, ...] = ()
+    min_prompt_tokens: int = 0  # fewer means Ollama cut the prompt: the case is void, not a model failure
 
 
 def cases() -> list[Case]:
@@ -141,7 +142,7 @@ def cases() -> list[Case]:
         Case("C08", "no tool for a plain question", [{"role": "user", "content": "In one sentence, what is an idempotency key? Do not use any tools."}], None, {}),
         Case(
             "C09",
-            "same exact edit inside a long prompt (~10K tokens)",
+            "same exact edit inside a long prompt (~17K tokens)",
             [
                 {"role": "user", "content": fix},
                 *_tool_turn("read_file", {"path": "shop/receipts.py"}, FILLER),
@@ -150,6 +151,7 @@ def cases() -> list[Case]:
             "str_replace",
             {"path": "payments.py", "old": 'key = f"order-{order.id}"', "new": 'key = f"order-{order.id}-v2"'},
             exact=("old", "new"),
+            min_prompt_tokens=10_000,
         ),
         Case(
             "C10",
@@ -266,6 +268,8 @@ def screen(model: str) -> dict:
             results.append({"case": case.id, "passed": False, "why": f"infra: {exc}", "seconds": round(time.time() - started, 1)})
             continue
         passed, why = score(case, resp.get("message", {}))
+        if (resp.get("prompt_eval_count") or 0) < case.min_prompt_tokens:
+            passed, why = False, f"infra: prompt cut to {resp.get('prompt_eval_count')} tokens (num_ctx {SCREEN_CTX})"
         if resp.get("eval_duration"):
             gen_tps.append(resp["eval_count"] / (resp["eval_duration"] / 1e9))
         if resp.get("prompt_eval_duration") and resp.get("prompt_eval_count", 0) > 1000:
@@ -288,6 +292,7 @@ def screen(model: str) -> dict:
         "passed": sum(r["passed"] for r in results),
         "total": len(results),
         "native_call_failures": sum("as text" in r["why"] for r in results),
+        "void_cases": sum(r["why"].startswith("infra") for r in results),
         "gen_tokens_per_s": round(sum(gen_tps) / len(gen_tps), 1) if gen_tps else None,
         "prompt_tokens_per_s": round(sum(prompt_tps) / len(prompt_tps), 1) if prompt_tps else None,
         "seconds": round(sum(r["seconds"] for r in results), 1),

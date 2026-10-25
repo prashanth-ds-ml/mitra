@@ -1,0 +1,8 @@
+Warning: Web search is disabled � TAVILY_API_KEY is not set.
+Get a key at https://tavily.com
+
+To suppress, edit ~\.deepagents\config.toml:
+[warnings]
+suppress = ["tavily"]
+
+Thread: 01a17473-b27e-7361-9172-7a20e1e381b7

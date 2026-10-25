@@ -1,0 +1,65 @@
+{
+  "agent": "opencode",
+  "agent_version": "1.17.8",
+  "model": "qwen3.5:4b",
+  "ok": true,
+  "prompt_tokens": 11847,
+  "tools": 9,
+  "tools_chars": 20325,
+  "system_chars": 25893,
+  "calls_before": 1,
+  "exit_code": null,
+  "timed_out": false,
+  "wall_seconds": 88.2,
+  "calls": {
+    "model_calls": 2,
+    "rejected_calls": 0,
+    "upstream_errors": 0,
+    "first_call_prompt_tokens": 588,
+    "first_call_tools": 0,
+    "first_call_tools_chars": 0,
+    "first_call_system_chars": 2096,
+    "first_tool_call_index": 1,
+    "first_tool_call_prompt_tokens": 11847,
+    "first_tool_call_tools": 9,
+    "first_tool_call_tools_chars": 20325,
+    "first_tool_call_system_chars": 25893,
+    "max_prompt_tokens": 11847,
+    "total_prompt_tokens": 12435,
+    "total_output_tokens": 6220,
+    "model_seconds": 165.4
+  },
+  "facts": {
+    "ollama": "http://127.0.0.1:11435",
+    "model": "qwen3.5:4b",
+    "ollama_version": "0.40.8",
+    "model_digest": "2a654d98e6fba55d452b7043684e9b57a947e393bbffa62485a7aac05ee4eefd",
+    "model_details": {
+      "parent_model": "",
+      "format": "gguf",
+      "family": "qwen35",
+      "families": [
+        "qwen35"
+      ],
+      "parameter_size": "4.7B",
+      "quantization_level": "Q4_K_M",
+      "context_length": 262144,
+      "embedding_length": 2560,
+      "runner": "ggml"
+    },
+    "loaded_models": [
+      "qwen3.5:4b"
+    ],
+    "free_ram_gb": 3.6,
+    "min_free_ram_gb": 3.0,
+    "gpu": {
+      "name": "NVIDIA GeForce RTX 5050 Laptop GPU",
+      "used_mib": 5969,
+      "total_mib": 8151
+    },
+    "loaded": {
+      "context_length": 65536,
+      "gpu_share": 1.0
+    }
+  }
+}

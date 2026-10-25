@@ -6,8 +6,8 @@ machine or your judgment. Updated every release.
 | ID | Milestone | What to do | Why it needs you | Status |
 |---|---|---|---|---|
 | U-001 | Before starting | Write the GPU model, VRAM and current power cap in STATUS.md | Your machine settings | done by Claude via `nvidia-smi` (2026-10-24) |
-| U-002 | M0 | Log in to the stock agents used as baselines (Claude Code, Codex CLI, Aider, deepagents-cli) | Your accounts | open |
+| U-002 | M0 | Log in to the stock agents used as baselines | Your accounts | not needed: all five run on Ollama without a login (2026-10-26) |
 | U-003 | M0 | Approve the release check, then the first push and the v0.0 post | Publishing is your call | open |
 | U-004 | M4 | Record the 2-minute demo video | Your voice and screen | open |
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
-| U-006 | M0 | Free RAM to >= 11-12 GB before the model screen: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open |
+| U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | done 2026-10-26 (~6 GB free was enough for the 4B; the 9B baselines may need more) |

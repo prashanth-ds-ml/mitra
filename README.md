@@ -7,8 +7,9 @@ every result with your tests, and calls a frontier model only when the check fai
 
 ## Why
 Coding agents like Claude Code, Codex and OpenCode can connect to local models through Ollama, but they are built for
-frontier models: 20-33K tokens of fixed prompt, many tools, strict tool-call formats. On a 4-9B model on a laptop GPU
-they often break. Mitra asks one question and publishes the answer either way:
+frontier models: many tools, strict tool-call formats and a large fixed prompt (measured here: 2.7K-12.2K tokens
+before the agent reads any code, 3x Ollama's default 4K context for three of five agents; see
+[EVALS.md](docs/EVALS.md)). On a 4-9B model on a laptop GPU they often break. Mitra asks one question and publishes the answer either way:
 
 > On an 8 GB consumer GPU, how much everyday coding work can a small model do when the agent is built for it, and does
 > test-gated escalation to a frontier model cut cost without hurting the success rate?

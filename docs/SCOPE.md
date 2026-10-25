@@ -7,7 +7,8 @@ Most everyday AI work can run on the machine you already own. Use a frontier mod
 answer was not good enough.
 
 Today's coding agents (Claude Code, Codex, OpenCode, Aider, Deep Agents) connect to Ollama, but they are built for
-frontier models: 20-33K tokens of fixed prompt, many tools, strict tool-call formats and no retry on a malformed call.
+frontier models: a large fixed prompt (measured 2026-10-26 with clean configs: 2.7K-12.2K tokens; reports with user
+plugins and MCP servers cite 20-33K), many tools, strict tool-call formats and no retry on a malformed call.
 On a small model on a laptop GPU they break. Nobody has published a controlled test that keeps a small model fixed and
 changes only the agent. This project runs that test and builds the agent that wins it.
 

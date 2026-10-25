@@ -27,6 +27,8 @@ local-codex review and this project's planning. Add a lesson whenever an error c
 | L-019 | Portability | Build paths with `pathlib`, store them relative with `/`, never assume PowerShell; run CI on Linux and Windows from the first commit | E-005 |
 | L-020 | Benchmarks | The agent's environment must match the grader's: same `python` on PATH, same packages; check it with a test before any real run | E-006 |
 | L-021 | Git | `git diff` ignores untracked files; `git add -A` then `git diff --cached <start>` to capture everything an agent changed | E-007 |
+| L-022 | Tests | Any test that depends on prompt length asserts the prompt tokens Ollama reports; measure the size, never estimate it in a comment. A cut prompt is a void case, not a model failure | E-008 |
+| L-023 | Benchmarks | Fakes only prove what they imitate. Before a benchmark, run every agent config once for real (one call) and read its log: real agents call lookup endpoints, send title calls first, use other APIs (Responses) and need their own folders | E-010, E-011 |
 
 ## Template
 `| L-0nn | <area> | <the rule, one or two lines, written as an instruction> | <E-nnn / F-nnn / source> |`
