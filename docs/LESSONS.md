@@ -13,7 +13,7 @@ local-codex review and this project's planning. Add a lesson whenever an error c
 | L-005 | Small models | Cap thinking and test with thinking on and off; thinking at temperature 0 may never finish | R-E-014, R-E-021 |
 | L-006 | Small models | Prefer scoring or ranking to yes/no judgments; small models reject almost everything on yes/no | R-E-015 |
 | L-007 | Ollama | Batch requests; one huge request (hundreds of embeddings) can crash the runner | R-E-018 |
-| L-008 | Machine | Ollama maps ~8 GB of RAM on Windows; check free RAM >= 11-12 GB, one model loaded at a time | R-E-022 |
+| L-008 | Machine | Ollama maps ~8 GB of RAM on Windows; check free RAM >= 11-12 GB, one model loaded at a time. Look at the whole picture before stopping one process: stopping a 9.6 GB backend still left 2.7 GB free because browsers held ~9 GB (group memory by process name) | R-E-022; 05 M0, 2026-10-25 |
 | L-009 | Env | After installing into the shared venv run `uv pip check`; mismatched package pairs break startup | R-E-016 |
 | L-010 | Release | Test a fresh clone before every release; check ignore rules with `git check-ignore -v` | Research Desk v0.3 (a hidden ignore rule kept a whole page out of git) |
 | L-011 | Paths | Create a directory before `cd`/clone into it and verify where files landed; a failed `cd` put a clone in the wrong project | 05 planning session, 2026-10-24 |
