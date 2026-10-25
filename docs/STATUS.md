@@ -10,14 +10,14 @@ The next unticked items in [PLAN.md](PLAN.md), M0:
    On 2026-10-25 the Research Desk backend (9.6 GB) was stopped, but free RAM was still 2.7 GB of 23.6 GB.
    Next biggest: Edge 5.0 GB (42 processes), Chrome 2.1 GB, ChatGPT app 2.1 GB, Edge WebView 1.3 GB, WSL 0.5 GB.
    Close all three apps (or reboot and open nothing else) before running the screen.
-2. Model screen (D-014): one model at a time, about 45 min in total, results saved to `results/model_screen.json`:
-   `python bench/model_screen.py --models qwen3.5:2b llama3.2:3b qwen3.5:4b qwen2.5-coder:7b llama3.1:8b qwen3:8b granite4.1:8b rnj-1:8b ministral-3:8b lfm2.5:8b deepseek-r1:8b gemma4:e4b qwen3.5:latest`
-   Optional: pull `qwen3:4b` (2507 thinking version, ~2.5 GB) first and add it. Pick one small (<= 5B) and one mid
-   (7-10B) model; record them in EVALS.md and DECISIONS.md.
+2. Model check (D-015): models are picked from published benchmarks, **qwen3.5:4b** and **qwen3.5:9b**
+   (`qwen3.5:latest`). Check the two picks (a few minutes):
+   `python bench/model_screen.py --models qwen3.5:4b qwen3.5:latest`
+   Optional: add `gemma4:e4b` as a different-family comparison.
 3. Open question: run a bench-owned Ollama server on a separate port with `OLLAMA_CONTEXT_LENGTH=65536`, leaving
    the normal one on 11434 untouched.
-4. Prompt overhead of each stock agent at 64K context (Ollama's own minimum for these agents), then baselines on the
-   two chosen models: `python bench/run.py --agent bench/configs/<agent>.toml --model <model>`. The agent configs are
+4. Prompt overhead of each stock agent at 64K context (Ollama's own minimum for these agents), then baselines on
+   qwen3.5:4b and qwen3.5:9b: `python bench/run.py --agent bench/configs/<agent>.toml --model <model>`. The agent configs are
    not yet tried end to end.
 5. Kill check 1, then release v0.0 + post 1 (lock file of tested versions first)
 

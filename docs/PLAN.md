@@ -36,10 +36,11 @@ test-gated escalation to a frontier model cut cost without hurting the success r
 - [x] Bench preflight: Ollama up, model pulled, context length set, free RAM/GPU checked; refuses to run otherwise (Harness² `preflight`) (`bench/preflight.py`, 2026-10-24)
 - [x] Run records: each run saves its trajectory (JSONL), result and a config fingerprint (agent version, model tag, prompt hash); a run counts only when the runner marks it complete; reruns skip completed runs (Harness² `runmark`) (`bench/run.py` + `bench/proxy.py`, 2026-10-24)
 - [x] Infra failures (dead Ollama, auth, crash, wall timeout) recorded separately from agent failures, never scored as a zero (2026-10-24)
-- [ ] Model screen over every local tools-capable model (tool-call accuracy, speed, VRAM fit); pick one small and one mid model (D-014)
+- [x] Models picked from published tool-calling benchmarks: qwen3.5:4b and qwen3.5:9b (D-015, 2026-10-26)
+- [ ] Model check on the two picks: native tool calls via Ollama, speed, GPU fit at 32K/64K (`bench/model_screen.py`)
 - [ ] Prompt overhead measured for each stock agent (Claude Code via Ollama, Codex `--oss`, Aider, deepagents-cli)
 - [ ] Ollama context set correctly for each (`OLLAMA_CONTEXT_LENGTH`); configs saved in `bench/configs/`
-- [ ] Baseline runs: stock agents × qwen 4B and 8B on benchmark v0; raw results in `results/`
+- [ ] Baseline runs: stock agents × qwen3.5:4b and qwen3.5:9b on benchmark v0; raw results in `results/`
 - [ ] **Kill check 1:** if stock agents already pass most tasks, write that up and stop
 - [ ] Release v0.0 + post: "Why coding agents break on your laptop" (prompt-overhead chart)
 
