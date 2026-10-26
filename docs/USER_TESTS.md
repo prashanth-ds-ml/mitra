@@ -10,4 +10,4 @@ machine or your judgment. Updated every release.
 | U-003 | M0 | Approve the release check, then the first push and the v0.0 post | Publishing is your call | open |
 | U-004 | M4 | Record the 2-minute demo video | Your voice and screen | open |
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
-| U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | done 2026-10-26 (~6 GB free was enough for the 4B; the 9B baselines may need more) |
+| U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |

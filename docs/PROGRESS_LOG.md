@@ -16,6 +16,7 @@ decisions to [DECISIONS.md](DECISIONS.md).
 | 2026-10-24 | M0 | Model choice made a measurement (D-014): `bench/model_screen.py` runs 12 native tool-call cases (exact `str_replace`, error recovery, no-tool restraint, ~10K-token prompt) plus speed and GPU fit on 13 local tools-capable models; 7 scorer tests | - |
 | 2026-10-25 | M0 | Screen not run: free RAM 2.7 GB even after stopping the Research Desk backend (9.6 GB); browsers and the ChatGPT app hold ~10 GB more. Blocker recorded as U-006 | - |
 | 2026-10-26 | M0 | Models picked from published benchmarks (D-015): qwen3.5:4b + qwen3.5:9b. Bench-owned Ollama server at 64K (D-016). Model check: 4B 9/12 at 81 tok/s, fully on GPU at 64K; 9B 11/12 at 20 tok/s, 64% on GPU. Prompt overhead of 5 stock agents: 2.7K-12.2K tokens. First real runs found 4 bench bugs (E-008 cut prompt in our own screen, E-009..E-011), all fixed with tests; README/SCOPE overhead claim corrected to measured numbers | - |
+| 2026-10-26 | M0 | Session closed. Idle bench Ollama server stopped by Claude Code for critically low system memory; U-006 (free RAM) reopened before the baselines | - |
 
 ## Scoreboard
 

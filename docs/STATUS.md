@@ -15,6 +15,11 @@ The next unticked items in [PLAN.md](PLAN.md), M0:
 Done 2026-10-26: model check, prompt overhead, 64K context setup (see EVALS.md). A Med360 overnight experiment was
 running on this machine (uses a remote vLLM, not the GPU); RAM was ~6 GB free.
 
+Session closed 2026-10-26: the bench Ollama server is **not running**. Claude Code stopped it while the session was
+idle because the machine ran critically low on memory (nothing lost; all results were already pushed). Before the
+baselines: free RAM first (U-006: close Edge, Chrome, the ChatGPT app, or reboot), then start the server and let
+preflight check RAM.
+
 To restart Research Desk afterwards: in `portfolio/04-local-deep-research-vertical`, run
 `uv run langgraph dev --no-browser --no-reload --port 2025`.
 
