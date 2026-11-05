@@ -8,7 +8,7 @@ import sys
 
 
 def _workspace_root() -> pathlib.Path:
-    value = os.environ.get("CODEMITRA_WORKSPACE") or os.getcwd()
+    value = os.environ.get("MITRA_WORKSPACE") or os.getcwd()
     return pathlib.Path(value).resolve()
 
 
@@ -156,7 +156,7 @@ def main() -> int:
                     request_id,
                     {
                         "protocolVersion": "2024-11-05",
-                        "serverInfo": {"name": "codemitra-filesystem", "version": "0.1.0"},
+                        "serverInfo": {"name": "mitra-filesystem", "version": "0.1.0"},
                         "capabilities": {"tools": {}},
                     },
                 )

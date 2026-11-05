@@ -58,10 +58,10 @@ def test_understand_command_saves_notes(monkeypatch, tmp_path):
 
 
 def test_understand_command_passes_workspace_context(monkeypatch, tmp_path):
-    (tmp_path / ".codemitra").mkdir()
-    (tmp_path / ".codemitra" / "context.md").write_text("# Context\nProject summary\n", encoding="utf-8")
-    (tmp_path / ".codemitra" / "brainstorm.md").write_text("# Brainstorm\nIdeas\n", encoding="utf-8")
-    (tmp_path / ".codemitra" / "understand.md").write_text("# Understand\nKnown notes\n", encoding="utf-8")
+    (tmp_path / ".mitra").mkdir()
+    (tmp_path / ".mitra" / "context.md").write_text("# Context\nProject summary\n", encoding="utf-8")
+    (tmp_path / ".mitra" / "brainstorm.md").write_text("# Brainstorm\nIdeas\n", encoding="utf-8")
+    (tmp_path / ".mitra" / "understand.md").write_text("# Understand\nKnown notes\n", encoding="utf-8")
     (tmp_path / "PRD.md").write_text("# Existing PRD\n", encoding="utf-8")
     monkeypatch.setattr("app.main._build_idea_llm", lambda cfg: SimpleNamespace())
 
@@ -93,7 +93,7 @@ def test_prd_command_writes_workspace_prd(monkeypatch, tmp_path):
 
     assert result.exit_code == 0
     root_prd = tmp_path / "PRD.md"
-    memory_prd = tmp_path / ".codemitra" / "prd.md"
+    memory_prd = tmp_path / ".mitra" / "prd.md"
     assert root_prd.exists()
     assert memory_prd.exists()
     assert "Build a snake game" in root_prd.read_text(encoding="utf-8")
@@ -106,7 +106,7 @@ def test_understand_command_updates_context_memory(monkeypatch, tmp_path):
     result = runner.invoke(cli, ["understand", "Build a snake game", "--cwd", str(tmp_path)])
 
     assert result.exit_code == 0
-    context = (tmp_path / ".codemitra" / "context.md").read_text(encoding="utf-8")
+    context = (tmp_path / ".mitra" / "context.md").read_text(encoding="utf-8")
     assert "### Understand" in context
     assert "Build a snake game" in context
 
@@ -121,16 +121,16 @@ def test_prd_command_updates_context_memory(monkeypatch, tmp_path):
     result = runner.invoke(cli, ["prd", "Build a snake game", "--cwd", str(tmp_path)])
 
     assert result.exit_code == 0
-    context = (tmp_path / ".codemitra" / "context.md").read_text(encoding="utf-8")
+    context = (tmp_path / ".mitra" / "context.md").read_text(encoding="utf-8")
     assert "### PRD" in context
     assert "Snake Game" in context
 
 
 def test_prd_command_includes_workspace_context_in_understanding(monkeypatch, tmp_path):
-    (tmp_path / ".codemitra").mkdir()
-    (tmp_path / ".codemitra" / "context.md").write_text("# Context\nShared context\n", encoding="utf-8")
-    (tmp_path / ".codemitra" / "brainstorm.md").write_text("# Brainstorm\nSaved ideas\n", encoding="utf-8")
-    (tmp_path / ".codemitra" / "understand.md").write_text("# Understand\nKnown notes\n", encoding="utf-8")
+    (tmp_path / ".mitra").mkdir()
+    (tmp_path / ".mitra" / "context.md").write_text("# Context\nShared context\n", encoding="utf-8")
+    (tmp_path / ".mitra" / "brainstorm.md").write_text("# Brainstorm\nSaved ideas\n", encoding="utf-8")
+    (tmp_path / ".mitra" / "understand.md").write_text("# Understand\nKnown notes\n", encoding="utf-8")
     monkeypatch.setattr("app.main._build_idea_llm", lambda cfg: SimpleNamespace())
 
     captured = {}
@@ -150,9 +150,9 @@ def test_prd_command_includes_workspace_context_in_understanding(monkeypatch, tm
 
 
 def test_prd_command_supports_update_request(monkeypatch, tmp_path):
-    (tmp_path / ".codemitra").mkdir()
-    (tmp_path / ".codemitra" / "understand.md").write_text("# Understand\n\n## Idea\nSnake game\n", encoding="utf-8")
-    (tmp_path / ".codemitra" / "prd.md").write_text("# Snake Game\n\n## Problem\nOld content\n", encoding="utf-8")
+    (tmp_path / ".mitra").mkdir()
+    (tmp_path / ".mitra" / "understand.md").write_text("# Understand\n\n## Idea\nSnake game\n", encoding="utf-8")
+    (tmp_path / ".mitra" / "prd.md").write_text("# Snake Game\n\n## Problem\nOld content\n", encoding="utf-8")
     monkeypatch.setattr("app.main._build_idea_llm", lambda cfg: SimpleNamespace())
 
     captured = {}
@@ -183,8 +183,8 @@ def test_slash_aliases_work(monkeypatch, tmp_path):
 
 
 def test_prd_command_reads_root_prd_first(monkeypatch, tmp_path):
-    (tmp_path / ".codemitra").mkdir()
+    (tmp_path / ".mitra").mkdir()
     (tmp_path / "PRD.md").write_text("# Root PRD\n", encoding="utf-8")
-    (tmp_path / ".codemitra" / "prd.md").write_text("# Mirror PRD\n", encoding="utf-8")
+    (tmp_path / ".mitra" / "prd.md").write_text("# Mirror PRD\n", encoding="utf-8")
 
     assert memory.load_prd(str(tmp_path)) == "# Root PRD\n"

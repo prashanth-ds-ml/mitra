@@ -13,29 +13,29 @@ runner = CliRunner()
 
 
 def test_status_command_supports_canonical_name(monkeypatch, tmp_path):
-    (tmp_path / "codemitra.toml").write_text('local_model = "qwen3:8b"\n', encoding="utf-8")
+    (tmp_path / "mitra.toml").write_text('local_model = "qwen3:8b"\n', encoding="utf-8")
     monkeypatch.setattr("app.main.probe_ollama", lambda *_args, **_kwargs: (True, "Connected: 1 local model detected"))
 
     result = runner.invoke(cli, ["status", "--cwd", str(tmp_path)])
 
     assert result.exit_code == 0
-    assert "CodeMitra Status" in result.stdout
+    assert "Mitra Status" in result.stdout
     assert "qwen3:8b" in result.stdout
 
 
 def test_status_command_supports_slash_alias(monkeypatch, tmp_path):
-    (tmp_path / "codemitra.toml").write_text('local_model = "qwen3:8b"\n', encoding="utf-8")
+    (tmp_path / "mitra.toml").write_text('local_model = "qwen3:8b"\n', encoding="utf-8")
     monkeypatch.setattr("app.main.probe_ollama", lambda *_args, **_kwargs: (True, "Connected: 1 local model detected"))
 
     result = runner.invoke(cli, ["/status", "--cwd", str(tmp_path)])
 
     assert result.exit_code == 0
-    assert "CodeMitra Status" in result.stdout
+    assert "Mitra Status" in result.stdout
     assert "qwen3:8b" in result.stdout
 
 
 def test_config_command_shows_layers(monkeypatch, tmp_path):
-    (tmp_path / "codemitra.toml").write_text('session_mode = "approve"\n', encoding="utf-8")
+    (tmp_path / "mitra.toml").write_text('session_mode = "approve"\n', encoding="utf-8")
     result = runner.invoke(cli, ["config", "--cwd", str(tmp_path)])
 
     assert result.exit_code == 0
@@ -44,7 +44,7 @@ def test_config_command_shows_layers(monkeypatch, tmp_path):
 
 
 def test_config_command_supports_slash_alias(monkeypatch, tmp_path):
-    (tmp_path / "codemitra.toml").write_text('session_mode = "approve"\n', encoding="utf-8")
+    (tmp_path / "mitra.toml").write_text('session_mode = "approve"\n', encoding="utf-8")
     result = runner.invoke(cli, ["/config", "--cwd", str(tmp_path)])
 
     assert result.exit_code == 0
@@ -81,13 +81,13 @@ def test_models_command_lists_inventory(monkeypatch, tmp_path):
 
 
 def test_status_command_creates_phase0_log(monkeypatch, tmp_path):
-    (tmp_path / "codemitra.toml").write_text('local_model = "qwen3:8b"\n', encoding="utf-8")
+    (tmp_path / "mitra.toml").write_text('local_model = "qwen3:8b"\n', encoding="utf-8")
     monkeypatch.setattr("app.main.probe_ollama", lambda *_args, **_kwargs: (True, "Connected: 1 local model detected"))
 
     result = runner.invoke(cli, ["status", "--cwd", str(tmp_path)])
 
     assert result.exit_code == 0
-    log_path = tmp_path / ".codemitra" / "codemitra.log"
+    log_path = tmp_path / ".mitra" / "mitra.log"
     assert log_path.exists()
     log_text = log_path.read_text(encoding="utf-8")
     assert "status command" in log_text

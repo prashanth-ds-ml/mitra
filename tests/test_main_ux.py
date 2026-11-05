@@ -238,7 +238,7 @@ class TestCloudRoutingConfig:
 
     def test_load_config_resolves_allowed_roots(self, tmp_path):
         (tmp_path / "extra").mkdir()
-        (tmp_path / "codemitra.toml").write_text('allowed_roots = ["extra"]\ndisabled_tools = ["delete_file"]\ndisabled_commands = ["python"]\n', encoding="utf-8")
+        (tmp_path / "mitra.toml").write_text('allowed_roots = ["extra"]\ndisabled_tools = ["delete_file"]\ndisabled_commands = ["python"]\n', encoding="utf-8")
         from app.config import load
         cfg = load(cwd=str(tmp_path))
         assert str((tmp_path / "extra").resolve()) in cfg["allowed_roots"]
@@ -250,22 +250,22 @@ class TestCloudRoutingConfig:
 
         (tmp_path / "AGENTS.md").write_text("Prefer small focused patches.", encoding="utf-8")
         (tmp_path / "CLAUDE.md").write_text("Ask before guessing.", encoding="utf-8")
-        (tmp_path / ".codemitra").mkdir()
-        (tmp_path / ".codemitra" / "instructions.md").write_text("Keep plans explicit.", encoding="utf-8")
+        (tmp_path / ".mitra").mkdir()
+        (tmp_path / ".mitra" / "instructions.md").write_text("Keep plans explicit.", encoding="utf-8")
 
         cfg = load(cwd=str(tmp_path))
         loaded = {item["path"]: item["content"] for item in cfg["project_instructions"]}
 
         assert loaded["AGENTS.md"] == "Prefer small focused patches."
         assert loaded["CLAUDE.md"] == "Ask before guessing."
-        assert loaded[str(pathlib.Path(".codemitra") / "instructions.md")] == "Keep plans explicit."
+        assert loaded[str(pathlib.Path(".mitra") / "instructions.md")] == "Keep plans explicit."
 
     def test_project_instruction_files_ignore_paths_outside_workspace(self, tmp_path):
         from app.config import load
 
         outside = tmp_path.parent / "outside-instructions.md"
         outside.write_text("Do not load me.", encoding="utf-8")
-        (tmp_path / "codemitra.toml").write_text(
+        (tmp_path / "mitra.toml").write_text(
             f'instruction_files = ["{outside.as_posix()}"]\n',
             encoding="utf-8",
         )
@@ -277,13 +277,13 @@ class TestCloudRoutingConfig:
     def test_build_project_instructions_prompt_formats_loaded_files(self):
         prompt = _build_project_instructions_prompt([
             {"path": "AGENTS.md", "content": "Prefer tests first."},
-            {"path": ".codemitra/instructions.md", "content": "Keep output concise."},
+            {"path": ".mitra/instructions.md", "content": "Keep output concise."},
         ])
 
         assert "Project Instructions" in prompt
         assert "### AGENTS.md" in prompt
         assert "Prefer tests first." in prompt
-        assert "### .codemitra/instructions.md" in prompt
+        assert "### .mitra/instructions.md" in prompt
         assert "Keep output concise." in prompt
 
     def test_skill_dirs_config_defaults_to_workspace_skill_locations(self, tmp_path):
@@ -291,7 +291,7 @@ class TestCloudRoutingConfig:
 
         cfg = load(cwd=str(tmp_path))
 
-        assert cfg["skill_dirs"] == ["skills", ".codemitra/skills"]
+        assert cfg["skill_dirs"] == ["skills", ".mitra/skills"]
 
     def test_instruction_files_default_includes_claude_compat(self, tmp_path):
         from app.config import load
@@ -310,7 +310,7 @@ class TestCloudRoutingConfig:
             )
         ])
 
-        assert "Available CodeMitra Skills" in prompt
+        assert "Available Mitra Skills" in prompt
         assert "repo-analyzer" in prompt
         assert "read that skill's `SKILL.md`" in prompt
 
@@ -323,14 +323,14 @@ class TestCloudRoutingConfig:
             )
         ])
 
-        assert "CodeMitra skills" in reply
+        assert "Mitra skills" in reply
         assert "**rag-pipeline**" in reply
         assert "05-rag-pipeline" in reply
         assert "/skills show <name>" in reply
 
     def test_build_skills_reply_handles_empty_registry(self):
         reply = _build_skills_reply([])
-        assert "No CodeMitra skills found" in reply
+        assert "No Mitra skills found" in reply
 
     def test_build_skills_reply_shows_specific_skill_body(self, tmp_path):
         skill_dir = tmp_path / "skills" / "05-rag-pipeline"
@@ -365,11 +365,11 @@ class TestCloudRoutingConfig:
 
 
 class TestPromptLabel:
-    def test_prompt_label_uses_codemitra_name(self):
-        assert _build_prompt_label("qwen3.5:latest") == "\n[CodeMitra · approve · builder] (qwen3.5)> "
+    def test_prompt_label_uses_mitra_name(self):
+        assert _build_prompt_label("qwen3.5:latest") == "\n[Mitra · approve · builder] (qwen3.5)> "
 
     def test_prompt_label_can_show_mode(self):
-        assert _build_prompt_label("qwen3.5:latest", "read-only", "mentor") == "\n[CodeMitra · read-only · mentor] (qwen3.5)> "
+        assert _build_prompt_label("qwen3.5:latest", "read-only", "mentor") == "\n[Mitra · read-only · mentor] (qwen3.5)> "
 
 
 class TestRoleRouting:
@@ -553,9 +553,9 @@ class TestGreetingHelpers:
         assert not _is_simple_greeting("help me debug this")
         assert not _is_simple_greeting("/help")
 
-    def test_greeting_reply_mentions_codemitra_capabilities(self):
+    def test_greeting_reply_mentions_mitra_capabilities(self):
         reply = _build_greeting_reply()
-        assert "CodeMitra" in reply
+        assert "Mitra" in reply
         assert "local coding assistant" in reply
         assert "run commands" in reply
 
@@ -1295,7 +1295,7 @@ class TestOperatorReplies:
             },
         )
         reply = _build_change_set_diff_reply(str(tmp_path))
-        assert "Last CodeMitra change set" in reply
+        assert "Last Mitra change set" in reply
         assert "print('old')" in reply
         assert "print('new')" in reply
 
@@ -1316,7 +1316,7 @@ class TestOperatorReplies:
         )
         review_input = _build_change_set_review_input(str(tmp_path))
         assert review_input is not None
-        assert "Last CodeMitra change set" in review_input
+        assert "Last Mitra change set" in review_input
         assert "print('old')" in review_input
         assert "print('new')" in review_input
 

@@ -86,7 +86,7 @@ _DOC_EXTS = {".pdf", ".docx", ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", 
 
 _IGNORE_DIRS = {
     ".git", ".venv", "venv", "__pycache__", "node_modules",
-    ".pytest_cache", ".mypy_cache", "dist", "build", ".codemitra",
+    ".pytest_cache", ".mypy_cache", "dist", "build", ".mitra",
 }
 
 MAX_FILE_READ = 200   # lines — safety cap for large files

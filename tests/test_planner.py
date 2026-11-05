@@ -234,7 +234,7 @@ class TestAutoCompactConfig:
         assert _DEFAULTS["num_ctx"] == 131072
 
     def test_loaded_from_toml(self, tmp_path):
-        (tmp_path / "codemitra.toml").write_text(
+        (tmp_path / "mitra.toml").write_text(
             'auto_compact_threshold = 4000\nnum_ctx = 16000\n', encoding="utf-8"
         )
         from app.config import load

@@ -47,7 +47,7 @@ def test_start_command_supports_slash_alias(tmp_path):
 
 
 def test_start_command_uses_configured_work_mode(monkeypatch, tmp_path):
-    (tmp_path / "codemitra.toml").write_text('work_mode = "mentor"\n', encoding="utf-8")
+    (tmp_path / "mitra.toml").write_text('work_mode = "mentor"\n', encoding="utf-8")
 
     captured = {}
 
@@ -65,7 +65,7 @@ def test_start_command_uses_configured_work_mode(monkeypatch, tmp_path):
 
 
 def test_start_command_mode_option_overrides_config(monkeypatch, tmp_path):
-    (tmp_path / "codemitra.toml").write_text('work_mode = "builder"\n', encoding="utf-8")
+    (tmp_path / "mitra.toml").write_text('work_mode = "builder"\n', encoding="utf-8")
 
     captured = {}
 
@@ -83,7 +83,7 @@ def test_start_command_mode_option_overrides_config(monkeypatch, tmp_path):
 
 
 def test_start_command_supports_playbook_option(tmp_path):
-    (tmp_path / "codemitra.toml").write_text('local_model = ""\n', encoding="utf-8")
+    (tmp_path / "mitra.toml").write_text('local_model = ""\n', encoding="utf-8")
     _write_simple_game_playbook(tmp_path)
 
     result = runner.invoke(cli, ["start", "--playbook", "simple-game", "Build a snake game", "--cwd", str(tmp_path)])
@@ -94,7 +94,7 @@ def test_start_command_supports_playbook_option(tmp_path):
 
 
 def test_start_command_supports_slash_alias_with_playbook(tmp_path):
-    (tmp_path / "codemitra.toml").write_text('local_model = ""\n', encoding="utf-8")
+    (tmp_path / "mitra.toml").write_text('local_model = ""\n', encoding="utf-8")
     _write_simple_game_playbook(tmp_path)
 
     result = runner.invoke(cli, ["/start", "--playbook", "simple-game", "Build a snake game", "--cwd", str(tmp_path)])
@@ -104,7 +104,7 @@ def test_start_command_supports_slash_alias_with_playbook(tmp_path):
 
 
 def test_playbooks_command_lists_project_playbooks(tmp_path):
-    (tmp_path / "codemitra.toml").write_text("work_mode = \"builder\"\n", encoding="utf-8")
+    (tmp_path / "mitra.toml").write_text("work_mode = \"builder\"\n", encoding="utf-8")
     _write_simple_game_playbook(tmp_path)
 
     result = runner.invoke(cli, ["playbooks", "--cwd", str(tmp_path)])
@@ -115,7 +115,7 @@ def test_playbooks_command_lists_project_playbooks(tmp_path):
 
 
 def test_next_command_uses_command_layer(monkeypatch, tmp_path):
-    (tmp_path / "codemitra.toml").write_text('local_model = "qwen3:8b"\n', encoding="utf-8")
+    (tmp_path / "mitra.toml").write_text('local_model = "qwen3:8b"\n', encoding="utf-8")
     captured = {}
 
     def fake_cmd_next(workspace, llm, **kwargs):
@@ -133,7 +133,7 @@ def test_next_command_uses_command_layer(monkeypatch, tmp_path):
 
 
 def test_build_command_uses_command_layer(monkeypatch, tmp_path):
-    (tmp_path / "codemitra.toml").write_text('local_model = "qwen3:8b"\n', encoding="utf-8")
+    (tmp_path / "mitra.toml").write_text('local_model = "qwen3:8b"\n', encoding="utf-8")
     captured = {}
 
     def fake_cmd_build(workspace, llm, **kwargs):

@@ -14,7 +14,7 @@ def test_detect_project_root_walks_up_to_pyproject(tmp_path):
 
 
 def test_load_uses_detected_project_root_for_nested_paths(tmp_path):
-    (tmp_path / "codemitra.toml").write_text('local_model = "qwen3:8b"\n', encoding="utf-8")
+    (tmp_path / "mitra.toml").write_text('local_model = "qwen3:8b"\n', encoding="utf-8")
     nested = tmp_path / "app" / "cli"
     nested.mkdir(parents=True)
 
@@ -156,7 +156,7 @@ def test_list_reclaimable_processes_merges_local_ai_and_gpu(monkeypatch):
 
 def test_load_exposes_default_plugin_dirs(tmp_path):
     cfg = config.load(cwd=str(tmp_path))
-    assert cfg["plugin_dirs"] == ["plugins", ".codemitra/plugins"]
+    assert cfg["plugin_dirs"] == ["plugins", ".mitra/plugins"]
 
 
 def test_load_exposes_default_mcp_servers(tmp_path):
@@ -182,7 +182,7 @@ def test_load_exposes_default_work_mode(tmp_path):
 
 
 def test_load_merges_agent_model_overrides(tmp_path):
-    (tmp_path / "codemitra.toml").write_text(
+    (tmp_path / "mitra.toml").write_text(
         "[agent_models]\nplanner = \"custom-planner\"\ndocs = \"custom-docs\"\n",
         encoding="utf-8",
     )

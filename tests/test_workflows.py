@@ -1,4 +1,4 @@
-"""Workflow-style regression tests for CodeMitra."""
+"""Workflow-style regression tests for Mitra."""
 
 from contextlib import nullcontext
 from types import SimpleNamespace
@@ -322,9 +322,9 @@ class TestPlanLifecycleWorkflow:
     def test_auto_plan_request_reuses_workspace_memory_context(self, monkeypatch, tmp_path):
         from app import main as main_mod
 
-        (tmp_path / ".codemitra").mkdir()
-        (tmp_path / ".codemitra" / "context.md").write_text("# Context\nProject memory\n", encoding="utf-8")
-        (tmp_path / ".codemitra" / "understand.md").write_text("# Understand\nKnown scope\n", encoding="utf-8")
+        (tmp_path / ".mitra").mkdir()
+        (tmp_path / ".mitra" / "context.md").write_text("# Context\nProject memory\n", encoding="utf-8")
+        (tmp_path / ".mitra" / "understand.md").write_text("# Understand\nKnown scope\n", encoding="utf-8")
         (tmp_path / "PRD.md").write_text("# PRD\nStable requirements\n", encoding="utf-8")
 
         monkeypatch.setattr(main_mod.console, "print", lambda *args, **kwargs: None)
@@ -397,11 +397,11 @@ class TestPlanLifecycleWorkflow:
 
     def test_plan_execution_block_reply_matches_continue_gate(self):
         assert _build_plan_execution_blocked_reply("plan") == (
-            "CodeMitra is in `plan` mode, so it will not execute plan steps yet. "
+            "Mitra is in `plan` mode, so it will not execute plan steps yet. "
             "Use `/mode approve` or `/mode auto` to act."
         )
         assert _build_plan_execution_blocked_reply("read-only", active_plan=True) == (
-            "CodeMitra is in `read-only` mode, so it will not execute the active plan yet. "
+            "Mitra is in `read-only` mode, so it will not execute the active plan yet. "
             "Use `/mode approve` or `/mode auto` to continue."
         )
 

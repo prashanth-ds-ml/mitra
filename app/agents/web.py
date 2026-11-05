@@ -16,7 +16,7 @@ from rich.panel import Panel
 
 from app.prompts import WEB_SYSTEM_PROMPT as _SYSTEM_PROMPT
 
-_USER_AGENT = "CodeMitra/1.0 (+https://github.com)"
+_USER_AGENT = "Mitra/1.0 (+https://github.com)"
 _MAX_FETCH_CHARS = 6000
 _DEFAULT_TIMEOUT = 15
 

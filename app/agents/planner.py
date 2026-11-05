@@ -2,7 +2,7 @@
 
 The planner:
   1. Takes a high-level goal and breaks it into concrete, actionable steps.
-  2. Writes the plan to .codemitra/plan.md.
+  2. Writes the plan to .mitra/plan.md.
   3. On each turn, reads the plan, picks the next pending step, and routes it
      to the appropriate agent (filesystem, shell, or reader).
   4. Marks steps done, updates the plan file, and summarises progress.

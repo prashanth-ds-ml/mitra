@@ -1,11 +1,11 @@
-"""Obsidian-compatible project memory for CodeMitra.
+"""Obsidian-compatible project memory for Mitra.
 
-Files written to <workspace>/.codemitra/
+Files written to <workspace>/.mitra/
   activity.md  — timestamped log of every conversation turn (daily-note style)
   context.md   — running project state, injected into the system prompt
   plan.md      — current active plan (populated by the planner agent later)
 
-All files are plain Markdown — open the .codemitra/ folder as an Obsidian vault
+All files are plain Markdown — open the .mitra/ folder as an Obsidian vault
 to browse, search, and link between sessions.
 """
 
@@ -20,7 +20,7 @@ from datetime import datetime
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
-_DIR = ".codemitra"
+_DIR = ".mitra"
 _ACTIVITY  = "activity.md"
 _SESSION_LOG = "session_log.md"
 _CONTEXT   = "context.md"
@@ -53,7 +53,7 @@ def append_activity(workspace: str, user_msg: str, ai_summary: str) -> None:
       ## YYYY-MM-DD
       ### HH:MM
       **You:** ...
-      **CodeMitra:** ...
+      **Mitra:** ...
     """
     path = _dir(workspace) / _ACTIVITY
     now  = datetime.now()
@@ -67,7 +67,7 @@ def append_activity(workspace: str, user_msg: str, ai_summary: str) -> None:
     entry = (
         f"\n{time_heading}\n"
         f"**You:** {user_short}\n\n"
-        f"**CodeMitra:** {ai_short}\n"
+        f"**Mitra:** {ai_short}\n"
     )
 
     if path.exists():
@@ -80,10 +80,10 @@ def append_activity(workspace: str, user_msg: str, ai_summary: str) -> None:
         header = textwrap.dedent(f"""\
             ---
             title: Activity Log
-            tags: [codemitra, activity, log]
+            tags: [mitra, activity, log]
             ---
 
-            # CodeMitra - Activity Log
+            # Mitra - Activity Log
 
             {date_heading}
         """)
@@ -105,13 +105,13 @@ def append_activity(workspace: str, user_msg: str, ai_summary: str) -> None:
 _CONTEXT_TEMPLATE = textwrap.dedent("""\
     ---
     title: Project Context
-    tags: [codemitra, context, memory]
+    tags: [mitra, context, memory]
     updated: {updated}
     ---
 
     # Project Context
 
-    > Auto-maintained by CodeMitra. Edit freely - it is re-read at every startup.
+    > Auto-maintained by Mitra. Edit freely - it is re-read at every startup.
 
     ## Last active
     {updated}
@@ -120,7 +120,7 @@ _CONTEXT_TEMPLATE = textwrap.dedent("""\
     {topics}
 
     ## Notes
-    <!-- Add anything you want CodeMitra to always remember about this project -->
+    <!-- Add anything you want Mitra to always remember about this project -->
 
 """)
 
@@ -214,13 +214,13 @@ def append_context_note(workspace: str, title: str, body: str) -> pathlib.Path:
 _PLAN_TEMPLATE = textwrap.dedent("""\
     ---
     title: Active Plan
-    tags: [codemitra, plan]
+    tags: [mitra, plan]
     updated: {updated}
     ---
 
     # Active Plan
 
-    > Managed by CodeMitra's planner. Use `/plan <goal>` to set or update.
+    > Managed by Mitra's planner. Use `/plan <goal>` to set or update.
 
     ## Goal
     {goal}
@@ -229,7 +229,7 @@ _PLAN_TEMPLATE = textwrap.dedent("""\
     {steps}
 
     ## Completed
-    <!-- CodeMitra will check off steps here as work progresses -->
+    <!-- Mitra will check off steps here as work progresses -->
 
 """)
 
@@ -293,8 +293,8 @@ def load_recent_activity(workspace: str, limit: int = 5) -> list[dict[str, str]]
             continue
         if line.startswith("**You:** "):
             current["user"] = line[len("**You:** "):].strip()
-        elif line.startswith("**CodeMitra:** "):
-            current["assistant"] = line[len("**CodeMitra:** "):].strip()
+        elif line.startswith("**Mitra:** "):
+            current["assistant"] = line[len("**Mitra:** "):].strip()
 
     if current:
         entries.append(current)
@@ -320,13 +320,13 @@ def write_understand(workspace: str, goal: str, summary: str, questions: list[st
     content = textwrap.dedent(f"""\
         ---
         title: Project Understanding
-        tags: [codemitra, understand, memory]
+        tags: [mitra, understand, memory]
         updated: {now}
         ---
 
         # Project Understanding
 
-        > Managed by CodeMitra. This note captures the current understanding of the user's idea.
+        > Managed by Mitra. This note captures the current understanding of the user's idea.
 
         ## Goal
         {goal}
@@ -343,12 +343,12 @@ def write_understand(workspace: str, goal: str, summary: str, questions: list[st
 
 
 def write_prd(workspace: str, title: str, content: str) -> pathlib.Path:
-    """Write the PRD to both .codemitra and the workspace root."""
+    """Write the PRD to both .mitra and the workspace root."""
     ws = pathlib.Path(workspace)
     path = ws / "PRD.md"
-    codemitra_path = _dir(workspace) / _PRD
+    mitra_path = _dir(workspace) / _PRD
     text = content.strip() + "\n"
-    codemitra_path.write_text(text, encoding="utf-8")
+    mitra_path.write_text(text, encoding="utf-8")
     path.write_text(text, encoding="utf-8")
     return path
 
@@ -386,19 +386,19 @@ def append_brainstorm_entry(workspace: str, prompt: str, response: str) -> pathl
         header = textwrap.dedent("""\
             ---
             title: Brainstorm Notes
-            tags: [codemitra, brainstorm, notes]
+            tags: [mitra, brainstorm, notes]
             ---
 
             # Brainstorm Notes
 
-            > Saved idea exploration and planning notes from CodeMitra.
+            > Saved idea exploration and planning notes from Mitra.
         """)
         path.write_text(header, encoding="utf-8")
 
     entry = (
         f"\n\n## {stamp}\n\n"
         f"**Prompt:** {prompt.strip()}\n\n"
-        f"**CodeMitra:**\n\n{response.strip()}\n"
+        f"**Mitra:**\n\n{response.strip()}\n"
     )
     existing = path.read_text(encoding="utf-8")
     path.write_text(existing + entry, encoding="utf-8")
@@ -554,10 +554,10 @@ def trust_shell_command(workspace: str, cwd: str, command_name: str) -> dict:
 _ACTIVITY_TEMPLATE = textwrap.dedent("""\
     ---
     title: Activity Log
-    tags: [codemitra, activity, log]
+    tags: [mitra, activity, log]
     ---
 
-    # CodeMitra - Activity Log
+    # Mitra - Activity Log
 
     > One entry per conversation turn. Open this folder as an Obsidian vault.
 
@@ -566,10 +566,10 @@ _ACTIVITY_TEMPLATE = textwrap.dedent("""\
 _SESSION_LOG_TEMPLATE = textwrap.dedent("""\
     ---
     title: Session Log
-    tags: [codemitra, session, log]
+    tags: [mitra, session, log]
     ---
 
-    # CodeMitra - Session Log
+    # Mitra - Session Log
 
     > Mirror of high-level session activity for traceability.
 
@@ -578,19 +578,19 @@ _SESSION_LOG_TEMPLATE = textwrap.dedent("""\
 _DECISIONS_TEMPLATE = textwrap.dedent("""\
     ---
     title: Decision Journal
-    tags: [codemitra, decisions]
+    tags: [mitra, decisions]
     ---
 
     # Decision Journal
 
-    > Important implementation and operator decisions recorded by CodeMitra.
+    > Important implementation and operator decisions recorded by Mitra.
 
 """)
 
 _ERRORS_TEMPLATE = textwrap.dedent("""\
     ---
     title: Error Log
-    tags: [codemitra, errors]
+    tags: [mitra, errors]
     ---
 
     # Error Log
@@ -602,7 +602,7 @@ _ERRORS_TEMPLATE = textwrap.dedent("""\
 _TASK_BOARD_TEMPLATE = textwrap.dedent("""\
     ---
     title: Task Board
-    tags: [codemitra, tasks]
+    tags: [mitra, tasks]
     updated: {updated}
     ---
 
@@ -620,9 +620,9 @@ _USER_PROFILE_TEMPLATE = textwrap.dedent("""\
 """)
 
 _OBSIDIAN_README = textwrap.dedent("""\
-    # .codemitra vault
+    # .mitra vault
 
-    This folder is managed by **CodeMitra** and doubles as an [Obsidian](https://obsidian.md) vault.
+    This folder is managed by **Mitra** and doubles as an [Obsidian](https://obsidian.md) vault.
 
     | File | Purpose |
     |---|---|
@@ -643,7 +643,7 @@ _OBSIDIAN_README = textwrap.dedent("""\
 
 
 def init_memory(workspace: str) -> list[str]:
-    """Create the .codemitra/ vault skeleton during `codemitra init`.
+    """Create the .mitra/ vault skeleton during `mitra init`.
 
     Returns a list of file paths that were created (skips existing files).
     """
@@ -672,8 +672,8 @@ def init_memory(workspace: str) -> list[str]:
         )
         # Inject project name into Notes section
         content = content.replace(
-            "<!-- Add anything you want CodeMitra to always remember about this project -->",
-            f"<!-- Add anything you want CodeMitra to always remember about this project -->\n"
+            "<!-- Add anything you want Mitra to always remember about this project -->",
+            f"<!-- Add anything you want Mitra to always remember about this project -->\n"
             f"- Project: **{project_name}**",
         )
         context_path.write_text(content, encoding="utf-8")
@@ -696,7 +696,7 @@ def init_memory(workspace: str) -> list[str]:
             textwrap.dedent("""\
                 ---
                 title: Understand Notes
-                tags: [codemitra, understand, notes]
+                tags: [mitra, understand, notes]
                 ---
 
                 # Understand Notes
@@ -713,7 +713,7 @@ def init_memory(workspace: str) -> list[str]:
             textwrap.dedent("""\
                 ---
                 title: Product Requirements Document
-                tags: [codemitra, prd, requirements]
+                tags: [mitra, prd, requirements]
                 ---
 
                 # Product Requirements Document
@@ -730,7 +730,7 @@ def init_memory(workspace: str) -> list[str]:
             textwrap.dedent("""\
                 ---
                 title: Brainstorm Notes
-                tags: [codemitra, brainstorm, notes]
+                tags: [mitra, brainstorm, notes]
                 ---
 
                 # Brainstorm Notes

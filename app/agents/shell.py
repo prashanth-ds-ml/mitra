@@ -2,7 +2,7 @@
 
 Design goals:
   - Streams stdout/stderr in real time so the user sees progress (tests, builds, servers)
-  - Hard timeout with subprocess kill so a runaway process never hangs CodeMitra
+  - Hard timeout with subprocess kill so a runaway process never hangs Mitra
   - Whitelisted executables (same _DEFAULT_COMMANDS as filesystem agent)
   - User sees a coloured "Shell Agent" panel with command, exit code, and truncated output
   - The main LLM gets the exit code + tail of output so it can react to failures

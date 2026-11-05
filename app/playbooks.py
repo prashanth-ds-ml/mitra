@@ -10,7 +10,7 @@ from typing import Any
 
 _DEFAULT_PLAYBOOK_DIRS = [
     "playbooks",
-    ".codemitra/playbooks",
+    ".mitra/playbooks",
 ]
 _MAX_DESCRIPTION_CHARS = 700
 

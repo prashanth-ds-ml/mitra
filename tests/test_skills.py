@@ -1,4 +1,4 @@
-"""Tests for CodeMitra skill discovery."""
+"""Tests for Mitra skill discovery."""
 
 import pathlib
 
@@ -45,7 +45,7 @@ class TestSkillDiscovery:
 
         prompt = skills.format_prompt([skill])
 
-        assert "Available CodeMitra Skills" in prompt
+        assert "Available Mitra Skills" in prompt
         assert "read that skill's `SKILL.md`" in prompt
         assert "`rag-pipeline`" in prompt
 

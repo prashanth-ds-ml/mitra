@@ -48,7 +48,7 @@ class Policy:
 
 
 DEFAULT_POLICY_YAML = """
-# CodeMitra Policy Configuration
+# Mitra Policy Configuration
 # Deny-first rule engine: rules are evaluated in priority order (highest wins)
 # Actions: allow, ask, deny
 # Scopes: tool, command, path

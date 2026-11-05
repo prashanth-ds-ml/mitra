@@ -1,4 +1,4 @@
-"""CodeMitra skill discovery and prompt formatting."""
+"""Mitra skill discovery and prompt formatting."""
 from __future__ import annotations
 
 import json
@@ -53,7 +53,7 @@ def discover(workspace: str, entries=None) -> list[Skill]:
     """Discover skills from configured directories inside the workspace."""
     root = pathlib.Path(workspace).resolve()
     if entries is None:
-        entries = ["skills", ".codemitra/skills"]
+        entries = ["skills", ".mitra/skills"]
     if isinstance(entries, str):
         entries = [entries]
 
@@ -167,7 +167,7 @@ def format_prompt(skills: list[Skill]) -> str:
     if not skills:
         return ""
     lines = [
-        "## Available CodeMitra Skills",
+        "## Available Mitra Skills",
         "",
         "Skills are reusable engineering playbooks stored in this workspace. When a user request clearly matches a skill description, read that skill's `SKILL.md` with the code reader before planning or editing, then follow its workflow. Keep using normal permission modes and approval rules.",
         "",

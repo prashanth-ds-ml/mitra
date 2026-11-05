@@ -8,18 +8,18 @@ import numpy as np
 from rich.text import Text
 
 
-_CODEMITRA_BANNER = dedent(
+_MITRA_BANNER = dedent(
     r"""
-     ______                 __          __       __ __   __
-    /      \               |  \        |  \     /  \  \ |  \
-   |  ▓▓▓▓▓▓\ ______   ____| ▓▓ ______ | ▓▓\   /  ▓▓\▓▓_| ▓▓_    ______   ______
-   | ▓▓   \▓▓/      \ /      ▓▓/      \| ▓▓▓\ /  ▓▓▓  \   ▓▓ \  /      \ |      \
-   | ▓▓     |  ▓▓▓▓▓▓\  ▓▓▓▓▓▓▓  ▓▓▓▓▓▓\ ▓▓▓▓\  ▓▓▓▓ ▓▓\▓▓▓▓▓▓ |  ▓▓▓▓▓▓\ \▓▓▓▓▓▓\
-   | ▓▓   __| ▓▓  | ▓▓ ▓▓  | ▓▓ ▓▓    ▓▓ ▓▓\▓▓ ▓▓ ▓▓ ▓▓ | ▓▓ __| ▓▓   \▓▓/      ▓▓
-   | ▓▓__/  \ ▓▓__/ ▓▓ ▓▓__| ▓▓ ▓▓▓▓▓▓▓▓ ▓▓ \▓▓▓| ▓▓ ▓▓ | ▓▓|  \ ▓▓     |  ▓▓▓▓▓▓▓
-    \▓▓    ▓▓\▓▓    ▓▓\▓▓    ▓▓\▓▓     \ ▓▓  \▓ | ▓▓ ▓▓  \▓▓  ▓▓ ▓▓      \▓▓    ▓▓
-     \▓▓▓▓▓▓  \▓▓▓▓▓▓  \▓▓▓▓▓▓▓ \▓▓▓▓▓▓▓\▓▓      \▓▓\▓▓   \▓▓▓▓ \▓▓       \▓▓▓▓▓▓▓
-    """
+ __       __ __   __
+|  \     /  \  \ |  \
+| ▓▓\   /  ▓▓\▓▓_| ▓▓_    ______   ______
+| ▓▓▓\ /  ▓▓▓  \   ▓▓ \  /      \ |      \
+| ▓▓▓▓\  ▓▓▓▓ ▓▓\▓▓▓▓▓▓ |  ▓▓▓▓▓▓\ \▓▓▓▓▓▓\
+| ▓▓\▓▓ ▓▓ ▓▓ ▓▓ | ▓▓ __| ▓▓   \▓▓/      ▓▓
+| ▓▓ \▓▓▓| ▓▓ ▓▓ | ▓▓|  \ ▓▓     |  ▓▓▓▓▓▓▓
+| ▓▓  \▓ | ▓▓ ▓▓  \▓▓  ▓▓ ▓▓      \▓▓    ▓▓
+ \▓▓      \▓▓\▓▓   \▓▓▓▓ \▓▓       \▓▓▓▓▓▓▓
+"""
 ).strip("\n")
 
 _BLOCK_FONT_7X7: dict[str, list[str]] = {
@@ -63,9 +63,9 @@ def generate_ascii_art(image_path: str, size: Tuple[int, int] = (40, 40), chars:
 	return "\n".join(lines)
 
 
-def generate_codemitra_banner_art() -> Text:
-	"""Return the fixed CodeMitra startup banner supplied for the CLI."""
-	return Text(_CODEMITRA_BANNER, style="bold #87ceeb", no_wrap=True)
+def generate_mitra_banner_art() -> Text:
+	"""Return the fixed Mitra startup banner supplied for the CLI."""
+	return Text(_MITRA_BANNER, style="bold #87ceeb", no_wrap=True)
 
 
 def generate_color_block_art(
@@ -202,7 +202,7 @@ def generate_halfblock_art(
 
 
 def generate_title_art(
-	text: str = "CodeMitra",
+	text: str = "Mitra",
 	cols: int = 96,
 	rows: int = 9,
 	font_path: str = "C:/Windows/Fonts/consolab.ttf",

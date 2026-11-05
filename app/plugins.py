@@ -33,7 +33,7 @@ class PluginRegistry:
 def _resolve_dirs(workspace: str, entries=None) -> list[pathlib.Path]:
     root = pathlib.Path(workspace).resolve()
     if entries is None:
-        entries = ["plugins", ".codemitra/plugins"]
+        entries = ["plugins", ".mitra/plugins"]
     if isinstance(entries, str):
         entries = [entries]
 
@@ -59,7 +59,7 @@ def _resolve_dirs(workspace: str, entries=None) -> list[pathlib.Path]:
 
 def _load_module(plugin_file: pathlib.Path) -> ModuleType:
     spec = importlib.util.spec_from_file_location(
-        f"codemitra_plugin_{plugin_file.stem}_{abs(hash(str(plugin_file)))}",
+        f"mitra_plugin_{plugin_file.stem}_{abs(hash(str(plugin_file)))}",
         plugin_file,
     )
     if spec is None or spec.loader is None:

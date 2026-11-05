@@ -1,4 +1,4 @@
-"""Internal event bus for CodeMitra hooks system."""
+"""Internal event bus for Mitra hooks system."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

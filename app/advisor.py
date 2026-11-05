@@ -1,4 +1,4 @@
-"""Model Advisor — recommends the best installed models for each CodeMitra role.
+"""Model Advisor — recommends the best installed models for each Mitra role.
 
 Roles
 -----
@@ -271,7 +271,7 @@ def format_recommendations(recs: Recommendations, current_local: str = "", curre
 # ── Config writing ────────────────────────────────────────────────────────────
 
 def apply_to_toml(workspace: str, local_model: str, codegen_model: str = "") -> tuple[bool, str]:
-    """Write (or update) codemitra.toml with the recommended models.
+    """Write (or update) mitra.toml with the recommended models.
 
     Returns (success, message).
     """
@@ -279,7 +279,7 @@ def apply_to_toml(workspace: str, local_model: str, codegen_model: str = "") -> 
         # Fall back to a simple line-based writer
         return _apply_to_toml_manual(workspace, local_model, codegen_model)
 
-    toml_path = pathlib.Path(workspace) / "codemitra.toml"
+    toml_path = pathlib.Path(workspace) / "mitra.toml"
     try:
         if toml_path.exists():
             with open(toml_path, "rb") as f:
@@ -292,14 +292,14 @@ def apply_to_toml(workspace: str, local_model: str, codegen_model: str = "") -> 
         with open(toml_path, "wb") as f:
             import tomli_w
             tomli_w.dump(cfg, f)
-        return True, f"Updated `codemitra.toml` → local_model = {local_model!r}"
+        return True, f"Updated `mitra.toml` → local_model = {local_model!r}"
     except Exception as exc:
-        return False, f"Could not update codemitra.toml: {exc}"
+        return False, f"Could not update mitra.toml: {exc}"
 
 
 def _apply_to_toml_manual(workspace: str, local_model: str, codegen_model: str = "") -> tuple[bool, str]:
     """Simple line-based toml updater used when tomli_w is unavailable."""
-    toml_path = pathlib.Path(workspace) / "codemitra.toml"
+    toml_path = pathlib.Path(workspace) / "mitra.toml"
     try:
         lines = toml_path.read_text(encoding="utf-8").splitlines() if toml_path.exists() else []
         updates = {"local_model": local_model}
@@ -324,9 +324,9 @@ def _apply_to_toml_manual(workspace: str, local_model: str, codegen_model: str =
                 new_lines.append(f'{key} = "{val}"')
 
         toml_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-        return True, f"Updated `codemitra.toml` → local_model = {local_model!r}"
+        return True, f"Updated `mitra.toml` → local_model = {local_model!r}"
     except Exception as exc:
-        return False, f"Could not update codemitra.toml: {exc}"
+        return False, f"Could not update mitra.toml: {exc}"
 
 
 def get_best_local_model(inventory: list, vram_gib: float | None, ram_gib: float | None) -> str | None:

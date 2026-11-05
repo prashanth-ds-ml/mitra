@@ -24,7 +24,7 @@ class TestReviewerAgent:
     def test_render_returns_panel(self):
         response = reviewer.ReviewResponse(
             request="Review current changes",
-            source="last CodeMitra change set",
+            source="last Mitra change set",
             summary="Potential regression in app.py.",
         )
         panel = reviewer.render(response)

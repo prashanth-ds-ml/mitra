@@ -3,18 +3,18 @@ from __future__ import annotations
 import logging
 import pathlib
 
-_LOGGER_NAME = "codemitra"
+_LOGGER_NAME = "mitra"
 
 
 def setup_logging(workspace: str | None = None) -> logging.Logger:
     """Configure a simple file logger for CLI commands."""
     root = pathlib.Path(workspace).resolve() if workspace else pathlib.Path.cwd().resolve()
-    log_dir = root / ".codemitra"
+    log_dir = root / ".mitra"
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / "codemitra.log"
+    log_path = log_dir / "mitra.log"
 
     logger = logging.getLogger(_LOGGER_NAME)
-    configured_path = getattr(logger, "_codemitra_log_path", None)
+    configured_path = getattr(logger, "_mitra_log_path", None)
     if configured_path == str(log_path):
         return logger
 
@@ -26,5 +26,5 @@ def setup_logging(workspace: str | None = None) -> logging.Logger:
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     logger.addHandler(handler)
 
-    logger._codemitra_log_path = str(log_path)  # type: ignore[attr-defined]
+    logger._mitra_log_path = str(log_path)  # type: ignore[attr-defined]
     return logger

@@ -1,7 +1,7 @@
 """Brainstorm Agent — iterative Q&A to clarify a goal before planning.
 
 Mirrors the brainstorm loop from agents-academy Project 1, adapted for
-CodeMitra's ChatOllama LLM and Rich terminal UI.
+Mitra's ChatOllama LLM and Rich terminal UI.
 
 Usage:
     from app.agents.brainstorm import run as brainstorm
@@ -72,7 +72,7 @@ def run(llm, goal: str, console: Console, *, project_context: str = "") -> str:
     console.print(Rule("[bold cyan]Brainstorming[/bold cyan]", style="cyan"))
     console.print()
     console.print(
-        "  [dim]Before planning, CodeMitra will ask a few questions to build a better plan.[/dim]"
+        "  [dim]Before planning, Mitra will ask a few questions to build a better plan.[/dim]"
     )
     console.print()
 

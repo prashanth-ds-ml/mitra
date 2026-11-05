@@ -160,7 +160,7 @@ def _read_message(stream) -> dict:
 
 def _spawn_server(server: MCPServer, workspace: str) -> subprocess.Popen:
     env = os.environ.copy()
-    env["CODEMITRA_WORKSPACE"] = workspace
+    env["MITRA_WORKSPACE"] = workspace
     repo_root = pathlib.Path(__file__).resolve().parents[1]
     command = [sys.executable if server.command.lower() == "python" else server.command, *server.args]
     return subprocess.Popen(
@@ -182,7 +182,7 @@ def probe_server(server: MCPServer, workspace: str, *, timeout_seconds: float = 
             "method": "initialize",
             "params": {
                 "protocolVersion": "2024-11-05",
-                "clientInfo": {"name": "codemitra", "version": "0.1.0"},
+                "clientInfo": {"name": "mitra", "version": "0.1.0"},
                 "capabilities": {},
             },
         },
@@ -229,7 +229,7 @@ def call_tool(server: MCPServer, workspace: str, tool_name: str, arguments: dict
                 "method": "initialize",
                 "params": {
                     "protocolVersion": "2024-11-05",
-                    "clientInfo": {"name": "codemitra", "version": "0.1.0"},
+                    "clientInfo": {"name": "mitra", "version": "0.1.0"},
                     "capabilities": {},
                 },
             },

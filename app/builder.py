@@ -1,4 +1,4 @@
-"""Guided wizard — helps users create Skills, Workflows, and Agents for CodeMitra.
+"""Guided wizard — helps users create Skills, Workflows, and Agents for Mitra.
 
 Flow
 ----
@@ -10,7 +10,7 @@ Flow
 6. Save to the right location
 
 Skills   → skills/<slug>/SKILL.md            (auto-discovered by /skills)
-Workflows → .codemitra/workflows/<slug>/WORKFLOW.md
+Workflows → .mitra/workflows/<slug>/WORKFLOW.md
 Agents   → app/agents/<slug>.py + wiring instructions
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 # ── Build types ───────────────────────────────────────────────────────────────
 
 BUILD_TYPES: list[tuple[str, str]] = [
-    ("skill",    "Skill    — Teach CodeMitra a reusable capability playbook  (beginner-friendly)"),
+    ("skill",    "Skill    — Teach Mitra a reusable capability playbook  (beginner-friendly)"),
     ("workflow", "Workflow — Save a step-by-step task automation              (intermediate)"),
     ("agent",    "Agent    — Add an AI sub-agent with custom tools            (advanced / developer)"),
 ]
@@ -58,7 +58,7 @@ SKILL_QUESTIONS: list[BuilderQuestion] = [
     ),
     BuilderQuestion(
         key="trigger",
-        prompt="When should CodeMitra automatically use this skill?\n"
+        prompt="When should Mitra automatically use this skill?\n"
                "  (Describe the situation: keywords, file types, user intent)",
         kind="free",
     ),
@@ -131,7 +131,7 @@ WORKFLOW_QUESTIONS: list[BuilderQuestion] = [
     BuilderQuestion(
         key="steps_raw",
         prompt="Describe each step of the workflow, one per line.\n"
-               "  You can use CodeMitra commands (/review, /fix <cmd>), shell commands, or plain English.\n"
+               "  You can use Mitra commands (/review, /fix <cmd>), shell commands, or plain English.\n"
                "  (Leave blank to let the AI generate the steps from your description)",
         kind="free",
         optional=True,
@@ -203,9 +203,9 @@ AGENT_QUESTIONS: list[BuilderQuestion] = [
 # ── LLM generation prompts ────────────────────────────────────────────────────
 
 _SKILL_GEN_PROMPT = """\
-You are a technical writer helping create a CodeMitra skill file.
+You are a technical writer helping create a Mitra skill file.
 
-A CodeMitra skill is a Markdown file with YAML frontmatter that teaches the AI a \
+A Mitra skill is a Markdown file with YAML frontmatter that teaches the AI a \
 reusable engineering playbook. The skill file is auto-discovered and injected into \
 the system prompt when the user's request matches the description.
 
@@ -259,9 +259,9 @@ Requirements:
 """
 
 _WORKFLOW_GEN_PROMPT = """\
-You are a technical writer creating a CodeMitra workflow file.
+You are a technical writer creating a Mitra workflow file.
 
-A CodeMitra workflow is a saved, replayable step-by-step playbook that guides \
+A Mitra workflow is a saved, replayable step-by-step playbook that guides \
 the user through a recurring engineering task. Users can run it with /workflow <name>.
 
 The user provided these answers:
@@ -294,7 +294,7 @@ cadence: {cadence}
 
 ## Steps
 
-1. <concrete step — use CodeMitra commands like /review, /fix <cmd>, or clear natural language action>
+1. <concrete step — use Mitra commands like /review, /fix <cmd>, or clear natural language action>
 2. <step>
 3. <continue — be thorough, cover the full end-to-end process>
 
@@ -309,16 +309,16 @@ cadence: {cadence}
 ```
 
 Requirements:
-- Steps must be actionable. Prefer CodeMitra slash commands (/review, /fix, /run) where applicable.
+- Steps must be actionable. Prefer Mitra slash commands (/review, /fix, /run) where applicable.
 - If steps_raw is provided, expand each step with detail.
 - Verification checklist should confirm the workflow actually worked, not just ran.
 - Do NOT output anything outside the ```markdown code block
 """
 
 _AGENT_GEN_PROMPT = """\
-You are a senior Python engineer helping create a new CodeMitra agent module.
+You are a senior Python engineer helping create a new Mitra agent module.
 
-CodeMitra agents are LangChain-based tool-calling sub-agents. Each agent is a Python \
+Mitra agents are LangChain-based tool-calling sub-agents. Each agent is a Python \
 module in app/agents/ that defines LangChain @tool functions and an invoke() entry point \
 that runs a ReAct-style agent loop.
 
@@ -333,7 +333,7 @@ The user provided:
 Generate a complete Python skeleton for app/agents/{slug}.py following this pattern:
 
 ```python
-\"\"\"CodeMitra {title} Agent — {goal}
+\"\"\"Mitra {title} Agent — {goal}
 
 Activation: {trigger}
 \"\"\"
@@ -526,7 +526,7 @@ def save_result(result: BuildResult, workspace: str) -> pathlib.Path:
         path.write_text(result.content, encoding="utf-8")
 
     elif result.build_type == "workflow":
-        dest_dir = ws / ".codemitra" / "workflows" / result.slug
+        dest_dir = ws / ".mitra" / "workflows" / result.slug
         dest_dir.mkdir(parents=True, exist_ok=True)
         path = dest_dir / "WORKFLOW.md"
         path.write_text(result.content, encoding="utf-8")
@@ -556,7 +556,7 @@ def save_path_for(build_type: str, slug: str, workspace: str) -> pathlib.Path:
     if build_type == "skill":
         return ws / "skills" / slug / "SKILL.md"
     if build_type == "workflow":
-        return ws / ".codemitra" / "workflows" / slug / "WORKFLOW.md"
+        return ws / ".mitra" / "workflows" / slug / "WORKFLOW.md"
     if build_type == "agent":
         return ws / "app" / "agents" / f"{slug}.py"
     raise ValueError(f"Unknown build type: {build_type!r}")

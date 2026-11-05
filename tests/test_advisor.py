@@ -108,11 +108,11 @@ class TestApplyToToml:
     def test_creates_new_toml(self, tmp_path):
         ok, msg = advisor.apply_to_toml(str(tmp_path), "qwen3:8b", "qwen2.5-coder:14b")
         assert ok
-        content = (tmp_path / "codemitra.toml").read_text()
+        content = (tmp_path / "mitra.toml").read_text()
         assert "qwen3:8b" in content
 
     def test_updates_existing_local_model(self, tmp_path):
-        toml = tmp_path / "codemitra.toml"
+        toml = tmp_path / "mitra.toml"
         toml.write_text('local_model = "old-model"\n')
         ok, msg = advisor.apply_to_toml(str(tmp_path), "qwen3:8b")
         assert ok
@@ -120,7 +120,7 @@ class TestApplyToToml:
         assert "old-model" not in toml.read_text()
 
     def test_preserves_other_keys(self, tmp_path):
-        toml = tmp_path / "codemitra.toml"
+        toml = tmp_path / "mitra.toml"
         toml.write_text('workspace = "/my/project"\nlocal_model = "old"\n')
         ok, _ = advisor.apply_to_toml(str(tmp_path), "qwen3:8b")
         assert ok

@@ -23,11 +23,11 @@ try:
 except ImportError:
     tomli_w = None
 
-_TOML_NAME = "codemitra.toml"
+_TOML_NAME = "mitra.toml"
 _LOCAL_TOML_NAME = "local.toml"
-_RULES_NAME = "CODEMITRA.md"
-_USER_CONFIG_DIR = pathlib.Path.home() / ".config" / "codemitra"
-_USER_CONFIG_FILE = _USER_CONFIG_DIR / "codemitra.toml"
+_RULES_NAME = "MITRA.md"
+_USER_CONFIG_DIR = pathlib.Path.home() / ".config" / "mitra"
+_USER_CONFIG_FILE = _USER_CONFIG_DIR / "mitra.toml"
 _PROJECT_ROOT_MARKERS = (
     _TOML_NAME,
     "pyproject.toml",
@@ -36,16 +36,16 @@ _PROJECT_ROOT_MARKERS = (
 _DEFAULT_INSTRUCTION_FILES = [
     "AGENTS.md",
     "CLAUDE.md",
-    ".codemitra/instructions.md",
+    ".mitra/instructions.md",
     ".github/copilot-instructions.md",
 ]
 _DEFAULT_SKILL_DIRS = [
     "skills",
-    ".codemitra/skills",
+    ".mitra/skills",
 ]
 _DEFAULT_PLUGIN_DIRS = [
     "plugins",
-    ".codemitra/plugins",
+    ".mitra/plugins",
 ]
 _DEFAULT_MCP_SERVERS = [
     {
@@ -111,7 +111,7 @@ _DEFAULTS: dict = {
     "policy_path": "",
     "instruction_files": list(_DEFAULT_INSTRUCTION_FILES),
     "skill_dirs": list(_DEFAULT_SKILL_DIRS),
-    "playbook_dirs": ["playbooks", ".codemitra/playbooks"],
+    "playbook_dirs": ["playbooks", ".mitra/playbooks"],
     "plugin_dirs": list(_DEFAULT_PLUGIN_DIRS),
     "mcp_servers": list(_DEFAULT_MCP_SERVERS),
 }
@@ -456,7 +456,7 @@ def list_local_ai_processes() -> list[ProcessInfo]:
 
 
 def list_reclaimable_processes() -> list[ProcessInfo]:
-    """Return processes CodeMitra can stop to reclaim local CPU/GPU resources."""
+    """Return processes Mitra can stop to reclaim local CPU/GPU resources."""
     combined: dict[int, ProcessInfo] = {}
     for process in list_local_ai_processes():
         combined[process.pid] = process
@@ -686,7 +686,7 @@ def get_config_paths(workspace: str | os.PathLike | None = None) -> dict[str, pa
     return {
         "user": _USER_CONFIG_FILE,
         "project": root / _TOML_NAME,
-        "local": root / ".codemitra" / _LOCAL_TOML_NAME,
+        "local": root / ".mitra" / _LOCAL_TOML_NAME,
         "rules": root / _RULES_NAME,
     }
 
@@ -694,9 +694,9 @@ def get_config_paths(workspace: str | os.PathLike | None = None) -> dict[str, pa
 def load(cwd: str | None = None, cli_overrides: dict | None = None) -> dict:
     """
     Load layered configuration with precedence:
-    1. User defaults (~/.config/codemitra/codemitra.toml)
-    2. Project settings (codemitra.toml in workspace)
-    3. Local overrides (.codemitra/local.toml, gitignored)
+    1. User defaults (~/.config/mitra/mitra.toml)
+    2. Project settings (mitra.toml in workspace)
+    3. Local overrides (.mitra/local.toml, gitignored)
     4. CLI/session overrides (passed via cli_overrides dict)
     5. Environment variables (.env, OLLAMA_API_KEY)
     """
@@ -712,7 +712,7 @@ def load(cwd: str | None = None, cli_overrides: dict | None = None) -> dict:
     cfg = _deep_merge(cfg, project_cfg)
 
     # Layer 3: Local overrides (gitignored)
-    local_cfg = _load_config_layer(root / ".codemitra" / _LOCAL_TOML_NAME)
+    local_cfg = _load_config_layer(root / ".mitra" / _LOCAL_TOML_NAME)
     cfg = _deep_merge(cfg, local_cfg)
 
     # Layer 4: CLI/session overrides
@@ -777,9 +777,9 @@ def save_user_config(config: dict) -> tuple[bool, str]:
 
 
 def save_local_config(config: dict, workspace: str) -> tuple[bool, str]:
-    """Save configuration to local override file (.codemitra/local.toml)."""
+    """Save configuration to local override file (.mitra/local.toml)."""
     root = pathlib.Path(workspace).resolve()
-    local_dir = root / ".codemitra"
+    local_dir = root / ".mitra"
     local_dir.mkdir(parents=True, exist_ok=True)
     local_file = local_dir / _LOCAL_TOML_NAME
     if tomli_w is None:

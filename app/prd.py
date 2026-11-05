@@ -15,7 +15,7 @@ _DEFAULT_TITLE = "Product Requirements Document"
 
 def _prompt(idea: str, understanding: str, existing_prd: str | None = None, update_request: str | None = None) -> str:
     parts = [
-        "You are CodeMitra's PRD writer.",
+        "You are Mitra's PRD writer.",
         "Write a concise, practical markdown PRD for the user's project.",
         "Use these sections exactly: Problem, Goals, Non-goals, Users, Requirements, Success Criteria, Risks.",
         "Keep it specific to the idea and the understanding notes.",

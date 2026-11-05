@@ -32,7 +32,6 @@ dev = ["pytest", "ruff", "fastapi", "httpx"]
 
 [project.scripts]
 mitra = "app.main:cli"
-codemitra = "app.main:cli"
 
 [tool.setuptools]
 include-package-data = true

@@ -51,7 +51,7 @@ intent_router = routing_module.IntentRouter()
 
 try:
     # prefer direct import
-    from misc.ascii import generate_codemitra_banner_art, generate_title_art
+    from misc.ascii import generate_mitra_banner_art, generate_title_art
 except Exception:
     # ensure project root is on sys.path when running as script
     import sys
@@ -60,17 +60,17 @@ except Exception:
     root = pathlib.Path(__file__).resolve().parents[1]
     if str(root) not in sys.path:
         sys.path.append(str(root))
-    from misc.ascii import generate_codemitra_banner_art, generate_title_art
+    from misc.ascii import generate_mitra_banner_art, generate_title_art
 
 
 
 
 def show_banner():
     try:
-        title = generate_codemitra_banner_art()
+        title = generate_mitra_banner_art()
     except Exception:
         from rich.text import Text
-        title = Text("  CodeMitra  ", style="bold #87ceeb")
+        title = Text("  Mitra  ", style="bold #87ceeb")
 
     from rich.console import Group
     from rich.text import Text as RichText
@@ -104,10 +104,10 @@ def show_banner():
     )
 
 
-_CODEMITRA_MD_TEMPLATE = """\
+_MITRA_MD_TEMPLATE = """\
 # Project Rules
 
-<!-- CodeMitra will follow these rules in every response. -->
+<!-- Mitra will follow these rules in every response. -->
 
 ## General
 - Always write clean, readable, well-structured code
@@ -140,7 +140,7 @@ _CODEMITRA_MD_TEMPLATE = """\
 - Confirm before running destructive commands
 """
 
-_CODEMITRA_TOML_TEMPLATE = """\
+_MITRA_TOML_TEMPLATE = """\
 model = ""                   # legacy fallback; prefer local_model
 local_model = ""             # leave empty to pick at startup
 codegen_model = "kimi-k2.5:cloud"  # used only when cloud codegen is enabled
@@ -155,13 +155,13 @@ num_ctx = 131072                 # requested Ollama context window when supporte
 ollama_api_key = ""          # optional; leave empty to be prompted at startup
 ollama_local_base_url = "http://localhost:11434"
 ollama_cloud_base_url = "https://ollama.com"
-allowed_roots = []           # extra folders CodeMitra may inspect/edit beyond the workspace
+allowed_roots = []           # extra folders Mitra may inspect/edit beyond the workspace
 disabled_tools = []          # tool names to disable from the filesystem agent
 disabled_commands = []       # shell executables to block (e.g. ["python", "git"])
-instruction_files = ["AGENTS.md", "CLAUDE.md", ".codemitra/instructions.md", ".github/copilot-instructions.md"]
-skill_dirs = ["skills", ".codemitra/skills"]
-playbook_dirs = ["playbooks", ".codemitra/playbooks"]
-plugin_dirs = ["plugins", ".codemitra/plugins"]
+instruction_files = ["AGENTS.md", "CLAUDE.md", ".mitra/instructions.md", ".github/copilot-instructions.md"]
+skill_dirs = ["skills", ".mitra/skills"]
+playbook_dirs = ["playbooks", ".mitra/playbooks"]
+plugin_dirs = ["plugins", ".mitra/plugins"]
 mcp_servers = [
     {"name": "filesystem", "description": "Workspace file access through MCP-compatible filesystem servers.", "fallback": "Built-in filesystem tools", "transport": "local-fallback", "command": "python", "args": ["-m", "app.mcp_servers.filesystem"], "enabled": true},
     {"name": "git", "description": "Repository inspection through an MCP git server.", "fallback": "Built-in git helpers", "transport": "local-fallback"},
@@ -188,34 +188,34 @@ def _run_init() -> None:
     cwd = pathlib.Path.cwd()
     created = []
 
-    rules_path = cwd / "CODEMITRA.md"
+    rules_path = cwd / "MITRA.md"
     if rules_path.exists():
-        console.print("[yellow]CODEMITRA.md already exists — skipped.[/yellow]")
+        console.print("[yellow]MITRA.md already exists — skipped.[/yellow]")
     else:
-        rules_path.write_text(_CODEMITRA_MD_TEMPLATE, encoding="utf-8")
-        created.append("CODEMITRA.md")
+        rules_path.write_text(_MITRA_MD_TEMPLATE, encoding="utf-8")
+        created.append("MITRA.md")
 
-    toml_path = cwd / "codemitra.toml"
+    toml_path = cwd / "mitra.toml"
     if toml_path.exists():
-        console.print("[yellow]codemitra.toml already exists — skipped.[/yellow]")
+        console.print("[yellow]mitra.toml already exists — skipped.[/yellow]")
     else:
-        toml_path.write_text(_CODEMITRA_TOML_TEMPLATE, encoding="utf-8")
-        created.append("codemitra.toml")
+        toml_path.write_text(_MITRA_TOML_TEMPLATE, encoding="utf-8")
+        created.append("mitra.toml")
 
     if created:
         console.print(f"[green]✓ Created:[/green] {', '.join(created)}")
-        console.print("[dim]Edit CODEMITRA.md to add your project rules.[/dim]")
+        console.print("[dim]Edit MITRA.md to add your project rules.[/dim]")
     else:
         console.print("[dim]Nothing to create — already initialised.[/dim]")
 
     # Always scaffold the Obsidian memory vault (skips existing files)
     vault_files = memory.init_memory(str(cwd))
     if vault_files:
-        console.print(f"\n[green]✓ Memory vault:[/green] .codemitra/")
+        console.print(f"\n[green]✓ Memory vault:[/green] .mitra/")
         for f in vault_files:
             console.print(f"  [dim cyan]  {f}[/dim cyan]")
         console.print(
-            "\n[dim]Tip: Open [bold].codemitra/[/bold] as an Obsidian vault for "
+            "\n[dim]Tip: Open [bold].mitra/[/bold] as an Obsidian vault for "
             "graph view, search, and history.[/dim]"
         )
     else:
@@ -225,7 +225,7 @@ def _run_init() -> None:
 @cli.command("init")
 @cli.command("/init", hidden=True)
 def cmd_init():
-    """Initialise CodeMitra in the current project directory."""
+    """Initialise Mitra in the current project directory."""
     _run_init()
 
 
@@ -243,7 +243,7 @@ def _print_phase0_status(cwd: str | None = None) -> None:
 
     logger.info("status command workspace=%s ollama_ok=%s", workspace, ollama_ok)
 
-    table = Table(title="CodeMitra Status")
+    table = Table(title="Mitra Status")
     table.add_column("Item", style="cyan", no_wrap=True)
     table.add_column("Value", style="white")
     table.add_row("Workspace", str(workspace))
@@ -357,7 +357,7 @@ def cmd_start(
         playbook_dirs=cfg.get("playbook_dirs"),
         codegen_llm=codegen_llm,
     )
-    console.print(Panel(Markdown(reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+    console.print(Panel(Markdown(reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
 
 
 def cmd_next(
@@ -368,7 +368,7 @@ def cmd_next(
     cfg, workspace = _phase5_workspace(cwd)
     _model, llm, codegen_llm = _resolve_noninteractive_llms(cfg)
     if llm is None:
-        console.print("[red]No `local_model` is configured yet. Set one in `codemitra.toml` first.[/red]")
+        console.print("[red]No `local_model` is configured yet. Set one in `mitra.toml` first.[/red]")
         raise typer.Exit(1)
     work_mode = _normalize_work_mode(mode or cfg.get("work_mode"))
     reply = _cmd_next(
@@ -378,7 +378,7 @@ def cmd_next(
         work_mode=work_mode,
         codegen_llm=codegen_llm,
     )
-    console.print(Panel(Markdown(reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+    console.print(Panel(Markdown(reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
 
 
 def cmd_build(
@@ -389,7 +389,7 @@ def cmd_build(
     cfg, workspace = _phase5_workspace(cwd)
     _model, llm, codegen_llm = _resolve_noninteractive_llms(cfg)
     if llm is None:
-        console.print("[red]No `local_model` is configured yet. Set one in `codemitra.toml` first.[/red]")
+        console.print("[red]No `local_model` is configured yet. Set one in `mitra.toml` first.[/red]")
         raise typer.Exit(1)
     work_mode = _normalize_work_mode(mode or cfg.get("work_mode"))
     reply = _cmd_build(
@@ -399,7 +399,7 @@ def cmd_build(
         work_mode=work_mode,
         codegen_llm=codegen_llm,
     )
-    console.print(Panel(Markdown(reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+    console.print(Panel(Markdown(reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
 
 
 def cmd_test(command: str = typer.Argument("pytest"), cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection.")) -> None:
@@ -425,14 +425,14 @@ def cmd_mcp(cwd: str | None = typer.Option(None, "--cwd", help="Start path for p
 
 
 def cmd_logs(target: str = typer.Argument("summary"), cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection.")) -> None:
-    """Inspect saved `.codemitra` logs and traces."""
+    """Inspect saved `.mitra` logs and traces."""
     _cfg, workspace = _phase5_workspace(cwd)
     reply = _build_logs_reply(workspace, target)
-    console.print(Panel(Markdown(reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+    console.print(Panel(Markdown(reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
 
 
 def cmd_understand(idea: str = typer.Argument("", help="Idea or project prompt to clarify."), cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection.")) -> None:
-    """Run the understand workflow and save `.codemitra/understand.md`."""
+    """Run the understand workflow and save `.mitra/understand.md`."""
     cfg, workspace = _phase5_workspace(cwd)
     if not idea.strip():
         existing = memory.load_understand(workspace)
@@ -670,7 +670,7 @@ def _build_plan_context(
 
 @cli.callback(invoke_without_command=True)
 def main(ctx: typer.Context):
-    """CodeMitra — local AI coding agent powered by Ollama."""
+    """Mitra — local AI coding agent powered by Ollama."""
     if ctx.invoked_subcommand is not None:
         return
     _chat()
@@ -699,7 +699,7 @@ _ERROR_HINTS: list[tuple[str, str]] = [
     ("validation error",          "The model returned malformed tool arguments. Try rephrasing your request."),
     ("list_type",                 "Package list was not recognised. Try: install pygame numpy"),
     ("context length",            "The conversation is too long. Use /reset to start a fresh session."),
-    ("requires more system memory", "The selected model is too large for available RAM. Use `/hibernate` to save state, unload the local model, and continue with a fresh session, or restart CodeMitra with a smaller model."),
+    ("requires more system memory", "The selected model is too large for available RAM. Use `/hibernate` to save state, unload the local model, and continue with a fresh session, or restart Mitra with a smaller model."),
     ("rate_limit",                "Request rate-limited. Wait a moment and try again."),
 ]
 
@@ -714,9 +714,9 @@ def _friendly_error(exc: Exception) -> str:
 
 
 def _log_error(workspace: str, exc: Exception) -> None:
-    """Append full traceback to .codemitra/errors.log."""
+    """Append full traceback to .mitra/errors.log."""
     try:
-        log_dir = pathlib.Path(workspace) / ".codemitra"
+        log_dir = pathlib.Path(workspace) / ".mitra"
         log_dir.mkdir(exist_ok=True)
         log_path = log_dir / "errors.log"
         from datetime import datetime
@@ -1012,7 +1012,7 @@ def _make_completer(workspace: str, extra_commands: list[str] | None = None) -> 
 def _build_prompt_label(model: str, session_mode: str = "approve", work_mode: str = "builder") -> str:
     """Return the interactive prompt label shown before each user input."""
     model_short = model.split(":")[0]
-    return f"\n[CodeMitra · {session_mode} · {work_mode}] ({model_short})> "
+    return f"\n[Mitra · {session_mode} · {work_mode}] ({model_short})> "
 
 
 def _shorten_display(text: str, max_len: int = 28) -> str:
@@ -1063,7 +1063,7 @@ def _build_hibernation_reply(
         f"- **Available RAM:** {ram_before} → {ram_after}\n"
         f"- **Persistence:** activity, context, plan timestamp, and session metadata updated\n"
         f"- **Unload result:** {unload_detail}\n\n"
-        "CodeMitra cleared the in-memory conversation and will continue from the saved workspace state on the next turn. Use `/resume` if you want a compact recap first."
+        "Mitra cleared the in-memory conversation and will continue from the saved workspace state on the next turn. Use `/resume` if you want a compact recap first."
     )
 
 
@@ -1130,7 +1130,7 @@ def _build_permissions_reply(cfg: dict, session_mode: str) -> str:
         f"- **Disabled file tools:** {tools_text}\n"
         f"- **Disabled shell commands:** {commands_text}\n"
         "- **Shell trust:** approved commands can be trusted per directory and then auto-approved on repeat.\n\n"
-        "Use `/mode` to change the session behavior. Edit `codemitra.toml` to change allowed roots or disabled tools and commands."
+        "Use `/mode` to change the session behavior. Edit `mitra.toml` to change allowed roots or disabled tools and commands."
     )
 
 
@@ -1138,7 +1138,7 @@ def _build_plan_execution_blocked_reply(session_mode: str, *, active_plan: bool 
     target = "the active plan" if active_plan else "plan steps"
     ending = "continue." if active_plan else "act."
     return (
-        f"CodeMitra is in `{session_mode}` mode, so it will not execute {target} yet. "
+        f"Mitra is in `{session_mode}` mode, so it will not execute {target} yet. "
         f"Use `/mode approve` or `/mode auto` to {ending}"
     )
 
@@ -1194,10 +1194,10 @@ def _build_skills_reply(
 
     if not skills:
         return (
-            "No CodeMitra skills found yet.\n\n"
-            "Add skills under `skills/<name>/SKILL.md` or `.codemitra/skills/<name>/SKILL.md`."
+            "No Mitra skills found yet.\n\n"
+            "Add skills under `skills/<name>/SKILL.md` or `.mitra/skills/<name>/SKILL.md`."
         )
-    lines = ["## CodeMitra skills", ""]
+    lines = ["## Mitra skills", ""]
     for skill in skills:
         lines.append(f"- **{skill.name}** — `{skill.path}`")
         lines.append(f"  {skill.description}")
@@ -1391,7 +1391,7 @@ def _is_simple_greeting(user_input: str) -> bool:
 def _build_greeting_reply() -> str:
     """Return a stable greeting so first-run UX does not depend on model quality."""
     return (
-        "Hello - I'm CodeMitra, your local coding assistant.\n\n"
+        "Hello - I'm Mitra, your local coding assistant.\n\n"
         "I can inspect code, run commands, help plan work, and make file changes inside your workspace. "
         "Tell me what you want to build, debug, or understand."
     )
@@ -1869,11 +1869,11 @@ def _find_run_targets(workspace: str) -> list[str]:
     ]
     candidates.extend(
         path for path in sorted(root.glob("*/cli.py"))
-        if path.parts[-2] not in {".venv", ".codemitra", "__pycache__"}
+        if path.parts[-2] not in {".venv", ".mitra", "__pycache__"}
     )
     candidates.extend(
         path for path in sorted(root.glob("*/__main__.py"))
-        if path.parts[-2] not in {".venv", ".codemitra", "__pycache__"}
+        if path.parts[-2] not in {".venv", ".mitra", "__pycache__"}
     )
     candidates.extend(sorted(root.glob("src/*/cli.py")))
     candidates.extend(sorted(root.glob("src/*/__main__.py")))
@@ -1895,7 +1895,7 @@ def _workspace_snapshot(workspace: str) -> tuple[list[str], list[str]]:
     dirs: list[str] = []
     files: list[str] = []
     for entry in sorted(root.iterdir(), key=lambda e: (e.is_file(), e.name.lower())):
-        if entry.name.startswith(".") and entry.name not in {".venv", ".codemitra"}:
+        if entry.name.startswith(".") and entry.name not in {".venv", ".mitra"}:
             continue
         if entry.is_dir():
             dirs.append(entry.name)
@@ -2268,14 +2268,14 @@ def _build_history_reply(workspace: str, limit: int = 5) -> str:
         stamp = " ".join(part for part in (entry.get("date"), entry.get("time")) if part)
         lines.append(f"- **{stamp}**")
         lines.append(f"  - **You:** {entry.get('user', '')}")
-        lines.append(f"  - **CodeMitra:** {entry.get('assistant', '')}")
+        lines.append(f"  - **Mitra:** {entry.get('assistant', '')}")
     return "\n".join(lines)
 
 
 def _build_logs_reply(workspace: str, target: str = "summary") -> str:
-    vault = pathlib.Path(workspace) / ".codemitra"
+    vault = pathlib.Path(workspace) / ".mitra"
     if not vault.exists():
-        return "No `.codemitra/` workspace logs exist yet. Run `agent init` or start a session first."
+        return "No `.mitra/` workspace logs exist yet. Run `agent init` or start a session first."
 
     target_name = (target or "summary").strip().lower()
     files = {
@@ -2388,7 +2388,7 @@ def _build_model_inventory_reply(
 
     lines.append("Use `/model remove <name>` to delete a local model and free space.")
     lines.append("Use `/resources` for live CPU/RAM/GPU usage, or `/make-space` to stop reclaimable local AI and GPU processes.")
-    lines.append("Override GPU layer count with `gpu_layers` in `codemitra.toml` (`0` = CPU, `-1` = full GPU, `auto` = let Ollama decide).")
+    lines.append("Override GPU layer count with `gpu_layers` in `mitra.toml` (`0` = CPU, `-1` = full GPU, `auto` = let Ollama decide).")
     return "\n".join(lines)
 
 
@@ -2422,7 +2422,7 @@ def _build_resources_reply() -> str:
             lines.append(f"- `{proc.name}` pid `{proc.pid}`{memory}")
         lines.append("")
     else:
-        lines.append("No Ollama/local AI processes detected beyond this CodeMitra session.")
+        lines.append("No Ollama/local AI processes detected beyond this Mitra session.")
         lines.append("")
     if gpu_processes:
         lines.append("### User-owned GPU processes from nvidia-smi")
@@ -2449,7 +2449,7 @@ def _confirm_make_space(processes: list) -> bool:
         preview += f"\n• ...and {len(processes) - 8} more"
     choice = _choose_approval_option(
         "Free local AI resources",
-        "CodeMitra can stop the following reclaimable processes to free CPU and GPU memory.\n"
+        "Mitra can stop the following reclaimable processes to free CPU and GPU memory.\n"
         "This includes Ollama/local AI processes and user-owned GPU processes reported by nvidia-smi.\n"
         "This may interrupt the current local model and your other GPU workloads.\n\n"
         f"{preview}\n\nProceed?",
@@ -2467,7 +2467,7 @@ def _confirm_make_space(processes: list) -> bool:
 def _cmd_make_space() -> str:
     processes = config.list_reclaimable_processes()
     if not processes:
-        return "No reclaimable local AI or user-owned GPU processes are currently using resources outside this CodeMitra session."
+        return "No reclaimable local AI or user-owned GPU processes are currently using resources outside this Mitra session."
     if not _confirm_make_space(processes):
         return "Skipped stopping reclaimable processes."
     stopped, errors = config.stop_reclaimable_processes()
@@ -2540,7 +2540,7 @@ def _build_brainstorm_prompt(workspace: str, request: str) -> str:
         has_plan=bool(memory.load_plan(workspace)),
     )
     return (
-        "You are CodeMitra in brainstorm mode.\n\n"
+        "You are Mitra in brainstorm mode.\n\n"
         "Behave like a strong product and engineering brainstorming partner.\n"
         "Use natural English with clean word order.\n"
         "Be warm, practical, and idea-focused.\n"
@@ -2775,7 +2775,7 @@ def _build_change_set_diff_reply(workspace: str) -> str | None:
     if not entries:
         return None
 
-    lines = ["## Last CodeMitra change set", ""]
+    lines = ["## Last Mitra change set", ""]
     for entry in entries:
         lines.append(_render_change_entry_diff(entry, workspace))
         lines.append("")
@@ -2806,7 +2806,7 @@ def _build_change_set_review_input(workspace: str) -> str | None:
     if not entries:
         return None
 
-    lines = ["Last CodeMitra change set", ""]
+    lines = ["Last Mitra change set", ""]
     for entry in entries:
         kind = entry.get("kind")
         if kind == "move_file":
@@ -2915,7 +2915,7 @@ def _get_review_material(workspace: str, target: str = "working") -> tuple[str, 
 
     change_set_input = _build_change_set_review_input(workspace)
     if change_set_input:
-        return ("last CodeMitra change set", change_set_input)
+        return ("last Mitra change set", change_set_input)
 
     return None
 
@@ -2964,7 +2964,7 @@ def _build_playbooks_reply(workspace: str, cfg: dict | None = None) -> str:
     if not playbooks:
         return (
             "No project playbooks found yet.\n\n"
-            "Add playbooks under `playbooks/<name>/PLAYBOOK.md` or `.codemitra/playbooks/<name>/PLAYBOOK.md`."
+            "Add playbooks under `playbooks/<name>/PLAYBOOK.md` or `.mitra/playbooks/<name>/PLAYBOOK.md`."
         )
     return playbook_registry.format_prompt(playbooks)
 
@@ -3170,7 +3170,7 @@ def _cmd_policy(raw: str, workspace: str) -> str:
         return "\n".join(lines)
 
     if subcmd == "edit":
-        policy_path = pathlib.Path(workspace) / ".codemitra" / "policy.yaml"
+        policy_path = pathlib.Path(workspace) / ".mitra" / "policy.yaml"
         policy_path.parent.mkdir(parents=True, exist_ok=True)
         if not policy_path.exists():
             policy_module.save_policy(policy_module.load_policy(), str(policy_path))
@@ -3179,7 +3179,7 @@ def _cmd_policy(raw: str, workspace: str) -> str:
         return f"Opened policy file for editing: {policy_path}"
 
     if subcmd == "reset":
-        policy_path = pathlib.Path(workspace) / ".codemitra" / "policy.yaml"
+        policy_path = pathlib.Path(workspace) / ".mitra" / "policy.yaml"
         if policy_path.exists():
             policy_path.unlink()
         return "Reset to built-in default policy"
@@ -3198,7 +3198,7 @@ def _cmd_config(raw: str, workspace: str) -> str:
 
         user_file = config_module._USER_CONFIG_FILE
         project_file = root / config_module._TOML_NAME
-        local_file = root / ".codemitra" / config_module._LOCAL_TOML_NAME
+        local_file = root / ".mitra" / config_module._LOCAL_TOML_NAME
 
         lines = ["## Layered Configuration", "", f"**Workspace:** `{workspace}`", ""]
 
@@ -3246,7 +3246,7 @@ def _cmd_config(raw: str, workspace: str) -> str:
         elif layer in ("project", "2"):
             target = root / config_module._TOML_NAME
         elif layer in ("local", "3"):
-            target = root / ".codemitra" / config_module._LOCAL_TOML_NAME
+            target = root / ".mitra" / config_module._LOCAL_TOML_NAME
             target.parent.mkdir(parents=True, exist_ok=True)
         else:
             return "Usage: `/config edit [user|project|local]`"
@@ -3271,7 +3271,7 @@ def _cmd_config(raw: str, workspace: str) -> str:
         elif layer in ("project", "2"):
             target = root / config_module._TOML_NAME
         elif layer in ("local", "3"):
-            target = root / ".codemitra" / config_module._LOCAL_TOML_NAME
+            target = root / ".mitra" / config_module._LOCAL_TOML_NAME
         else:
             return "Usage: `/config reset [user|project|local]`"
 
@@ -3432,7 +3432,7 @@ def _confirm_cleanup_plan(candidates: list[str]) -> bool:
         preview += f"\n• ...and {len(candidates) - 10} more"
     choice = _choose_approval_option(
         "Cleanup plan",
-        "CodeMitra prepared a cleanup plan for obvious disposable folders/files.\n\n"
+        "Mitra prepared a cleanup plan for obvious disposable folders/files.\n\n"
         f"{preview}\n\nChoose what to do next.",
         [
             ("deny", "No, keep these files/folders"),
@@ -3464,7 +3464,7 @@ def _handle_cleanup_request(user_input: str, workspace: str) -> str:
     console.print(
         Panel(
             Markdown(f"**Cleanup target:** `{root_display}`\n\n{preview}"),
-            title="[bold cyan]CodeMitra[/bold cyan]",
+            title="[bold cyan]Mitra[/bold cyan]",
             border_style="cyan",
         )
     )
@@ -3589,14 +3589,14 @@ def _auto_plan_request(
         context = f"{plan_context}\n\n## Brainstorm Q&A\n{context}".strip()
     if playbook_context:
         context = f"{context}\n\n{playbook_context}".strip()
-    _print_progress_message("Writing the plan", "Saving the next steps to `.codemitra/plan.md`.", color="yellow")
+    _print_progress_message("Writing the plan", "Saving the next steps to `.mitra/plan.md`.", color="yellow")
     with console.status("[bold green]Generating plan...[/bold green]"):
         plan = planner_agent.create_plan(llm, goal, workspace, context=context, work_mode=work_mode)
-    console.print(f"[dim cyan]  ✦  Plan written to .codemitra/plan.md[/dim cyan]")
+    console.print(f"[dim cyan]  ✦  Plan written to .mitra/plan.md[/dim cyan]")
     console.print(planner_agent.render(plan))
 
     if _normalize_session_mode(session_mode) in {"read-only", "plan"}:
-        console.print("[dim]Plan mode is active, so CodeMitra saved the plan without starting execution.[/dim]")
+        console.print("[dim]Plan mode is active, so Mitra saved the plan without starting execution.[/dim]")
         return f"Created a plan for: {goal}"
 
     if _confirm_plan_start():
@@ -3666,7 +3666,7 @@ def _pick_model(cfg: dict) -> str:
                     "[yellow]GPU memory is partly busy right now. If another project releases VRAM soon, waiting may let you run larger models more comfortably.[/yellow]"
                 )
         if not recommended_models:
-            console.print("[yellow]No installed model fits the recommended budget right now, so CodeMitra is showing all installed models.[/yellow]")
+            console.print("[yellow]No installed model fits the recommended budget right now, so Mitra is showing all installed models.[/yellow]")
         for i, model_info in enumerate(visible_models, 1):
             size = f" [dim]({model_info.size_text})[/dim]" if model_info.size_text else ""
             badge = f" {_placement_badge(model_info.placement)}" if model_info.placement else ""
@@ -3845,8 +3845,8 @@ def _chat():
     # Build system prompt, appending project rules + memory context
     system_prompt = SYSTEM_PROMPT
     if cfg.get("rules"):
-        system_prompt += f"\n\n## Project Rules (from CODEMITRA.md)\n{cfg['rules']}"
-        console.print("[dim cyan]  ✦  Project rules loaded from CODEMITRA.md[/dim cyan]")
+        system_prompt += f"\n\n## Project Rules (from MITRA.md)\n{cfg['rules']}"
+        console.print("[dim cyan]  ✦  Project rules loaded from MITRA.md[/dim cyan]")
 
     project_instructions = cfg.get("project_instructions") or []
     instructions_prompt = _build_project_instructions_prompt(project_instructions)
@@ -3860,7 +3860,7 @@ def _chat():
     if skills_prompt:
         system_prompt += f"\n\n{skills_prompt}"
         count = len(available_skills)
-        console.print(f"[dim cyan]  ✦  CodeMitra skill{'s' if count != 1 else ''} loaded: {count}[/dim cyan]")
+        console.print(f"[dim cyan]  ✦  Mitra skill{'s' if count != 1 else ''} loaded: {count}[/dim cyan]")
 
     plugin_commands = plugin_registry.discover(cfg["workspace"], cfg.get("plugin_dirs"))
     if plugin_commands.commands:
@@ -3874,8 +3874,8 @@ def _chat():
 
     ctx_text = memory.load_context(cfg["workspace"])
     if ctx_text:
-        system_prompt += f"\n\n## Project Memory (from .codemitra/context.md)\n{ctx_text}"
-        console.print("[dim cyan]  ✦  Project memory loaded from .codemitra/context.md[/dim cyan]")
+        system_prompt += f"\n\n## Project Memory (from .mitra/context.md)\n{ctx_text}"
+        console.print("[dim cyan]  ✦  Project memory loaded from .mitra/context.md[/dim cyan]")
 
     startup_project_brief = _build_startup_project_brief(cfg["workspace"])
     if startup_project_brief:
@@ -3884,8 +3884,8 @@ def _chat():
 
     plan_text = memory.load_plan(cfg["workspace"])
     if plan_text:
-        system_prompt += f"\n\n## Active Plan (from .codemitra/plan.md)\n{plan_text}"
-        console.print("[dim cyan]  ✦  Active plan loaded from .codemitra/plan.md[/dim cyan]")
+        system_prompt += f"\n\n## Active Plan (from .mitra/plan.md)\n{plan_text}"
+        console.print("[dim cyan]  ✦  Active plan loaded from .mitra/plan.md[/dim cyan]")
 
     console.print(
         _build_startup_status(
@@ -4050,7 +4050,7 @@ def _chat():
                 console.print(
                     Panel(
                         Markdown(ai_reply),
-                        title="[bold cyan]CodeMitra[/bold cyan]",
+                        title="[bold cyan]Mitra[/bold cyan]",
                         border_style="cyan",
                     )
                 )
@@ -4069,7 +4069,7 @@ def _chat():
             console.print(
                 Panel(
                     Markdown(ai_reply),
-                    title="[bold cyan]CodeMitra[/bold cyan]",
+                    title="[bold cyan]Mitra[/bold cyan]",
                     border_style="cyan",
                 )
             )
@@ -4087,7 +4087,7 @@ def _chat():
             console.print(
                 Panel(
                     Markdown(ai_reply),
-                    title="[bold cyan]CodeMitra[/bold cyan]",
+                    title="[bold cyan]Mitra[/bold cyan]",
                     border_style="cyan",
                 )
             )
@@ -4104,7 +4104,7 @@ def _chat():
             console.print(
                 Panel(
                     Markdown(ai_reply),
-                    title="[bold cyan]CodeMitra[/bold cyan]",
+                    title="[bold cyan]Mitra[/bold cyan]",
                     border_style="cyan",
                 )
             )
@@ -4145,7 +4145,7 @@ def _chat():
             console.print(
                 Panel(
                     Markdown(_build_greeting_reply()),
-                    title="[bold cyan]CodeMitra[/bold cyan]",
+                    title="[bold cyan]Mitra[/bold cyan]",
                     border_style="cyan",
                 )
             )
@@ -4158,7 +4158,7 @@ def _chat():
             console.print(
                 Panel(
                     Markdown(ai_reply),
-                    title="[bold cyan]CodeMitra[/bold cyan]",
+                    title="[bold cyan]Mitra[/bold cyan]",
                     border_style="cyan",
                 )
             )
@@ -4184,7 +4184,7 @@ def _chat():
             console.print(
                 Panel(
                     Markdown(ai_reply),
-                    title="[bold cyan]CodeMitra[/bold cyan]",
+                    title="[bold cyan]Mitra[/bold cyan]",
                     border_style="cyan",
                 )
             )
@@ -4199,7 +4199,7 @@ def _chat():
             console.print(
                 Panel(
                     Markdown(ai_reply),
-                    title="[bold cyan]CodeMitra[/bold cyan]",
+                    title="[bold cyan]Mitra[/bold cyan]",
                     border_style="cyan",
                 )
             )
@@ -4214,7 +4214,7 @@ def _chat():
             console.print(
                 Panel(
                     Markdown(ai_reply),
-                    title="[bold cyan]CodeMitra[/bold cyan]",
+                    title="[bold cyan]Mitra[/bold cyan]",
                     border_style="cyan",
                 )
             )
@@ -4229,7 +4229,7 @@ def _chat():
             console.print(
                 Panel(
                     Markdown(ai_reply),
-                    title="[bold cyan]CodeMitra[/bold cyan]",
+                    title="[bold cyan]Mitra[/bold cyan]",
                     border_style="cyan",
                 )
             )
@@ -4250,7 +4250,7 @@ def _chat():
             console.print(
                 Panel(
                     Markdown(ai_reply),
-                    title="[bold cyan]CodeMitra[/bold cyan]",
+                    title="[bold cyan]Mitra[/bold cyan]",
                     border_style="cyan",
                 )
             )
@@ -4279,7 +4279,7 @@ def _chat():
                 console.print(
                     Panel(
                         Markdown(root_rename_reply),
-                        title="[bold cyan]CodeMitra[/bold cyan]",
+                        title="[bold cyan]Mitra[/bold cyan]",
                         border_style="cyan",
                     )
                 )
@@ -4294,7 +4294,7 @@ def _chat():
             console.print(
                 Panel(
                     Markdown(ai_reply),
-                    title="[bold cyan]CodeMitra[/bold cyan]",
+                    title="[bold cyan]Mitra[/bold cyan]",
                     border_style="cyan",
                 )
             )
@@ -4337,7 +4337,7 @@ def _chat():
             console.print("[dim]Session reset.[/dim]")
             continue
 
-        if cmd in ("/init", "codemitra init"):
+        if cmd in ("/init", "mitra init"):
             _run_init()
             continue
 
@@ -4362,10 +4362,10 @@ def _chat():
             _set_current_task("Brainstorming")
             _print_progress_message(
                 "Running explicit brainstorm mode",
-                "This turn will be saved to `.codemitra/brainstorm.md`.",
+                "This turn will be saved to `.mitra/brainstorm.md`.",
             )
             ai_reply = _cmd_brainstorm(user_input, cfg["workspace"], idea_llm)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -4374,7 +4374,7 @@ def _chat():
             _set_current_task("Understanding")
             _print_progress_message(
                 "Running understand mode",
-                "This turn will be saved to `.codemitra/understand.md` and `PRD.md` will use it later.",
+                "This turn will be saved to `.mitra/understand.md` and `PRD.md` will use it later.",
             )
             ai_reply = _cmd_understand(user_input, cfg["workspace"], idea_llm)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
@@ -4385,7 +4385,7 @@ def _chat():
             _set_current_task("Drafting PRD")
             _print_progress_message(
                 "Drafting PRD",
-                "This turn will be saved to `PRD.md` and `.codemitra/prd.md`.",
+                "This turn will be saved to `PRD.md` and `.mitra/prd.md`.",
             )
             ai_reply = _cmd_prd(user_input, cfg["workspace"], idea_llm)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
@@ -4408,14 +4408,14 @@ def _chat():
 
         if cmd.startswith("/skills"):
             ai_reply = _build_skills_reply(available_skills, user_input, workspace=cfg["workspace"])
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
 
         if cmd == "/context":
             ai_reply = _build_context_reply(sess_in + sess_out, auto_compact_threshold, num_ctx)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -4435,7 +4435,7 @@ def _chat():
                 agent_models=agent_models,
                 mcp_servers=cfg.get("mcp_servers"),
             )
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -4452,7 +4452,7 @@ def _chat():
                 playbook_dirs=cfg.get("playbook_dirs"),
                 codegen_llm=codegen_llm,
             )
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -4466,7 +4466,7 @@ def _chat():
                 work_mode=selected_mode,
                 codegen_llm=codegen_llm,
             )
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -4480,21 +4480,21 @@ def _chat():
                 work_mode=selected_mode,
                 codegen_llm=codegen_llm,
             )
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
 
         if cmd == "/playbooks":
             ai_reply = _build_playbooks_reply(cfg["workspace"], cfg)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
 
         if cmd == "/mcp":
             ai_reply = _build_mcp_reply(cfg["workspace"], cfg)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -4508,14 +4508,14 @@ def _chat():
 
         if cmd.startswith("/logs"):
             ai_reply = _cmd_logs(user_input, cfg["workspace"])
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
 
         if cmd == "/permissions":
             ai_reply = _build_permissions_reply(cfg, session_mode)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -4533,7 +4533,7 @@ def _chat():
                     _apply_session_mode(cfg, session_mode)
                     prompt_str = _build_prompt_label(model, session_mode, work_mode)
                     ai_reply = _build_mode_reply(session_mode)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -4550,7 +4550,7 @@ def _chat():
                 ai_reply = _build_reasoning_reply(show_reasoning)
             else:
                 ai_reply = "Usage: `/thinking on` or `/thinking off`."
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -4562,14 +4562,14 @@ def _chat():
                 codegen_model,
                 cloud_codegen_enabled=bool(cloud_api_key),
             )
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
 
         if cmd == "/history":
             ai_reply = _build_history_reply(cfg["workspace"])
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -4584,21 +4584,21 @@ def _chat():
 
         if cmd.startswith("/rename"):
             ai_reply = _cmd_rename(user_input, cfg["workspace"])
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
 
         if cmd == "/diff":
             ai_reply = _build_diff_reply(cfg["workspace"])
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
 
         if cmd.startswith("/review"):
             review_target = _parse_review_target(user_input)
-            detail = "Checking the staged git diff and status." if review_target == "staged" else "Checking the current git diff or last CodeMitra change set."
+            detail = "Checking the staged git diff and status." if review_target == "staged" else "Checking the current git diff or last Mitra change set."
             _print_progress_message("Reviewing current changes", detail)
             ai_reply = _cmd_review(cfg["workspace"], review_llm, target=review_target)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
@@ -4654,7 +4654,7 @@ def _chat():
 
         if cmd == "/undo":
             ai_reply = filesystem.undo_last_change_set(cfg["workspace"])
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -4666,37 +4666,37 @@ def _chat():
                 rest = rest.replace("--generate", "").replace("-g", "").strip()
             message = rest if rest and not generate else None
             ai_reply = _cmd_commit(cfg["workspace"], local_llm, message=message, staged=True, generate=generate)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
 
         if cmd.startswith("/tasks"):
             ai_reply = _build_tasks_reply(user_input)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
 
         if cmd == "/plugins":
             ai_reply = plugin_registry.build_registry_reply(plugin_commands)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
 
         if cmd == "/resources":
             ai_reply = _build_resources_reply()
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
 
         if cmd == "/make-space":
             _set_current_task("Freeing local AI resources")
-            _print_progress_message("Reclaiming local AI resources", "CodeMitra can stop reclaimable local AI and user-owned GPU processes to free memory.", color="yellow")
+            _print_progress_message("Reclaiming local AI resources", "Mitra can stop reclaimable local AI and user-owned GPU processes to free memory.", color="yellow")
             ai_reply = _cmd_make_space()
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -4704,7 +4704,7 @@ def _chat():
         if cmd.startswith("/fix"):
             fix_command = _extract_fix_command(user_input, last_command=_LAST_SHELL_COMMAND)
             ai_reply = _cmd_fix(fix_command or "", cfg["workspace"], codegen_llm)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -4725,7 +4725,7 @@ def _chat():
             _set_current_task("Hibernating session")
             _print_progress_message(
                 "Saving workspace state and unloading the model",
-                "CodeMitra is persisting session memory, resetting chat history, and asking Ollama to release RAM.",
+                "Mitra is persisting session memory, resetting chat history, and asking Ollama to release RAM.",
                 color="yellow",
             )
             messages, sess_in, sess_out, ai_reply = _hibernate_session(
@@ -4735,7 +4735,7 @@ def _chat():
                 total_tokens=sess_in + sess_out,
                 auto_compact_threshold=auto_compact_threshold,
             )
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             continue
 
         if cmd.startswith("/run "):
@@ -4743,7 +4743,7 @@ def _chat():
             if run_in_background:
                 _set_current_task("Starting background task")
                 ai_reply = _cmd_run_background(raw_cmd, cfg["workspace"])
-                console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+                console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
                 memory.append_activity(cfg["workspace"], user_input, ai_reply)
                 memory.update_context(cfg["workspace"], user_input)
             else:
@@ -4766,7 +4766,7 @@ def _chat():
                         console=console,
                     ),
                 )
-                console.print(Panel(Markdown(ai_reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+                console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
                 memory.append_activity(cfg["workspace"], user_input, ai_reply)
                 memory.update_context(cfg["workspace"], user_input)
                 continue
@@ -4926,7 +4926,7 @@ def _chat():
                         console.print(
                             Panel(
                                 Markdown(fu_content),
-                                title="[bold cyan]CodeMitra[/bold cyan]",
+                                title="[bold cyan]Mitra[/bold cyan]",
                                 border_style="cyan",
                             )
                         )
@@ -4938,7 +4938,7 @@ def _chat():
                 console.print(
                     Panel(
                         Markdown(ai_reply),
-                        title="[bold cyan]CodeMitra[/bold cyan]",
+                        title="[bold cyan]Mitra[/bold cyan]",
                         border_style="cyan",
                     )
                 )
@@ -4997,7 +4997,7 @@ def _chat():
             console.print(
                 Panel(
                     f"[red]⚠  {_friendly_error(e)}[/red]\n"
-                    f"[dim](Full trace saved to .codemitra/errors.log)[/dim]",
+                    f"[dim](Full trace saved to .mitra/errors.log)[/dim]",
                     title="[bold red]Error[/bold red]",
                     border_style="red",
                 )
@@ -5053,7 +5053,7 @@ def _cmd_plan(
                 shell_llm=shell_llm,
                 direct_llm=direct_llm,
             )
-        console.print(Panel(Markdown(reply), title="[bold cyan]CodeMitra[/bold cyan]", border_style="cyan"))
+        console.print(Panel(Markdown(reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
         return reply
 
     if llm is not None:
@@ -5070,7 +5070,7 @@ def _cmd_plan(
             context = f"{workspace_context}\n\n## Brainstorm Q&A\n{context}".strip()
         with console.status("[bold green]Generating plan...[/bold green]"):
             plan = planner_agent.create_plan(llm, goal, workspace, context=context, work_mode=work_mode)
-        console.print(f"[dim cyan]  ✦  Plan written to .codemitra/plan.md[/dim cyan]")
+        console.print(f"[dim cyan]  ✦  Plan written to .mitra/plan.md[/dim cyan]")
         console.print(planner_agent.render(plan))
         console.print("[dim]Use [cyan]/plan approve[/cyan] when you're ready, then [cyan]/plan next[/cyan].[/dim]")
         return f"Created a plan for: {goal}"
@@ -5091,7 +5091,7 @@ def _cmd_plan(
 
 
 def _cmd_memory(workspace: str) -> None:
-    """Handle `/memory` — show saved CodeMitra workspace artifacts."""
+    """Handle `/memory` — show saved Mitra workspace artifacts."""
     ctx = memory.load_context(workspace)
     plan = memory.load_plan(workspace)
     brainstorm = memory.load_brainstorm(workspace)
@@ -5099,11 +5099,11 @@ def _cmd_memory(workspace: str) -> None:
         console.print("[dim]No memory yet. Start chatting and it will build automatically.[/dim]")
         return
     if ctx:
-        console.print(Panel(ctx, title="[bold cyan].codemitra/context.md[/bold cyan]", border_style="cyan"))
+        console.print(Panel(ctx, title="[bold cyan].mitra/context.md[/bold cyan]", border_style="cyan"))
     if plan:
-        console.print(Panel(plan, title="[bold cyan].codemitra/plan.md[/bold cyan]", border_style="cyan"))
+        console.print(Panel(plan, title="[bold cyan].mitra/plan.md[/bold cyan]", border_style="cyan"))
     if brainstorm:
-        console.print(Panel(brainstorm, title="[bold cyan].codemitra/brainstorm.md[/bold cyan]", border_style="cyan"))
+        console.print(Panel(brainstorm, title="[bold cyan].mitra/brainstorm.md[/bold cyan]", border_style="cyan"))
 
 
 def _cmd_brainstorm(raw: str, workspace: str, llm) -> str:
@@ -5220,7 +5220,7 @@ def _builder_ask_choice(
     Returns the chosen value, or None if cancelled.
     """
     result = _choose_approval_option(
-        title="CodeMitra Builder",
+        title="Mitra Builder",
         prompt=prompt_text,
         options=choices,
         fallback_default=choices[0][0] if choices else None,
@@ -5240,7 +5240,7 @@ def _builder_show_preview(
     lexer = "python" if build_type == "agent" else "markdown"
     title = {
         "skill":    f"[bold cyan]Preview: skills/{artifact_builder.slugify(name)}/SKILL.md[/bold cyan]",
-        "workflow": f"[bold cyan]Preview: .codemitra/workflows/{artifact_builder.slugify(name)}/WORKFLOW.md[/bold cyan]",
+        "workflow": f"[bold cyan]Preview: .mitra/workflows/{artifact_builder.slugify(name)}/WORKFLOW.md[/bold cyan]",
         "agent":    f"[bold cyan]Preview: app/agents/{artifact_builder.slugify(name)}.py[/bold cyan]",
     }.get(build_type, "[bold cyan]Preview[/bold cyan]")
 
@@ -5250,7 +5250,7 @@ def _builder_show_preview(
 
 def _cmd_create(workspace: str, llm) -> None:
     """Guided wizard: create a Skill, Workflow, or Agent through Q&A."""
-    console.rule("[bold cyan]🔨 CodeMitra Builder[/bold cyan]")
+    console.rule("[bold cyan]🔨 Mitra Builder[/bold cyan]")
     console.print(
         "  Answer a few questions and I'll generate a ready-to-use artifact for you.\n"
         "  [dim]Press Ctrl+C at any time to cancel.[/dim]\n"
@@ -5272,7 +5272,7 @@ def _cmd_create(workspace: str, llm) -> None:
         console.print(
             Panel(
                 "[yellow]⚠ Agent creation is for developers.[/yellow]\n"
-                "CodeMitra will generate a Python skeleton file you'll need to complete.\n"
+                "Mitra will generate a Python skeleton file you'll need to complete.\n"
                 "Wiring instructions will be saved alongside the generated file.",
                 border_style="yellow",
                 padding=(0, 2),
@@ -5350,7 +5350,7 @@ def _cmd_create(workspace: str, llm) -> None:
             ))
 
         action = _choose_approval_option(
-            title="CodeMitra Builder — Review",
+            title="Mitra Builder — Review",
             prompt="What would you like to do with this generated artifact?",
             options=[
                 ("save",       "✅  Save to disk — looks good!"),
@@ -5422,7 +5422,7 @@ def _cmd_create(workspace: str, llm) -> None:
         f"[bold green]✅ {type_labels.get(build_type, build_type)} saved![/bold green]\n\n"
         f"  📄 [cyan]{rel}[/cyan]\n\n"
         + (
-            f"  CodeMitra will automatically discover this skill next session.\n"
+            f"  Mitra will automatically discover this skill next session.\n"
             f"  You can also use it now: [bold]/skills show {result.slug}[/bold]"
             if build_type == "skill" else
             f"  Run this workflow any time: [bold]/workflow {result.slug}[/bold]"
@@ -5473,16 +5473,16 @@ def _cmd_recommend(workspace: str, current_local: str, current_codegen: str) -> 
         console.print("[green]✔ Your current local_model is already the top recommendation.[/green]")
         return
 
-    console.print(f"\n[bold]Apply recommended config to [cyan]codemitra.toml[/cyan]?[/bold]")
+    console.print(f"\n[bold]Apply recommended config to [cyan]mitra.toml[/cyan]?[/bold]")
     console.print(f"  local_model   = [cyan]{best_chat}[/cyan]")
     if best_code and best_code != best_chat:
         console.print(f"  codegen_model = [cyan]{best_code}[/cyan]  [dim](used when cloud key is set)[/dim]")
 
     choice = _choose_approval_option(
         "Apply recommendations",
-        "Write these models to codemitra.toml?",
+        "Write these models to mitra.toml?",
         [
-            ("apply", "Yes, update codemitra.toml"),
+            ("apply", "Yes, update mitra.toml"),
             ("skip",  "No, just show me the recommendations"),
         ],
         fallback_default="skip",
@@ -5492,7 +5492,7 @@ def _cmd_recommend(workspace: str, current_local: str, current_codegen: str) -> 
         style = "green" if ok else "red"
         console.print(f"[{style}]{msg}[/{style}]")
         if ok:
-            console.print("[dim]Restart CodeMitra to load the new model.[/dim]")
+            console.print("[dim]Restart Mitra to load the new model.[/dim]")
     else:
         console.print("[dim]No changes made.[/dim]")
 
@@ -5865,7 +5865,7 @@ def _build_root_rename_reply(user_input: str, workspace: str) -> str | None:
         )
 
     return (
-        f"The current project root is already `{root.name}`, and CodeMitra is locked inside that workspace, so it cannot rename the root folder from within itself.{extra}\n\n"
+        f"The current project root is already `{root.name}`, and Mitra is locked inside that workspace, so it cannot rename the root folder from within itself.{extra}\n\n"
         "If you want to rename the project folder, run this from the parent folder in PowerShell:\n\n"
         f"1. `Set-Location '{parent}'`\n"
         f"2. `Rename-Item '{root.name}' '{dest}'`\n\n"
@@ -5877,7 +5877,7 @@ def _build_root_delete_reply(workspace: str) -> str:
     root = pathlib.Path(workspace)
     parent = root.parent
     return (
-        f"CodeMitra is locked inside `{root.name}`, so it cannot delete the current project root from within itself.\n\n"
+        f"Mitra is locked inside `{root.name}`, so it cannot delete the current project root from within itself.\n\n"
         "If you want to remove the whole project and start fresh, run this from the parent folder in PowerShell:\n\n"
         f"1. `Set-Location '{parent}'`\n"
         f"2. `Remove-Item '{root.name}' -Recurse -Force`\n\n"
@@ -5886,7 +5886,7 @@ def _build_root_delete_reply(workspace: str) -> str:
 
 
 # ── Tokens at which auto-compact kicks in ────────────────────────────────────
-_AUTO_COMPACT_THRESHOLD = 120_000  # overridden at runtime from codemitra.toml
+_AUTO_COMPACT_THRESHOLD = 120_000  # overridden at runtime from mitra.toml
 
 
 def _compact(
@@ -6003,18 +6003,18 @@ def _print_help(extra_commands=None):
     table.add_column(style="cyan", no_wrap=True)
     table.add_column(style="dim")
     commands = [
-        ("/init",         "Create CODEMITRA.md + codemitra.toml in current folder"),
+        ("/init",         "Create MITRA.md + mitra.toml in current folder"),
         ("/run <cmd>",    "Run a shell command directly in the workspace (e.g. /run python main.py)"),
-        ("/run --background <cmd>", "Start a long-running shell command in the background and keep using CodeMitra"),
-        ("/plan <goal>",  "Set the active plan for this project (saved to .codemitra/plan.md)"),
+        ("/run --background <cmd>", "Start a long-running shell command in the background and keep using Mitra"),
+        ("/plan <goal>",  "Set the active plan for this project (saved to .mitra/plan.md)"),
         ("/plan",         "Show the current active plan"),
         ("/plan approve", "Approve the saved plan for execution"),
         ("/plan next",    "Execute exactly one approved pending plan step"),
         ("/plan run",     "Execute all approved pending plan steps"),
         ("/plan pause",   "Pause active plan execution without losing progress"),
-        ("/brainstorm <topic>", "Brainstorm ideas in a lighter chat mode and save them to .codemitra/brainstorm.md"),
+        ("/brainstorm <topic>", "Brainstorm ideas in a lighter chat mode and save them to .mitra/brainstorm.md"),
         ("/brainstorm",   "Show saved brainstorm notes"),
-        ("/understand <idea>", "Ask focused questions about an idea and save the answers to .codemitra/understand.md"),
+        ("/understand <idea>", "Ask focused questions about an idea and save the answers to .mitra/understand.md"),
         ("/understand",   "Show saved understanding notes"),
         ("/prd <idea>",   "Draft or update a PRD and save it to PRD.md"),
         ("/prd",          "Show the current PRD draft"),
@@ -6027,7 +6027,7 @@ def _print_help(extra_commands=None):
         ("/test [cmd]",   "Run a test command in the workspace (defaults to `pytest`)"),
         ("/playbooks",    "List available project playbooks and their starter stacks"),
         ("/mcp",          "List MCP profiles and their local fallback tool paths"),
-        ("/logs [name]",  "Inspect `.codemitra` logs such as history, trace, errors, decisions, or tasks"),
+        ("/logs [name]",  "Inspect `.mitra` logs such as history, trace, errors, decisions, or tasks"),
         ("/permissions",  "Show current execution policy, workspace scope, and tool restrictions"),
         ("/resume",       "Show the saved session summary, plan state, undo state, and recent activity"),
         ("/rename <name>", "Rename the current workspace session"),
@@ -6036,9 +6036,9 @@ def _print_help(extra_commands=None):
         ("/model",        "Show the active chat and codegen models"),
         ("/model list",   "Show installed local Ollama models and highlight the active one"),
         ("/model remove <name>", "Delete a local Ollama model you no longer want"),
-        ("/history",      "Show the recent saved conversation history from .codemitra/activity.md"),
-        ("/diff",         "Show the current git diff or the last CodeMitra change set"),
-        ("/review [staged]", "Review the current or staged git diff, or the last CodeMitra change set, for material issues"),
+        ("/history",      "Show the recent saved conversation history from .mitra/activity.md"),
+        ("/diff",         "Show the current git diff or the last Mitra change set"),
+        ("/review [staged]", "Review the current or staged git diff, or the last Mitra change set, for material issues"),
         ("/explain <file>", "Explain what a specific file does, including important flows and editing risks"),
         ("/symbols <name>", "Show symbol-focused code intelligence: definitions plus usages across the workspace"),
         ("/diagnostics [path]", "Run available local language servers and show LSP diagnostics for a file or workspace"),
@@ -6046,24 +6046,24 @@ def _print_help(extra_commands=None):
         ("/config [show|edit <layer>|reset <layer>]", "View or edit layered config (user|project|local)"),
         ("/search <query>", "Search the web for public docs, references, tutorials, or other online information"),
         ("/open-url <url>", "Read and summarize a specific webpage"),
-        ("/undo",         "Undo the last recorded file change set applied by CodeMitra"),
+        ("/undo",         "Undo the last recorded file change set applied by Mitra"),
         ("/commit [msg]", "Commit staged changes; use --generate to auto-suggest a conventional message"),
         ("/fix <cmd>",    "Run a bounded test-fix-retry loop for a failing command"),
         ("/tasks",        "List tracked background tasks and show their current status"),
         ("/tasks show <id>", "Show details and recent output for one background task"),
         ("/tasks stop <id>", "Stop a running background task"),
-        ("/skills",       "List available CodeMitra skills discovered in this workspace"),
+        ("/skills",       "List available Mitra skills discovered in this workspace"),
         ("/skills show <name>", "Show one skill's instructions"),
         ("/plugins",      "Show loaded workspace plugin slash commands and any load issues"),
         ("/resources",    "Show live CPU, RAM, GPU, and reclaimable process usage"),
         ("/make-space",   "Stop detected local AI and user-owned GPU processes to free CPU and GPU memory"),
-        ("/recommend",    "Suggest the best local models for your hardware and optionally apply them to codemitra.toml"),
+        ("/recommend",    "Suggest the best local models for your hardware and optionally apply them to mitra.toml"),
         ("/create",       "Guided wizard: build a Skill, Workflow, or Agent through a series of plain-English questions"),
         ("/compact",      "Summarise + compress conversation history to free context window"),
         ("/hibernate",   "Save session memory, unload the active local model, clear chat history, and continue fresh"),
         ("/reset",        "Clear conversation history (memory files are kept)"),
         ("/help",         "Show this help"),
-        ("exit / quit",   "Exit CodeMitra"),
+        ("exit / quit",   "Exit Mitra"),
     ]
     for command in extra_commands or []:
         commands.append((command.name, f"{command.description} [plugin:{command.plugin_name}]"))

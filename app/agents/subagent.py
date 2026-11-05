@@ -1,4 +1,4 @@
-"""True subagent runtime boundary for CodeMitra.
+"""True subagent runtime boundary for Mitra.
 
 Subagents are isolated workers with:
 - Fresh context windows
