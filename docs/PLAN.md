@@ -36,8 +36,7 @@ Plan v2 (2026-11-05, D-017); v1 is in [archive/PLAN-v1-2026-10-24.md](archive/PL
 - [x] Model check on the two picks: native tool calls via Ollama, speed, GPU fit at 32K/64K (`bench/model_screen.py`): 4B 9/12, 81 tok/s, fits; 9B 11/12, 20 tok/s, 64% on GPU at 64K (EVALS, 2026-10-26)
 - [x] Prompt overhead measured for each stock agent (Claude Code, Codex, OpenCode, Aider, deepagents-code): 2.7K-12.2K tokens on the first work call (`run.py --overhead`, EVALS, 2026-10-26)
 - [x] Ollama context set correctly for each (`OLLAMA_CONTEXT_LENGTH`); configs saved in `bench/configs/`: bench server at 64K (D-016), preflight checks the loaded context; Aider sets its own `num_ctx` (stock behaviour, kept) (2026-10-26)
-- [ ] Model check on `mimo-v2.6:9b` (Qwen3.5-9B fine-tune, reports better agent scores than qwen3.5:9b) with `bench/model_screen.py`; it replaces qwen3.5:9b only if it scores at least as well at similar speed (D-029)
-- [ ] Baseline runs: stock agents × the small and mid models on benchmark v0; raw results in `results/`
+- [ ] Baseline runs: stock agents × qwen3.5:4b and qwen3.5:9b on benchmark v0; raw results in `results/`
 - [ ] **Kill check 1:** if stock agents already pass most tasks, the best one becomes the builder (SCOPE kill rule)
 - [ ] Release v0.0 + post: "Why coding agents break on your laptop" (prompt-overhead chart)
 

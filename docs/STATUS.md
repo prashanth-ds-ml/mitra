@@ -5,7 +5,7 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next
-M2 design written: [M2_PLAN.md](M2_PLAN.md) (D-028 MCP). Before the baselines: model check on `mimo-v2.6:9b` (D-029).
+M2 design written: [M2_PLAN.md](M2_PLAN.md) (D-028 MCP). Models stay qwen3.5:4b + 9b (D-029).
 
 Plan v2 agreed 2026-11-05 (D-017..D-027): terminal coding assistant on local models (M2); Mitra plans and builds
 locally, unattended (M3); Claude Code only as a fallback; practice ladder in a separate repo `mitra-playground`;
