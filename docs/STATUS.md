@@ -5,6 +5,13 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next
+2026-11-05: code renamed to Mitra (920ee63); MCP client on the official SDK with day-one servers (8a91474, D-030):
+git, GitHub (remote HTTP, token from `gh auth token -u prashanth-ds-ml` via `~/.mitra/mcp.json`), Context7,
+filesystem, Semgrep on; fetch, AWS docs, Serena off. 640 tests pass (Windows CI green; Linux has the same 8 E-005
+failures as before). **Not yet done:** starting the real servers (`python -m app.main mcp test <name>` from this
+folder) needs the user's OK, because it downloads the packages (`uvx`/`npx`) and sends the GitHub token to GitHub's
+MCP endpoint. Pin their versions after the first good start.
+
 M2 design written: [M2_PLAN.md](M2_PLAN.md) (D-028 MCP). Models stay qwen3.5:4b + 9b (D-029).
 
 Plan v2 agreed 2026-11-05 (D-017..D-027): terminal coding assistant on local models (M2); Mitra plans and builds
