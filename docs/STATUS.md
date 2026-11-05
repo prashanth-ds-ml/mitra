@@ -7,7 +7,9 @@
 ## Next
 Plan v2 agreed 2026-11-05 (D-017..D-027): terminal coding assistant on local models (M2); Mitra plans and builds
 locally, unattended (M3); Claude Code only as a fallback; practice ladder in a separate repo `mitra-playground`;
-MCP + Harness² in M4; fine-tune last (M7). Old scope and plan in `docs/archive/`. GitHub milestones still show the v1 M0-M8 names (to update).
+MCP + Harness² in M4; fine-tune last (M7). Old scope and plan in `docs/archive/`. GitHub milestones and tracking issues renamed to M0-M7 (old M8 closed).
+Practice ladder repo created: https://github.com/prashanth-ds-ml/mitra-playground (public; skeleton, plan format v0,
+`scripts/check_level.py`, CI green). Both repos push as prashanth-ds-ml via a repo-local credential helper.
 
 The next unticked items in [PLAN.md](PLAN.md), M0:
 1. Baseline runs: 5 stock agents x qwen3.5:4b and qwen3.5:9b on the 10 tasks. Start the bench server first
