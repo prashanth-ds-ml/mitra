@@ -30,7 +30,6 @@ from app.main import (
     _extract_url_from_input,
     _extract_web_search_query,
     _extract_workspace_selection_target,
-    _hibernate_session,
     _is_project_summary_request,
     _is_understand_alias_request,
 )
@@ -232,66 +231,6 @@ class TestSessionRecoveryWorkflow:
         assert metadata["last_compaction"]["summary"] == "Summary with next action preserved."
         assert metadata["last_compaction"]["turns_compacted"] == 2
         assert metadata["last_compaction"]["usage_tokens_before"] == 42000
-
-    def test_hibernate_then_resume_preserves_session_context(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("app.main.config.get_available_system_memory_gib", lambda: 4.0)
-        monkeypatch.setattr("app.main.config.stop_local_model", lambda model: (True, f"Stopped `{model}`."))
-        monkeypatch.setattr("app.main.shell_agent.get_cwd", lambda: str(tmp_path))
-
-        session_agent.ensure_session(str(tmp_path))
-        memory.write_plan(str(tmp_path), goal="Ship Med_RAG", steps=["Create project", "Verify setup"])
-        memory.append_activity(str(tmp_path), "start work", "Created initial scaffold")
-
-        messages, sess_in, sess_out, reply = _hibernate_session(
-            workspace=str(tmp_path),
-            model="qwen3.5:latest",
-            system_prompt="SYSTEM",
-            total_tokens=24000,
-            auto_compact_threshold=120000,
-        )
-
-        resume = session_agent.build_resume_reply(str(tmp_path))
-
-        assert len(messages) == 1
-        assert messages[0].content == "SYSTEM"
-        assert sess_in == 0
-        assert sess_out == 0
-        assert "Session hibernated" in reply
-        assert "Ship Med_RAG" in memory.load_plan(str(tmp_path))
-        assert "Session resume" in resume
-        assert "Loaded" in resume
-
-    def test_resume_after_recovery_includes_brainstorm_and_undo_state(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("app.main.config.get_available_system_memory_gib", lambda: 6.0)
-        monkeypatch.setattr("app.main.config.stop_local_model", lambda model: (True, f"Stopped `{model}`."))
-        monkeypatch.setattr("app.main.shell_agent.get_cwd", lambda: str(tmp_path))
-
-        session_agent.ensure_session(str(tmp_path))
-        memory.write_plan(str(tmp_path), goal="Ship Med_RAG", steps=["Create project"])
-        memory.append_activity(str(tmp_path), "draft the ingestion flow", "Captured the first bootstrap notes.")
-        memory.append_brainstorm_entry(str(tmp_path), "brainstorm ingestion options", "Use a staged document pipeline.")
-        memory.record_last_change_set(
-            str(tmp_path),
-            {"entries": [{"kind": "create_file", "path": str(tmp_path / "README.md"), "before": None}]},
-        )
-
-        _hibernate_session(
-            workspace=str(tmp_path),
-            model="qwen3.5:latest",
-            system_prompt="SYSTEM",
-            total_tokens=18000,
-            auto_compact_threshold=120000,
-        )
-
-        resume = session_agent.build_resume_reply(str(tmp_path))
-        metadata = memory.load_session_metadata(str(tmp_path))
-
-        assert metadata is not None
-        assert metadata["last_hibernated_model"] == "qwen3.5:latest"
-        assert "Brainstorm notes:** Saved" in resume
-        assert "Undo state:** 1 step available for undo" in resume
-        assert "draft the ingestion flow" in resume
-        assert "/hibernate" in resume
 
 
 class TestPlanLifecycleWorkflow:

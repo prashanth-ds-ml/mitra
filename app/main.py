@@ -1,11 +1,8 @@
 import difflib
-import shlex
-import gc
 import os
 import json
 import pathlib
 import re
-import shutil
 import subprocess
 import sys
 import traceback
@@ -28,21 +25,17 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.shortcuts import radiolist_dialog
 
 from app.llm import get_cloud_llm, get_local_llm, probe_ollama
-from app.prompts import SYSTEM_PROMPT, TECHNICAL_WRITER_PROMPT
+from app.prompts import SYSTEM_PROMPT
 from app.agents import filesystem
-from app.agents import codeintel as codeintel_agent
-from app.agents import diagnostics as diagnostics_agent
-from app.agents import explainer as explainer_agent
 from app.agents import registry as agent_registry
 from app.agents import reviewer as reviewer_agent
 from app.agents import session as session_agent
 from app.agents import shell as shell_agent
 from app.agents import reader as reader_agent
 from app.agents import planner as planner_agent
-from app.agents import understand as understand_agent
 from app.agents import web as web_agent
 from app.agents.response import render
-from app import config, logs as app_logs, memory, skills as skills_registry, playbooks as playbook_registry, mcp as mcp_registry, advisor as model_advisor, builder as artifact_builder, plugins as plugin_registry, policy as policy_module, events as event_bus, workflows, langgraph_workflows, prd as prd_flow, routing as routing_module
+from app import config, logs as app_logs, memory, skills as skills_registry, mcp as mcp_registry, advisor as model_advisor, plugins as plugin_registry, policy as policy_module, events as event_bus, workflows, langgraph_workflows, routing as routing_module
 
 cli = typer.Typer(invoke_without_command=True, add_completion=False)
 
@@ -52,7 +45,7 @@ intent_router = routing_module.IntentRouter()
 
 try:
     # prefer direct import
-    from misc.ascii import generate_mitra_banner_art, generate_title_art
+    from misc.ascii import generate_mitra_banner_art
 except Exception:
     # ensure project root is on sys.path when running as script
     import sys
@@ -61,9 +54,7 @@ except Exception:
     root = pathlib.Path(__file__).resolve().parents[1]
     if str(root) not in sys.path:
         sys.path.append(str(root))
-    from misc.ascii import generate_mitra_banner_art, generate_title_art
-
-
+    from misc.ascii import generate_mitra_banner_art
 
 
 def show_banner():
@@ -332,85 +323,12 @@ def cmd_models(cwd: str | None = typer.Option(None, "--cwd", help="Start path fo
     _print_phase0_models(cwd)
 
 
-def cmd_start(
-    goal: str,
-    cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection."),
-    mode: str | None = typer.Option(None, "--mode", help="Work mode: builder, collaborator, mentor, architect, reviewer, debugger, or product."),
-    playbook: str | None = typer.Option(None, "--playbook", help="Project playbook to seed the plan from."),
-) -> None:
-    """Start a structured build loop from one prompt."""
-    cfg, workspace = _phase5_workspace(cwd)
-    _model, llm, codegen_llm = _resolve_noninteractive_llms(cfg)
-    work_mode = _normalize_work_mode(mode or cfg.get("work_mode"))
-    playbook_name = (playbook or "").strip()
-    reply = _cmd_start(
-        goal,
-        workspace,
-        llm=llm,
-        session_mode=cfg.get("session_mode", "approve"),
-        work_mode=work_mode,
-        playbook=playbook_name or None,
-        playbook_dirs=cfg.get("playbook_dirs"),
-        codegen_llm=codegen_llm,
-    )
-    console.print(Panel(Markdown(reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-
-
-def cmd_next(
-    cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection."),
-    mode: str | None = typer.Option(None, "--mode", help="Work mode: builder, collaborator, mentor, architect, reviewer, debugger, or product."),
-) -> None:
-    """Execute the next approved plan step."""
-    cfg, workspace = _phase5_workspace(cwd)
-    _model, llm, codegen_llm = _resolve_noninteractive_llms(cfg)
-    if llm is None:
-        console.print("[red]No `local_model` is configured yet. Set one in `mitra.toml` first.[/red]")
-        raise typer.Exit(1)
-    work_mode = _normalize_work_mode(mode or cfg.get("work_mode"))
-    reply = _cmd_next(
-        workspace,
-        llm,
-        session_mode=cfg.get("session_mode", "approve"),
-        work_mode=work_mode,
-        codegen_llm=codegen_llm,
-    )
-    console.print(Panel(Markdown(reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-
-
-def cmd_build(
-    cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection."),
-    mode: str | None = typer.Option(None, "--mode", help="Work mode: builder, collaborator, mentor, architect, reviewer, debugger, or product."),
-) -> None:
-    """Execute all approved pending plan steps."""
-    cfg, workspace = _phase5_workspace(cwd)
-    _model, llm, codegen_llm = _resolve_noninteractive_llms(cfg)
-    if llm is None:
-        console.print("[red]No `local_model` is configured yet. Set one in `mitra.toml` first.[/red]")
-        raise typer.Exit(1)
-    work_mode = _normalize_work_mode(mode or cfg.get("work_mode"))
-    reply = _cmd_build(
-        workspace,
-        llm,
-        session_mode=cfg.get("session_mode", "approve"),
-        work_mode=work_mode,
-        codegen_llm=codegen_llm,
-    )
-    console.print(Panel(Markdown(reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-
-
 def cmd_test(command: str = typer.Argument("pytest"), cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection.")) -> None:
     """Run a test command in the workspace."""
     _cfg, workspace = _phase5_workspace(cwd)
     output = _cmd_test(command, workspace)
     if output:
         console.print(Panel(output, title="[bold cyan]Test Command[/bold cyan]", border_style="cyan"))
-
-
-def cmd_playbooks(cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection.")) -> None:
-    """List available project playbooks."""
-    cfg, workspace = _phase5_workspace(cwd)
-    reply = _build_playbooks_reply(workspace, cfg)
-    console.print(Panel(Markdown(reply), title="[bold cyan]Project Playbooks[/bold cyan]", border_style="cyan"))
 
 
 def cmd_mcp(
@@ -430,86 +348,18 @@ def cmd_logs(target: str = typer.Argument("summary"), cwd: str | None = typer.Op
     console.print(Panel(Markdown(reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
 
 
-def cmd_understand(idea: str = typer.Argument("", help="Idea or project prompt to clarify."), cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection.")) -> None:
-    """Run the understand workflow and save `.mitra/understand.md`."""
-    cfg, workspace = _phase5_workspace(cwd)
-    if not idea.strip():
-        existing = memory.load_understand(workspace)
-        console.print(Markdown(existing) if existing else "Usage: `/understand <idea>`")
-        return
-    llm = _build_command_llm(cfg)
-    _cmd_understand(f"/understand {idea}".strip(), workspace, llm)
-
-
-def cmd_prd(prompt: str = typer.Argument("", help="Idea to draft or update as a PRD."), cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection.")) -> None:
-    """Run the PRD workflow and save `PRD.md`."""
-    cfg, workspace = _phase5_workspace(cwd)
-    if not prompt.strip():
-        existing = memory.load_prd(workspace)
-        console.print(Markdown(existing) if existing else "Usage: `/prd <idea>` or `/prd update <notes>`")
-        return
-    llm = _build_command_llm(cfg)
-    _cmd_prd(f"/prd {prompt}".strip(), workspace, llm)
-
-
 cli.command("status")(cmd_status)
 cli.command("/status", hidden=True)(cmd_status)
 cli.command("config")(cmd_config)
 cli.command("/config", hidden=True)(cmd_config)
 cli.command("models")(cmd_models)
 cli.command("/models", hidden=True)(cmd_models)
-cli.command("start")(cmd_start)
-cli.command("/start", hidden=True)(cmd_start)
-cli.command("next")(cmd_next)
-cli.command("/next", hidden=True)(cmd_next)
-cli.command("build")(cmd_build)
-cli.command("/build", hidden=True)(cmd_build)
 cli.command("test")(cmd_test)
 cli.command("/test", hidden=True)(cmd_test)
-cli.command("playbooks")(cmd_playbooks)
-cli.command("/playbooks", hidden=True)(cmd_playbooks)
 cli.command("mcp")(cmd_mcp)
 cli.command("/mcp", hidden=True)(cmd_mcp)
 cli.command("logs")(cmd_logs)
 cli.command("/logs", hidden=True)(cmd_logs)
-cli.command("understand")(cmd_understand)
-cli.command("/understand", hidden=True)(cmd_understand)
-cli.command("prd")(cmd_prd)
-cli.command("/prd", hidden=True)(cmd_prd)
-
-
-def _resolve_noninteractive_llms(cfg: dict):
-    """Resolve local/codegen LLMs for canonical CLI commands without prompting."""
-    model = (cfg.get("local_model") or cfg.get("model") or "").strip()
-    if not model:
-        return None, None, None
-
-    temperature = cfg.get("temperature", 0.2)
-    num_ctx = int(cfg.get("num_ctx", 131072))
-    cloud_api_key = (cfg.get("ollama_api_key") or "").strip()
-    planner_llm = _build_role_llm(
-        cfg,
-        "planner",
-        temperature=temperature,
-        num_ctx=num_ctx,
-        num_gpu=None,
-        base_url=cfg.get("ollama_local_base_url"),
-        cloud_api_key=None,
-        cloud_base_url=cfg.get("ollama_cloud_base_url"),
-        fallback_model=model,
-    )
-    codegen_llm = _build_role_llm(
-        cfg,
-        "coder",
-        temperature=temperature,
-        num_ctx=num_ctx,
-        num_gpu=None,
-        base_url=cfg.get("ollama_local_base_url"),
-        cloud_api_key=cloud_api_key,
-        cloud_base_url=cfg.get("ollama_cloud_base_url"),
-        fallback_model=model,
-    )
-    return _resolve_role_model(cfg, "planner", fallback_model=model, cloud_codegen_enabled=bool(cloud_api_key)), planner_llm, codegen_llm
 
 
 def _phase5_workspace(cwd: str | None = None) -> tuple[dict, str]:
@@ -604,11 +454,6 @@ def _build_idea_llm(cfg: dict):
         cloud_base_url=cfg.get("ollama_cloud_base_url"),
         fallback_model=(cfg.get("local_model") or cfg.get("model") or "").strip(),
     )
-
-
-def _build_command_llm(cfg: dict):
-    """Backward-compatible alias for the idea-shaping model builder."""
-    return _build_idea_llm(cfg)
 
 
 def _build_workspace_context(
@@ -730,9 +575,8 @@ def _log_error(workspace: str, exc: Exception) -> None:
 
 # ── Slash command completer ───────────────────────────────────────────────────
 _SLASH_COMMANDS = [
-    "/init", "/run", "/plan", "/memory", "/context", "/status", "/model",
-    "/history", "/resume", "/rename", "/diff", "/review", "/explain", "/symbols", "/diagnostics", "/policy", "/config", "/search", "/open-url", "/undo", "/commit", "/fix", "/tasks", "/skills", "/plugins", "/resources", "/make-space", "/brainstorm", "/understand", "/prd", "/recommend", "/create", "/mode", "/thinking", "/permissions", "/compact", "/hibernate", "/reset", "/help",
-    "/start", "/next", "/build", "/test", "/logs", "/playbooks", "/mcp",
+    "/help", "/init", "/status", "/doctor", "/model", "/context", "/think", "/mode", "/test", "/fix",
+    "/diff", "/undo", "/commit", "/review", "/mcp", "/skills", "/logs", "/resume", "/compact", "/clear",
     "exit", "quit",
 ]
 _SESSION_MODES = ("read-only", "plan", "approve", "auto")
@@ -1038,80 +882,6 @@ def _build_context_reply(total_tokens: int, auto_compact_threshold: int, num_ctx
     )
 
 
-def _build_hibernation_reply(
-    *,
-    workspace: str,
-    model: str,
-    session_name: str,
-    shell_cwd: str,
-    total_tokens: int,
-    auto_compact_threshold: int,
-    free_ram_before: float | None,
-    free_ram_after: float | None,
-    unload_detail: str,
-) -> str:
-    ram_before = f"`{free_ram_before:.1f} GB`" if free_ram_before is not None else "Unknown"
-    ram_after = f"`{free_ram_after:.1f} GB`" if free_ram_after is not None else "Unknown"
-    return (
-        "## Session hibernated\n\n"
-        f"- **Session:** `{session_name}`\n"
-        f"- **Workspace:** `{workspace}`\n"
-        f"- **Shell cwd:** `{shell_cwd}`\n"
-        f"- **Model unloaded:** `{model}`\n"
-        f"- **Session usage before reset:** {_format_session_usage(total_tokens, auto_compact_threshold)}\n"
-        f"- **Available RAM:** {ram_before} → {ram_after}\n"
-        f"- **Persistence:** activity, context, plan timestamp, and session metadata updated\n"
-        f"- **Unload result:** {unload_detail}\n\n"
-        "Mitra cleared the in-memory conversation and will continue from the saved workspace state on the next turn. Use `/resume` if you want a compact recap first."
-    )
-
-
-def _hibernate_session(
-    *,
-    workspace: str,
-    model: str,
-    system_prompt: str,
-    total_tokens: int,
-    auto_compact_threshold: int,
-) -> tuple[list, int, int, str]:
-    session_meta = session_agent.ensure_session(workspace)
-    session_name = session_meta.get("name", pathlib.Path(workspace).resolve().name)
-    shell_cwd = shell_agent.get_cwd()
-    free_ram_before = config.get_available_system_memory_gib()
-
-    memory.save_session_metadata(
-        workspace,
-        {
-            **session_meta,
-            "last_hibernated_at": datetime.now().isoformat(timespec="seconds"),
-            "last_hibernated_cwd": shell_cwd,
-            "last_hibernated_model": model,
-            "last_hibernated_usage_tokens": total_tokens,
-        },
-    )
-
-    unload_ok, unload_detail = config.stop_local_model(model)
-    if not unload_ok:
-        unload_detail = f"{unload_detail} The session was still reset and saved."
-
-    gc.collect()
-    recovered_messages = [SystemMessage(content=system_prompt)]
-    free_ram_after = config.get_available_system_memory_gib()
-    reply = _build_hibernation_reply(
-        workspace=workspace,
-        model=model,
-        session_name=session_name,
-        shell_cwd=shell_cwd,
-        total_tokens=total_tokens,
-        auto_compact_threshold=auto_compact_threshold,
-        free_ram_before=free_ram_before,
-        free_ram_after=free_ram_after,
-        unload_detail=unload_detail,
-    )
-    memory.record_hibernation(workspace, reply)
-    return recovered_messages, 0, 0, reply
-
-
 def _build_permissions_reply(cfg: dict, session_mode: str) -> str:
     allowed_roots = cfg.get("allowed_roots") or []
     disabled_tools = cfg.get("disabled_tools") or []
@@ -1240,13 +1010,6 @@ def _clear_terminal() -> None:
             os.system("cls" if os.name == "nt" else "clear")
         except Exception:
             pass
-
-
-def _build_progress_message(message: str, detail: str | None = None) -> str:
-    text = f"{_activity_icon(message)} {message}"
-    if detail:
-        text += f"\n  {detail}"
-    return text
 
 
 def _activity_icon(label: str) -> str:
@@ -1884,11 +1647,6 @@ def _find_run_targets(workspace: str) -> list[str]:
     return targets
 
 
-def _find_run_target(workspace: str) -> str | None:
-    targets = _find_run_targets(workspace)
-    return targets[0] if targets else None
-
-
 def _workspace_snapshot(workspace: str) -> tuple[list[str], list[str]]:
     root = pathlib.Path(workspace)
     dirs: list[str] = []
@@ -2108,26 +1866,6 @@ def _build_startup_status(
     return Panel(content, title="[bold cyan]Session Snapshot[/bold cyan]", border_style="cyan")
 
 
-def _build_startup_walkthrough() -> Panel:
-    from rich.console import Group
-    from rich.text import Text
-
-    notes = Text.from_markup(
-        "[bold]Start here:[/bold] ask naturally, or reach for a command when you want something specific."
-    )
-    examples = Text.from_markup(
-        "[cyan]Understand[/cyan]  what do you understand about this project?\n"
-        "[cyan]Plan[/cyan]  /plan build a goal tracker app\n"
-        "[cyan]Inspect[/cyan]  /review  ·  /explain app\\main.py  ·  /symbols helper\n"
-        "[cyan]Search[/cyan]  /search python packaging best practices"
-    )
-    return Panel(
-        Group(notes, Text(""), examples),
-        title="[bold cyan]Start Here[/bold cyan]",
-        border_style="cyan",
-    )
-
-
 def _summarize_plan_progress(workspace: str) -> str:
     plan_text = memory.load_plan(workspace)
     if not plan_text:
@@ -2254,20 +1992,6 @@ def _build_status_reply(
         f"- **Commit readiness:** {_build_commit_readiness(workspace)}\n"
         f"- **Last undoable change:** {_describe_last_change(workspace)}"
     )
-
-
-def _build_history_reply(workspace: str, limit: int = 5) -> str:
-    entries = memory.load_recent_activity(workspace, limit=limit)
-    if not entries:
-        return "No saved history yet."
-
-    lines = ["## Recent history", ""]
-    for entry in entries:
-        stamp = " ".join(part for part in (entry.get("date"), entry.get("time")) if part)
-        lines.append(f"- **{stamp}**")
-        lines.append(f"  - **You:** {entry.get('user', '')}")
-        lines.append(f"  - **Mitra:** {entry.get('assistant', '')}")
-    return "\n".join(lines)
 
 
 def _build_logs_reply(workspace: str, target: str = "summary") -> str:
@@ -2436,60 +2160,6 @@ def _build_resources_reply() -> str:
         lines.append("Use `/make-space` to stop these reclaimable processes and free CPU/GPU memory.")
     else:
         lines.append("No reclaimable local AI or user-owned GPU processes detected right now.")
-    return "\n".join(lines)
-
-
-def _confirm_make_space(processes: list) -> bool:
-    preview = "\n".join(
-        f"• {proc.name} (pid {proc.pid}, {proc.category})" for proc in processes[:8]
-    ) or "• No matching processes found"
-    if len(processes) > 8:
-        preview += f"\n• ...and {len(processes) - 8} more"
-    choice = _choose_approval_option(
-        "Free local AI resources",
-        "Mitra can stop the following reclaimable processes to free CPU and GPU memory.\n"
-        "This includes Ollama/local AI processes and user-owned GPU processes reported by nvidia-smi.\n"
-        "This may interrupt the current local model and your other GPU workloads.\n\n"
-        f"{preview}\n\nProceed?",
-        [
-            ("deny", "No, keep them running"),
-            ("approve", "Yes, stop these processes"),
-        ],
-        fallback_default="deny",
-    )
-    approved = choice == "approve"
-    _print_approval_result("Approved" if approved else "Skipped", approved=approved)
-    return approved
-
-
-def _cmd_make_space() -> str:
-    processes = config.list_reclaimable_processes()
-    if not processes:
-        return "No reclaimable local AI or user-owned GPU processes are currently using resources outside this Mitra session."
-    if not _confirm_make_space(processes):
-        return "Skipped stopping reclaimable processes."
-    stopped, errors = config.stop_reclaimable_processes()
-    gpu_info = config.get_gpu_memory_info()
-    cpu_pct = config.get_cpu_usage_pct()
-    lines = [
-        "## Resources reclaimed",
-        "",
-        f"- **Processes stopped:** `{len(stopped)}`",
-    ]
-    if stopped:
-        lines.append("- **Stopped:** " + ", ".join(f"`{proc.name}` (`{proc.pid}`)" for proc in stopped[:6]))
-        if len(stopped) > 6:
-            lines.append(f"- **Additional stopped:** `{len(stopped) - 6}` more")
-    if cpu_pct is not None:
-        lines.append(f"- **CPU usage now:** `{cpu_pct:.1f}%`")
-    if gpu_info is not None:
-        lines.append(f"- **GPU free now:** `{gpu_info.free_gib:.1f} / {gpu_info.total_gib:.1f} GB`")
-    lines.append("- **Note:** if this session is using a local Ollama model, the next local request may need Ollama to spin back up.")
-    if errors:
-        lines.append("")
-        lines.append("### Errors")
-        for error in errors:
-            lines.append(f"- {error}")
     return "\n".join(lines)
 
 
@@ -2957,151 +2627,8 @@ def _cmd_logs(raw: str, workspace: str) -> str:
     return _build_logs_reply(workspace, target or "summary")
 
 
-def _build_playbooks_reply(workspace: str, cfg: dict | None = None) -> str:
-    playbooks = playbook_registry.discover(workspace, (cfg or {}).get("playbook_dirs"))
-    if not playbooks:
-        return (
-            "No project playbooks found yet.\n\n"
-            "Add playbooks under `playbooks/<name>/PLAYBOOK.md` or `.mitra/playbooks/<name>/PLAYBOOK.md`."
-        )
-    return playbook_registry.format_prompt(playbooks)
-
-
 def _build_mcp_reply(workspace: str, cfg: dict | None = None, args: str = "") -> str:
     return mcp_registry.handle_command(workspace, args)
-
-
-def _resolve_playbook(workspace: str, query: str, cfg: dict | None = None):
-    playbooks = playbook_registry.discover(workspace, (cfg or {}).get("playbook_dirs"))
-    selected = playbook_registry.find(playbooks, query)
-    return selected, playbooks
-
-
-def _extract_work_mode_and_payload(raw: str, default_mode: str) -> tuple[str, str]:
-    mode, _playbook, payload = _extract_start_options_and_payload(raw, default_mode)
-    return mode, payload
-
-
-def _extract_start_options_and_payload(raw: str, default_mode: str) -> tuple[str, str, str]:
-    try:
-        tokens = shlex.split(raw)
-    except ValueError:
-        return _normalize_work_mode(default_mode), "", raw.strip()
-
-    if not tokens:
-        return _normalize_work_mode(default_mode), "", ""
-
-    mode = default_mode
-    playbook = ""
-    payload: list[str] = []
-    i = 1
-    while i < len(tokens):
-        token = tokens[i]
-        if token == "--mode" and i + 1 < len(tokens):
-            mode = tokens[i + 1]
-            i += 2
-            continue
-        if token.startswith("--mode="):
-            mode = token.split("=", 1)[1]
-            i += 1
-            continue
-        if token == "--playbook" and i + 1 < len(tokens):
-            playbook = tokens[i + 1]
-            i += 2
-            continue
-        if token.startswith("--playbook="):
-            playbook = token.split("=", 1)[1]
-            i += 1
-            continue
-        payload.append(token)
-        i += 1
-    return _normalize_work_mode(mode), playbook.strip(), " ".join(payload).strip()
-
-
-def _cmd_start(
-    goal: str,
-    workspace: str,
-    llm=None,
-    *,
-    session_mode: str = "approve",
-    work_mode: str = "builder",
-    playbook: str | None = None,
-    playbook_dirs: list[str] | None = None,
-    codegen_llm=None,
-) -> str:
-    normalized_goal = goal.strip()
-    if not normalized_goal:
-        return "Usage: `agent start \"<goal>\"`"
-    playbook_context = ""
-    playbook_obj = None
-    if playbook:
-        playbook_obj, available = _resolve_playbook(workspace, playbook, {"playbook_dirs": playbook_dirs} if playbook_dirs is not None else None)
-        if playbook_obj is None:
-            names = ", ".join(f"`{item.name}`" for item in available) if available else "none"
-            return f"No matching playbook found for `{playbook}`. Available playbooks: {names}."
-        body = playbook_registry.read_body(workspace, playbook_obj)
-        playbook_context = playbook_registry.build_context(playbook_obj, body=body)
-    if llm is None:
-        if playbook_obj and playbook_obj.starter_steps:
-            path = memory.write_plan(workspace, goal=normalized_goal, steps=list(playbook_obj.starter_steps))
-            planner_agent._reset_plan_execution_state(workspace, normalized_goal)
-            lines = [f"Created a plan for: {normalized_goal}", "", f"Using playbook: {playbook_obj.name}", "", f"Plan written to `{path.relative_to(pathlib.Path(workspace))}`."]
-            return "\n".join(lines)
-        return _cmd_plan(f"/plan {normalized_goal}", workspace, llm=None, session_mode=session_mode, work_mode=work_mode) or ""
-    return _auto_plan_request(
-        normalized_goal,
-        workspace,
-        llm,
-        session_mode=session_mode,
-        work_mode=work_mode,
-        playbook_context=playbook_context,
-        codegen_llm=codegen_llm or llm,
-        reader_llm=llm,
-        shell_llm=llm,
-        direct_llm=llm,
-    )
-
-
-def _cmd_next(
-    workspace: str,
-    llm,
-    *,
-    session_mode: str = "approve",
-    work_mode: str = "builder",
-    codegen_llm=None,
-) -> str:
-    return _execute_approved_plan(
-        workspace=workspace,
-        llm=llm,
-        max_steps=1,
-        session_mode=session_mode,
-        work_mode=work_mode,
-        codegen_llm=codegen_llm or llm,
-        reader_llm=llm,
-        shell_llm=llm,
-        direct_llm=llm,
-    )
-
-
-def _cmd_build(
-    workspace: str,
-    llm,
-    *,
-    session_mode: str = "approve",
-    work_mode: str = "builder",
-    codegen_llm=None,
-) -> str:
-    return _execute_approved_plan(
-        workspace=workspace,
-        llm=llm,
-        max_steps=None,
-        session_mode=session_mode,
-        work_mode=work_mode,
-        codegen_llm=codegen_llm or llm,
-        reader_llm=llm,
-        shell_llm=llm,
-        direct_llm=llm,
-    )
 
 
 def _cmd_test(command: str, workspace: str) -> str:
@@ -3115,168 +2642,6 @@ def _cmd_resume(workspace: str) -> str:
     reply = session_agent.build_resume_reply(workspace)
     console.print(session_agent.render_resume(reply))
     return reply
-
-
-def _cmd_rename(raw: str, workspace: str) -> str:
-    new_name = raw.strip()[7:].strip()
-    if not new_name:
-        metadata = session_agent.ensure_session(workspace)
-        return f"Current session name: `{metadata.get('name', pathlib.Path(workspace).resolve().name)}`"
-
-    updated = session_agent.rename_session(workspace, new_name)
-    return f"Renamed the current session to `{updated.get('name', new_name)}`."
-
-
-def _cmd_explain(raw: str, workspace: str, llm) -> str:
-    target = raw.strip()[8:].strip()
-    if not target:
-        return "Usage: `/explain <file>`"
-
-    response = explainer_agent.run(llm, workspace, target)
-    console.print(explainer_agent.render(response))
-    return response.summary
-
-
-def _cmd_symbols(raw: str, workspace: str) -> str:
-    symbol = raw.strip()[8:].strip()
-    if not symbol:
-        return "Usage: `/symbols <name>`"
-
-    response = codeintel_agent.run(workspace, symbol)
-    console.print(codeintel_agent.render(response))
-    return response.summary
-
-
-def _cmd_diagnostics(raw: str, workspace: str) -> str:
-    target = raw.strip()[12:].strip()
-    response = diagnostics_agent.run(workspace, target)
-    console.print(diagnostics_agent.render(response))
-    return response.summary
-
-
-def _cmd_policy(raw: str, workspace: str) -> str:
-    """Handle `/policy` — show or edit the current policy."""
-    subcmd = raw.strip()[7:].strip().lower()
-
-    if not subcmd or subcmd == "show":
-        policy = policy_module.load_policy()
-        lines = ["## Current Policy", "", f"**Default action:** `{policy.default_action.value}`", "", "### Rules"]
-        for rule in sorted(policy.rules, key=lambda r: (r.scope.value, -r.priority)):
-            lines.append(f"- **{rule.scope.value}** `{rule.pattern}` → `{rule.action.value}` (priority: {rule.priority}) {rule.description}")
-        console.print(Panel(Markdown("\n".join(lines)), title="[bold cyan]Policy[/bold cyan]", border_style="cyan"))
-        return "\n".join(lines)
-
-    if subcmd == "edit":
-        policy_path = pathlib.Path(workspace) / ".mitra" / "policy.yaml"
-        policy_path.parent.mkdir(parents=True, exist_ok=True)
-        if not policy_path.exists():
-            policy_module.save_policy(policy_module.load_policy(), str(policy_path))
-        import subprocess
-        subprocess.run(["code", str(policy_path)] if shutil.which("code") else ["notepad", str(policy_path)])
-        return f"Opened policy file for editing: {policy_path}"
-
-    if subcmd == "reset":
-        policy_path = pathlib.Path(workspace) / ".mitra" / "policy.yaml"
-        if policy_path.exists():
-            policy_path.unlink()
-        return "Reset to built-in default policy"
-
-    return "Usage: `/policy [show|edit|reset]`"
-
-
-def _cmd_config(raw: str, workspace: str) -> str:
-    """Handle `/config` — show layered config or edit a layer."""
-    subcmd = raw.strip()[6:].strip().lower()
-
-    from app import config as config_module
-
-    if not subcmd or subcmd == "show":
-        root = pathlib.Path(workspace).resolve()
-
-        user_file = config_module._USER_CONFIG_FILE
-        project_file = root / config_module._TOML_NAME
-        local_file = root / ".mitra" / config_module._LOCAL_TOML_NAME
-
-        lines = ["## Layered Configuration", "", f"**Workspace:** `{workspace}`", ""]
-
-        def show_layer(name: str, path: pathlib.Path):
-            lines.append(f"### {name}")
-            lines.append(f"`{path}`")
-            if path.exists():
-                try:
-                    import tomllib
-                except ImportError:
-                    import tomli as tomllib
-                with open(path, "rb") as f:
-                    data = tomllib.load(f)
-                if data:
-                    for k, v in data.items():
-                        lines.append(f"  - `{k}` = `{v}`")
-                else:
-                    lines.append("  *(empty)*")
-            else:
-                lines.append("  *(not found)*")
-            lines.append("")
-
-        show_layer("1. User defaults", user_file)
-        show_layer("2. Project settings", project_file)
-        show_layer("3. Local overrides (gitignored)", local_file)
-
-        lines.append("### 4. CLI/session overrides")
-        lines.append("  *(applied at runtime, not persisted)*")
-        lines.append("")
-
-        lines.append("### 5. Environment variables")
-        lines.append("  - `OLLAMA_API_KEY` (also from `.env`)")
-        lines.append("")
-
-        console.print(Panel(Markdown("\n".join(lines)), title="[bold cyan]Configuration[/bold cyan]", border_style="cyan"))
-        return "\n".join(lines)
-
-    if subcmd == "edit":
-        layer = raw.strip()[6:].strip().lower().replace("edit ", "")
-        root = pathlib.Path(workspace).resolve()
-
-        if layer in ("user", "1"):
-            target = config_module._USER_CONFIG_FILE
-            target.parent.mkdir(parents=True, exist_ok=True)
-        elif layer in ("project", "2"):
-            target = root / config_module._TOML_NAME
-        elif layer in ("local", "3"):
-            target = root / ".mitra" / config_module._LOCAL_TOML_NAME
-            target.parent.mkdir(parents=True, exist_ok=True)
-        else:
-            return "Usage: `/config edit [user|project|local]`"
-
-        if not target.exists():
-            if config_module.tomli_w:
-                with open(target, "wb") as f:
-                    config_module.tomli_w.dump({}, f)
-            else:
-                target.write_text("# Empty config layer\n")
-
-        import subprocess
-        subprocess.run(["code", str(target)] if shutil.which("code") else ["notepad", str(target)])
-        return f"Opened {layer} config layer for editing: {target}"
-
-    if subcmd == "reset":
-        layer = raw.strip()[6:].strip().lower().replace("reset ", "")
-        root = pathlib.Path(workspace).resolve()
-
-        if layer in ("user", "1"):
-            target = config_module._USER_CONFIG_FILE
-        elif layer in ("project", "2"):
-            target = root / config_module._TOML_NAME
-        elif layer in ("local", "3"):
-            target = root / ".mitra" / config_module._LOCAL_TOML_NAME
-        else:
-            return "Usage: `/config reset [user|project|local]`"
-
-        if target.exists():
-            target.unlink()
-        return f"Removed {layer} config layer: {target}"
-
-    return "Usage: `/config [show|edit <layer>|reset <layer>]`"
 
 
 def _cmd_search(raw: str, llm) -> str:
@@ -4325,81 +3690,16 @@ def _chat():
         cmd = user_input.strip().lower()
 
         if cmd in ("/help", "help"):
-            _print_help(plugin_commands.commands)
+            _print_help()
             continue
 
-        if cmd in ("/reset", "reset"):
+        if cmd in ("/clear", "clear", "/reset"):
             messages = [SystemMessage(content=system_prompt)]
             console.print("[dim]Session reset.[/dim]")
             continue
 
         if cmd in ("/init", "mitra init"):
             _run_init()
-            continue
-
-        if cmd.startswith("/plan"):
-            ai_reply = _cmd_plan(
-                user_input,
-                cfg["workspace"],
-                llm=local_llm,
-                session_mode=session_mode,
-                work_mode=work_mode,
-                codegen_llm=codegen_llm,
-                reader_llm=local_llm,
-                shell_llm=local_llm,
-                direct_llm=local_llm,
-            )
-            if ai_reply:
-                memory.append_activity(cfg["workspace"], user_input, ai_reply)
-                memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd.startswith("/brainstorm"):
-            _set_current_task("Brainstorming")
-            _print_progress_message(
-                "Running explicit brainstorm mode",
-                "This turn will be saved to `.mitra/brainstorm.md`.",
-            )
-            ai_reply = _cmd_brainstorm(user_input, cfg["workspace"], idea_llm)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd.startswith("/understand"):
-            _set_current_task("Understanding")
-            _print_progress_message(
-                "Running understand mode",
-                "This turn will be saved to `.mitra/understand.md` and `PRD.md` will use it later.",
-            )
-            ai_reply = _cmd_understand(user_input, cfg["workspace"], idea_llm)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd.startswith("/prd"):
-            _set_current_task("Drafting PRD")
-            _print_progress_message(
-                "Drafting PRD",
-                "This turn will be saved to `PRD.md` and `.mitra/prd.md`.",
-            )
-            ai_reply = _cmd_prd(user_input, cfg["workspace"], idea_llm)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd == "/recommend":
-            _cmd_recommend(cfg["workspace"], model, codegen_model)
-            continue
-
-        if cmd == "/create":
-            _cmd_create(cfg["workspace"], local_llm)
-            # Re-discover skills so a newly created skill is available immediately
-            available_skills = skills_registry.discover(cfg["workspace"], cfg.get("skill_dirs", []))
-            continue
-
-        if cmd == "/memory":
-            _cmd_memory(cfg["workspace"])
             continue
 
         if cmd.startswith("/skills"):
@@ -4435,58 +3735,6 @@ def _chat():
             memory.update_context(cfg["workspace"], user_input)
             continue
 
-        if cmd.startswith("/start"):
-            selected_mode, selected_playbook, goal = _extract_start_options_and_payload(user_input, work_mode)
-            ai_reply = _cmd_start(
-                goal,
-                cfg["workspace"],
-                llm=local_llm,
-                session_mode=session_mode,
-                work_mode=selected_mode,
-                playbook=selected_playbook or None,
-                playbook_dirs=cfg.get("playbook_dirs"),
-                codegen_llm=codegen_llm,
-            )
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd == "/next":
-            selected_mode, _ = _extract_work_mode_and_payload(user_input, work_mode)
-            ai_reply = _cmd_next(
-                cfg["workspace"],
-                local_llm,
-                session_mode=session_mode,
-                work_mode=selected_mode,
-                codegen_llm=codegen_llm,
-            )
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd == "/build":
-            selected_mode, _ = _extract_work_mode_and_payload(user_input, work_mode)
-            ai_reply = _cmd_build(
-                cfg["workspace"],
-                local_llm,
-                session_mode=session_mode,
-                work_mode=selected_mode,
-                codegen_llm=codegen_llm,
-            )
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd == "/playbooks":
-            ai_reply = _build_playbooks_reply(cfg["workspace"], cfg)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
         if cmd == "/mcp" or cmd.startswith("/mcp "):
             ai_reply = _build_mcp_reply(cfg["workspace"], cfg, user_input.strip()[len("/mcp"):].strip())
             console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
@@ -4503,13 +3751,6 @@ def _chat():
 
         if cmd.startswith("/logs"):
             ai_reply = _cmd_logs(user_input, cfg["workspace"])
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd == "/permissions":
-            ai_reply = _build_permissions_reply(cfg, session_mode)
             console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
@@ -4533,8 +3774,8 @@ def _chat():
             memory.update_context(cfg["workspace"], user_input)
             continue
 
-        if cmd.startswith("/thinking"):
-            requested = user_input.strip()[9:].strip().lower()
+        if cmd == "/think" or cmd.startswith("/think "):
+            requested = user_input.strip()[len("/think"):].strip().lower()
             if not requested:
                 ai_reply = _build_reasoning_reply(show_reasoning)
             elif requested in {"on", "show", "true"}:
@@ -4544,7 +3785,7 @@ def _chat():
                 show_reasoning = False
                 ai_reply = _build_reasoning_reply(show_reasoning)
             else:
-                ai_reply = "Usage: `/thinking on` or `/thinking off`."
+                ai_reply = "Usage: `/think on` or `/think off`."
             console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
@@ -4562,24 +3803,10 @@ def _chat():
             memory.update_context(cfg["workspace"], user_input)
             continue
 
-        if cmd == "/history":
-            ai_reply = _build_history_reply(cfg["workspace"])
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
         if cmd == "/resume":
             _set_current_task("Resuming session")
             _print_progress_message("Resuming the current session", "Loading the saved session summary, plan, and recent activity.")
             ai_reply = _cmd_resume(cfg["workspace"])
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd.startswith("/rename"):
-            ai_reply = _cmd_rename(user_input, cfg["workspace"])
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -4600,53 +3827,6 @@ def _chat():
             memory.update_context(cfg["workspace"], user_input)
             continue
 
-        if cmd.startswith("/explain"):
-            _print_progress_message("Explaining the requested file", "Reading the file and summarizing how it works.", color="magenta")
-            ai_reply = _cmd_explain(user_input, cfg["workspace"], local_llm)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd.startswith("/symbols"):
-            _print_progress_message("Looking up symbol intelligence", "Finding definitions and usages across the workspace.", color="cyan")
-            ai_reply = _cmd_symbols(user_input, cfg["workspace"])
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd.startswith("/diagnostics"):
-            _print_progress_message("Collecting diagnostics", "Running available language servers against the workspace files.", color="cyan")
-            ai_reply = _cmd_diagnostics(user_input, cfg["workspace"])
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd.startswith("/policy"):
-            ai_reply = _cmd_policy(user_input, cfg["workspace"])
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd.startswith("/config"):
-            ai_reply = _cmd_config(user_input, cfg["workspace"])
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd.startswith("/search"):
-            _print_progress_message("Searching the web", user_input.strip()[7:].strip()[:120], color="cyan")
-            ai_reply = _cmd_search(user_input, local_llm)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd.startswith("/open-url"):
-            _print_progress_message("Reading the webpage", user_input.strip()[9:].strip()[:120], color="cyan")
-            ai_reply = _cmd_open_url(user_input, local_llm)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
         if cmd == "/undo":
             ai_reply = filesystem.undo_last_change_set(cfg["workspace"])
             console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
@@ -4661,36 +3841,6 @@ def _chat():
                 rest = rest.replace("--generate", "").replace("-g", "").strip()
             message = rest if rest and not generate else None
             ai_reply = _cmd_commit(cfg["workspace"], local_llm, message=message, staged=True, generate=generate)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd.startswith("/tasks"):
-            ai_reply = _build_tasks_reply(user_input)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd == "/plugins":
-            ai_reply = plugin_registry.build_registry_reply(plugin_commands)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd == "/resources":
-            ai_reply = _build_resources_reply()
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if cmd == "/make-space":
-            _set_current_task("Freeing local AI resources")
-            _print_progress_message("Reclaiming local AI resources", "Mitra can stop reclaimable local AI and user-owned GPU processes to free memory.", color="yellow")
-            ai_reply = _cmd_make_space()
             console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
@@ -4716,55 +3866,30 @@ def _chat():
             sess_in = sess_out = 0
             continue
 
-        if cmd == "/hibernate":
-            _set_current_task("Hibernating session")
-            _print_progress_message(
-                "Saving workspace state and unloading the model",
-                "Mitra is persisting session memory, resetting chat history, and asking Ollama to release RAM.",
-                color="yellow",
-            )
-            messages, sess_in, sess_out, ai_reply = _hibernate_session(
-                workspace=cfg["workspace"],
-                model=model,
-                system_prompt=system_prompt,
-                total_tokens=sess_in + sess_out,
-                auto_compact_threshold=auto_compact_threshold,
-            )
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-            continue
-
-        if cmd.startswith("/run "):
-            raw_cmd, run_in_background = _parse_run_command(user_input)
-            if run_in_background:
-                _set_current_task("Starting background task")
-                ai_reply = _cmd_run_background(raw_cmd, cfg["workspace"])
-                console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-                memory.append_activity(cfg["workspace"], user_input, ai_reply)
-                memory.update_context(cfg["workspace"], user_input)
-            else:
-                _cmd_run(raw_cmd)
-            continue
-
         if intent == "run" and _looks_like_explicit_command(user_input):
             _cmd_run(_extract_command(user_input))
             continue
 
+        if cmd == "/doctor":
+            ai_reply = "\n\n".join([
+                _build_resources_reply(),
+                _build_permissions_reply(cfg, session_mode),
+                "## MCP\n\n" + mcp_registry.summarize(mcp_registry.discover(cfg["workspace"])),
+            ])
+            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Doctor[/bold cyan]", border_style="cyan"))
+            continue
+
+        if cmd == "/run" or cmd.startswith("/run "):
+            console.print(Panel(Markdown(
+                "`/run <plan>` comes with the plan runner (M3). For a shell command use `! <command>`, "
+                "for example `! pytest -q`."), title="[bold yellow]Mitra[/bold yellow]", border_style="yellow"))
+            continue
+
         if user_input.strip().startswith("/"):
-            plugin_command = plugin_registry.find_command(plugin_commands, user_input.strip().split()[0])
-            if plugin_command:
-                ai_reply = plugin_registry.execute(
-                    plugin_command,
-                    user_input,
-                    plugin_registry.PluginContext(
-                        workspace=cfg["workspace"],
-                        config=cfg,
-                        console=console,
-                    ),
-                )
-                console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-                memory.append_activity(cfg["workspace"], user_input, ai_reply)
-                memory.update_context(cfg["workspace"], user_input)
-                continue
+            unknown = user_input.strip().split()[0]
+            console.print(Panel(Markdown(f"Unknown command `{unknown}`. Type `/help` for the list."),
+                                title="[bold yellow]Mitra[/bold yellow]", border_style="yellow"))
+            continue
 
         messages.append(HumanMessage(content=user_input))
 
@@ -4999,497 +4124,7 @@ def _chat():
             )
 
 
-def _cmd_plan(
-    raw: str,
-    workspace: str,
-    llm=None,
-    *,
-    session_mode: str = "approve",
-    work_mode: str = "builder",
-    codegen_llm=None,
-    reader_llm=None,
-    shell_llm=None,
-    direct_llm=None,
-) -> str | None:
-    """Handle `/plan <goal>` — brainstorm clarifying questions, then generate AI steps."""
-    goal = raw.strip()[5:].strip()  # strip "/plan "
-    if not goal:
-        existing = memory.load_plan(workspace)
-        if existing:
-            plan = planner_agent._parse_plan(workspace)
-            if plan:
-                console.print(planner_agent.render(plan))
-            else:
-                console.print(Panel(existing, title="[bold cyan]Active Plan[/bold cyan]", border_style="cyan"))
-        else:
-            console.print("[dim]No active plan. Use [cyan]/plan <your goal>[/cyan] to create one.[/dim]")
-        return None
-
-    subcommand = goal.lower()
-    if subcommand in {"approve", "pause", "next", "run"}:
-        if subcommand == "approve":
-            reply = planner_agent.approve_plan(workspace)
-        elif subcommand == "pause":
-            reply = planner_agent.pause_plan(workspace)
-        else:
-            _print_progress_message(
-                "Executing the active plan",
-                "Running one approved step." if subcommand == "next" else "Running approved pending steps.",
-                color="yellow",
-            )
-            reply = _execute_approved_plan(
-                workspace=workspace,
-                llm=llm,
-                max_steps=1 if subcommand == "next" else None,
-                session_mode=session_mode,
-                work_mode=work_mode,
-                codegen_llm=codegen_llm,
-                reader_llm=reader_llm,
-                shell_llm=shell_llm,
-                direct_llm=direct_llm,
-            )
-        console.print(Panel(Markdown(reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
-        return reply
-
-    if llm is not None:
-        from app.agents import brainstorm as brainstorm_agent
-        workspace_context = _build_workspace_context(
-            workspace,
-            include_context=True,
-            include_brainstorm=True,
-            include_understand=True,
-            include_prd=True,
-        )
-        context = brainstorm_agent.run(llm, goal, console, project_context=workspace_context)
-        if workspace_context:
-            context = f"{workspace_context}\n\n## Brainstorm Q&A\n{context}".strip()
-        with console.status("[bold green]Generating plan...[/bold green]"):
-            plan = planner_agent.create_plan(llm, goal, workspace, context=context, work_mode=work_mode)
-        console.print(f"[dim cyan]  ✦  Plan written to .mitra/plan.md[/dim cyan]")
-        console.print(planner_agent.render(plan))
-        console.print("[dim]Use [cyan]/plan approve[/cyan] when you're ready, then [cyan]/plan next[/cyan].[/dim]")
-        return f"Created a plan for: {goal}"
-    else:
-        # Fallback: write a generic plan without AI step generation
-        path = memory.write_plan(workspace, goal=goal, steps=[
-            "Understand current codebase structure",
-            "Break goal into sub-tasks",
-            "Implement each sub-task step by step",
-            "Test and verify",
-        ])
-        planner_agent._reset_plan_execution_state(workspace, goal)
-        console.print(f"[dim cyan]  ✦  Plan written to {path.relative_to(pathlib.Path(workspace))}[/dim cyan]")
-        plan = planner_agent._parse_plan(workspace)
-        if plan:
-            console.print(planner_agent.render(plan))
-        return f"Created a plan for: {goal}"
-
-
-def _cmd_memory(workspace: str) -> None:
-    """Handle `/memory` — show saved Mitra workspace artifacts."""
-    ctx = memory.load_context(workspace)
-    plan = memory.load_plan(workspace)
-    brainstorm = memory.load_brainstorm(workspace)
-    if not ctx and not plan and not brainstorm:
-        console.print("[dim]No memory yet. Start chatting and it will build automatically.[/dim]")
-        return
-    if ctx:
-        console.print(Panel(ctx, title="[bold cyan].mitra/context.md[/bold cyan]", border_style="cyan"))
-    if plan:
-        console.print(Panel(plan, title="[bold cyan].mitra/plan.md[/bold cyan]", border_style="cyan"))
-    if brainstorm:
-        console.print(Panel(brainstorm, title="[bold cyan].mitra/brainstorm.md[/bold cyan]", border_style="cyan"))
-
-
-def _cmd_brainstorm(raw: str, workspace: str, llm) -> str:
-    topic = raw.strip()[11:].strip()
-    if not topic:
-        existing = memory.load_brainstorm(workspace)
-        return existing or "No brainstorm notes yet. Use `/brainstorm <topic>` to start saving idea exploration."
-
-    project_context = _build_workspace_context(
-        workspace,
-        include_context=True,
-        include_brainstorm=True,
-        include_understand=True,
-        include_prd=True,
-    )
-    reply = _run_brainstorm_reply(llm, workspace, topic, project_context=project_context)
-    return _save_brainstorm_reply(workspace, topic, reply)
-
-
-def _cmd_understand(raw: str, workspace: str, llm) -> str:
-    idea = raw.strip()[12:].strip()
-    if not idea:
-        existing = memory.load_understand(workspace)
-        return existing or "Usage: `/understand <idea>`"
-
-    if llm is None:
-        summary = f"# Understand\n\n## Idea\n{idea}\n\n## Note\nNo model is available for clarification."
-    else:
-        project_context = _build_workspace_context(
-            workspace,
-            include_context=True,
-            include_brainstorm=True,
-            include_understand=True,
-            include_prd=True,
-        )
-        summary = understand_agent.run(llm, idea, console, project_context=project_context)
-
-    path = memory.write_understand(workspace, idea, summary)
-    memory.append_context_note(workspace, "Understand", summary)
-    console.print(Panel(Markdown(summary), title=f"[bold cyan]{path.name}[/bold cyan]", border_style="cyan"))
-    return summary
-
-
-def _cmd_prd(raw: str, workspace: str, llm) -> str:
-    request = raw.strip()[5:].strip()
-    existing_understand = memory.load_understand(workspace) or ""
-    existing_prd = memory.load_prd(workspace)
-    workspace_context = _build_workspace_context(
-        workspace,
-        include_context=True,
-        include_brainstorm=True,
-    )
-
-    if not request:
-        return existing_prd or "Usage: `/prd <idea>` or `/prd update <notes>`"
-
-    update_request = ""
-    idea = request
-    if request.startswith(("update ", "fix ", "revise ", "edit ")):
-        update_request = request
-        if existing_prd:
-            idea = existing_prd.splitlines()[0].lstrip("# ").strip() or "Product Requirements Document"
-
-    if not idea:
-        return "Usage: `/prd <idea>` or `/prd update <notes>`"
-
-    prd_markdown = prd_flow.generate_markdown(
-        llm,
-        idea=idea,
-        understanding="\n\n".join(
-            part for part in (existing_understand, workspace_context, idea) if (part or "").strip()
-        ),
-        existing_prd=existing_prd,
-        update_request=update_request or None,
-    )
-    path = memory.write_prd(workspace, idea, prd_markdown)
-    memory.append_context_note(workspace, "PRD", prd_markdown)
-    console.print(Panel(Markdown(prd_markdown), title=f"[bold cyan]{path.name}[/bold cyan]", border_style="cyan"))
-    return prd_markdown
-
-
 # ── Guided Builder (/create) ──────────────────────────────────────────────────
-
-def _builder_ask_freeform(prompt_text: str, *, optional: bool = False) -> str | None:
-    """Ask the user a freeform question and return the answer.
-
-    Returns None if the user cancels (Ctrl+C / EOFError).
-    Returns "" if optional and the user submits nothing.
-    """
-    from prompt_toolkit import prompt as pt_prompt
-
-    hint = " [dim](optional — press Enter to skip)[/dim]" if optional else ""
-    console.print(f"\n  [bold cyan]{prompt_text}[/bold cyan]{hint}")
-    try:
-        answer = pt_prompt("  › ").strip()
-    except (KeyboardInterrupt, EOFError):
-        return None
-    if not answer and not optional:
-        # Re-ask once
-        console.print("  [yellow]Please enter a value (or Ctrl+C to cancel).[/yellow]")
-        try:
-            answer = pt_prompt("  › ").strip()
-        except (KeyboardInterrupt, EOFError):
-            return None
-    return answer
-
-
-def _builder_ask_choice(
-    prompt_text: str,
-    choices: list[tuple[str, str]],
-) -> str | None:
-    """Present a radiolist dialog for multiple-choice questions.
-
-    Returns the chosen value, or None if cancelled.
-    """
-    result = _choose_approval_option(
-        title="Mitra Builder",
-        prompt=prompt_text,
-        options=choices,
-        fallback_default=choices[0][0] if choices else None,
-    )
-    return result
-
-
-def _builder_show_preview(
-    build_type: str,
-    name: str,
-    content: str,
-    save_path: str,
-) -> None:
-    """Render a preview panel of the generated artifact."""
-    from rich.syntax import Syntax
-
-    lexer = "python" if build_type == "agent" else "markdown"
-    title = {
-        "skill":    f"[bold cyan]Preview: skills/{artifact_builder.slugify(name)}/SKILL.md[/bold cyan]",
-        "workflow": f"[bold cyan]Preview: .mitra/workflows/{artifact_builder.slugify(name)}/WORKFLOW.md[/bold cyan]",
-        "agent":    f"[bold cyan]Preview: app/agents/{artifact_builder.slugify(name)}.py[/bold cyan]",
-    }.get(build_type, "[bold cyan]Preview[/bold cyan]")
-
-    syntax = Syntax(content, lexer, theme="monokai", line_numbers=True, word_wrap=True)
-    console.print(Panel(syntax, title=title, border_style="cyan", padding=(0, 1)))
-
-
-def _cmd_create(workspace: str, llm) -> None:
-    """Guided wizard: create a Skill, Workflow, or Agent through Q&A."""
-    console.rule("[bold cyan]🔨 Mitra Builder[/bold cyan]")
-    console.print(
-        "  Answer a few questions and I'll generate a ready-to-use artifact for you.\n"
-        "  [dim]Press Ctrl+C at any time to cancel.[/dim]\n"
-    )
-
-    # ── Step 1: What to build ─────────────────────────────────────────────────
-    build_type = _builder_ask_choice(
-        "What would you like to create?",
-        artifact_builder.BUILD_TYPES,
-    )
-    if build_type is None:
-        console.print("[dim]Builder cancelled.[/dim]")
-        return
-
-    type_labels = {t[0]: t[1].split("—")[0].strip() for t in artifact_builder.BUILD_TYPES}
-    console.print(f"\n  [bold green]✔ Building:[/bold green] {type_labels.get(build_type, build_type)}\n")
-
-    if build_type == "agent":
-        console.print(
-            Panel(
-                "[yellow]⚠ Agent creation is for developers.[/yellow]\n"
-                "Mitra will generate a Python skeleton file you'll need to complete.\n"
-                "Wiring instructions will be saved alongside the generated file.",
-                border_style="yellow",
-                padding=(0, 2),
-            )
-        )
-        confirm = _builder_ask_choice(
-            "Continue with agent creation?",
-            [("yes", "Yes, I understand — continue"), ("no", "No, go back")],
-        )
-        if confirm != "yes":
-            console.print("[dim]Builder cancelled.[/dim]")
-            return
-
-    # ── Step 2: Q&A ──────────────────────────────────────────────────────────
-    questions = artifact_builder.get_questions(build_type)
-    answers: dict[str, str] = {}
-    total = sum(1 for q in questions if artifact_builder.should_ask(q, answers) and not q.optional)
-
-    asked = 0
-    for question in questions:
-        if not artifact_builder.should_ask(question, answers):
-            continue
-
-        asked += 1
-        q_num = f"[dim]Question {asked}/{len(questions)}[/dim]  "
-
-        if question.kind == "choice":
-            console.print(f"\n  {q_num}[bold]{question.prompt}[/bold]")
-            answer = _builder_ask_choice(question.prompt, question.choices)
-            if answer is None:
-                console.print("[dim]Builder cancelled.[/dim]")
-                return
-            answers[question.key] = answer
-            label = next((lbl for val, lbl in question.choices if val == answer), answer)
-            console.print(f"  [green]✔[/green] {label}")
-
-        else:  # free
-            answer = _builder_ask_freeform(
-                f"{q_num}{question.prompt}", optional=question.optional
-            )
-            if answer is None:
-                console.print("[dim]Builder cancelled.[/dim]")
-                return
-            answers[question.key] = answer
-
-    # ── Step 3: Generate with LLM ────────────────────────────────────────────
-    console.print()
-    with console.status(
-        f"[bold cyan]Generating your {build_type} with AI…[/bold cyan]", spinner="dots"
-    ):
-        try:
-            from langchain_core.messages import HumanMessage, SystemMessage
-            gen_prompt = artifact_builder.build_llm_prompt(build_type, answers)
-            response = llm.invoke([
-                SystemMessage(content=TECHNICAL_WRITER_PROMPT),
-                HumanMessage(content=gen_prompt),
-            ])
-            llm_output = response.content if hasattr(response, "content") else str(response)
-        except Exception as exc:
-            console.print(f"[red]Generation failed: {exc}[/red]")
-            return
-
-    result = artifact_builder.finalize(build_type, answers, llm_output)
-
-    # ── Step 4: Preview + Approve loop ───────────────────────────────────────
-    while True:
-        _builder_show_preview(build_type, result.name, result.content, workspace)
-
-        if result.wiring:
-            console.print(Panel(
-                result.wiring,
-                title="[bold yellow]📋 Wiring Instructions[/bold yellow]",
-                border_style="yellow",
-                padding=(1, 2),
-            ))
-
-        action = _choose_approval_option(
-            title="Mitra Builder — Review",
-            prompt="What would you like to do with this generated artifact?",
-            options=[
-                ("save",       "✅  Save to disk — looks good!"),
-                ("regen",      "🔄  Regenerate — try again with the same answers"),
-                ("regen_edit", "✏️   Regenerate with corrections — I'll add notes"),
-                ("cancel",     "❌  Cancel — discard"),
-            ],
-            fallback_default="save",
-        )
-
-        if action == "cancel" or action is None:
-            console.print("[dim]Builder cancelled — nothing saved.[/dim]")
-            return
-
-        if action == "save":
-            break
-
-        if action == "regen":
-            console.print()
-            with console.status("[bold cyan]Regenerating…[/bold cyan]", spinner="dots"):
-                try:
-                    response = llm.invoke([
-                        SystemMessage(content=TECHNICAL_WRITER_PROMPT),
-                        HumanMessage(content=gen_prompt),
-                    ])
-                    llm_output = response.content if hasattr(response, "content") else str(response)
-                except Exception as exc:
-                    console.print(f"[red]Regeneration failed: {exc}[/red]")
-                    return
-            result = artifact_builder.finalize(build_type, answers, llm_output)
-            continue
-
-        if action == "regen_edit":
-            correction = _builder_ask_freeform(
-                "What should be different? Describe your corrections or additions:",
-                optional=False,
-            )
-            if correction is None:
-                continue
-            console.print()
-            with console.status("[bold cyan]Regenerating with your corrections…[/bold cyan]", spinner="dots"):
-                try:
-                    correction_prompt = (
-                        f"{gen_prompt}\n\n"
-                        f"IMPORTANT CORRECTIONS FROM USER:\n{correction}\n\n"
-                        "Please regenerate the file incorporating these corrections."
-                    )
-                    response = llm.invoke([
-                        SystemMessage(content=TECHNICAL_WRITER_PROMPT),
-                        HumanMessage(content=correction_prompt),
-                    ])
-                    llm_output = response.content if hasattr(response, "content") else str(response)
-                except Exception as exc:
-                    console.print(f"[red]Regeneration failed: {exc}[/red]")
-                    return
-            result = artifact_builder.finalize(build_type, answers, llm_output)
-            continue
-
-    # ── Step 5: Save ─────────────────────────────────────────────────────────
-    try:
-        saved_path = artifact_builder.save_result(result, workspace)
-    except Exception as exc:
-        console.print(f"[red]Failed to save: {exc}[/red]")
-        return
-
-    rel = saved_path.relative_to(pathlib.Path(workspace)) if saved_path.is_absolute() else saved_path
-    console.print()
-    console.print(Panel(
-        f"[bold green]✅ {type_labels.get(build_type, build_type)} saved![/bold green]\n\n"
-        f"  📄 [cyan]{rel}[/cyan]\n\n"
-        + (
-            f"  Mitra will automatically discover this skill next session.\n"
-            f"  You can also use it now: [bold]/skills show {result.slug}[/bold]"
-            if build_type == "skill" else
-            f"  Run this workflow any time: [bold]/workflow {result.slug}[/bold]"
-            if build_type == "workflow" else
-            f"  Review [cyan]app/agents/{result.slug}_WIRING.md[/cyan] for next steps."
-        ),
-        title="[bold green]Builder Complete[/bold green]",
-        border_style="green",
-        padding=(1, 2),
-    ))
-
-
-def _cmd_recommend(workspace: str, current_local: str, current_codegen: str) -> None:
-    """Analyse installed models against this hardware and suggest the best config."""
-    inventory = config.get_local_model_inventory()
-    vram_gib  = config.get_gpu_vram_gib()
-    ram_gib   = config.get_total_system_memory_gib()
-
-    if not inventory:
-        console.print("[red]No local Ollama models found. Run `ollama pull <model>` first.[/red]")
-        return
-
-    # GPU name via nvidia-smi
-    gpu_name: str | None = None
-    try:
-        import subprocess as _sp
-        r = _sp.run(
-            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=5,
-        )
-        if r.returncode == 0:
-            gpu_name = r.stdout.strip().splitlines()[0].strip()
-    except Exception:
-        pass
-
-    recs = model_advisor.recommend_models(inventory, vram_gib=vram_gib, ram_gib=ram_gib, gpu_name=gpu_name)
-    report = model_advisor.format_recommendations(recs, current_local=current_local, current_codegen=current_codegen)
-    console.print(Panel(report, title="[bold cyan]Model Recommendations[/bold cyan]", border_style="cyan", padding=(1, 2)))
-
-    if not recs.chat:
-        return
-
-    best_chat = recs.chat.model.name
-    best_code = recs.code.model.name if recs.code else ""
-
-    already_set = (best_chat == current_local)
-    if already_set:
-        console.print("[green]✔ Your current local_model is already the top recommendation.[/green]")
-        return
-
-    console.print(f"\n[bold]Apply recommended config to [cyan]mitra.toml[/cyan]?[/bold]")
-    console.print(f"  local_model   = [cyan]{best_chat}[/cyan]")
-    if best_code and best_code != best_chat:
-        console.print(f"  codegen_model = [cyan]{best_code}[/cyan]  [dim](used when cloud key is set)[/dim]")
-
-    choice = _choose_approval_option(
-        "Apply recommendations",
-        "Write these models to mitra.toml?",
-        [
-            ("apply", "Yes, update mitra.toml"),
-            ("skip",  "No, just show me the recommendations"),
-        ],
-        fallback_default="skip",
-    )
-    if choice == "apply":
-        ok, msg = model_advisor.apply_to_toml(workspace, best_chat, best_code)
-        style = "green" if ok else "red"
-        console.print(f"[{style}]{msg}[/{style}]")
-        if ok:
-            console.print("[dim]Restart Mitra to load the new model.[/dim]")
-    else:
-        console.print("[dim]No changes made.[/dim]")
 
 
 def _amend_command(original: str) -> str | None:
@@ -5564,110 +4199,6 @@ def _cmd_run(command: str, workspace: str | None = None) -> None:
     _print_progress_message("Running shell command", command, color="blue")
     result = shell_agent.execute(command=command, cwd=workspace, console=console)
     console.print(shell_agent.render(result))
-
-
-def _parse_run_command(raw: str) -> tuple[str, bool]:
-    command = raw.strip()
-    if command.startswith("/run"):
-        command = command[4:].strip()
-    lowered = command.lower()
-    for prefix in ("--background ", "-b ", "bg "):
-        if lowered.startswith(prefix):
-            return command[len(prefix):].strip(), True
-    return command, False
-
-
-def _cmd_run_background(command: str, workspace: str | None = None) -> str:
-    """Launch a shell command in the background and return a task summary."""
-    if not command:
-        return "Usage: `/run --background <command>`"
-
-    global _LAST_SHELL_COMMAND
-    _LAST_SHELL_COMMAND = command
-    task, error = shell_agent.start_background(command=command, cwd=workspace)
-    if error:
-        return error
-    if task is None:
-        return "Could not start the background task."
-    return (
-        "## Background task started\n\n"
-        f"- **Task:** `{task.id}`\n"
-        f"- **Command:** `{task.command}`\n"
-        f"- **Directory:** `{task.cwd}`\n"
-        f"- **Status:** `{task.status}`\n\n"
-        "Use `/tasks` to inspect it, `/tasks show <id>` for output, or `/tasks stop <id>` to stop it."
-    )
-
-
-def _build_tasks_reply(raw: str) -> str:
-    target = raw.strip()[6:].strip() if raw.strip().startswith("/tasks") else raw.strip()
-    if not target:
-        tasks = shell_agent.list_background_tasks()
-        if not tasks:
-            return "No background tasks yet. Use `/run --background <command>` to start one."
-        running = sum(1 for task in tasks if task.status == "running")
-        lines = [
-            "## Background tasks",
-            "",
-            f"- **Running:** `{running}`",
-            f"- **Tracked total:** `{len(tasks)}`",
-            "",
-        ]
-        for task in reversed(tasks[-8:]):
-            status = task.status
-            lines.append(f"- **{task.id}** · `{status}` · `{task.command}`")
-            lines.append(f"  - **CWD:** `{task.cwd}`")
-            if task.exit_code is not None:
-                lines.append(f"  - **Exit:** `{task.exit_code}`")
-        lines.extend([
-            "",
-            "Use `/tasks show <id>` for details or `/tasks stop <id>` to stop a running task.",
-        ])
-        return "\n".join(lines)
-
-    if target.startswith("show "):
-        task_id = target[5:].strip()
-        task = shell_agent.get_background_task(task_id)
-        if task is None:
-            return f"No background task found for `{task_id}`."
-        lines = [
-            "## Background task",
-            "",
-            f"- **Task:** `{task.id}`",
-            f"- **Command:** `{task.command}`",
-            f"- **Directory:** `{task.cwd}`",
-            f"- **Status:** `{task.status}`",
-            f"- **Started:** `{task.started_at}`",
-        ]
-        if task.completed_at:
-            lines.append(f"- **Completed:** `{task.completed_at}`")
-        if task.exit_code is not None:
-            lines.append(f"- **Exit:** `{task.exit_code}`")
-        if task.note:
-            lines.append(f"- **Note:** {task.note}")
-        lines.extend(["", "```text", task.tail or "(no output yet)", "```"])
-        return "\n".join(lines)
-
-    if target.startswith("stop "):
-        task_id = target[5:].strip()
-        existing = shell_agent.get_background_task(task_id)
-        if existing is None:
-            return f"No background task found for `{task_id}`."
-        if existing.status != "running":
-            return f"Background task `{task_id}` is already `{existing.status}`."
-        task, error = shell_agent.stop_background_task(task_id)
-        if error:
-            return error
-        if task is None:
-            return f"No background task found for `{task_id}`."
-        return (
-            "## Background task stopped\n\n"
-            f"- **Task:** `{task.id}`\n"
-            f"- **Command:** `{task.command}`\n"
-            f"- **Status:** `{task.status}`"
-        )
-
-    return "Usage: `/tasks`, `/tasks show <id>`, or `/tasks stop <id>`."
 
 
 def _extract_fix_command(raw: str, *, last_command: str | None = None) -> str | None:
@@ -6004,70 +4535,29 @@ def _print_help(extra_commands=None):
     table.add_column(style="cyan", no_wrap=True)
     table.add_column(style="dim")
     commands = [
-        ("/init",         "Create MITRA.md + mitra.toml in current folder"),
-        ("/run <cmd>",    "Run a shell command directly in the workspace (e.g. /run python main.py)"),
-        ("/run --background <cmd>", "Start a long-running shell command in the background and keep using Mitra"),
-        ("/plan <goal>",  "Set the active plan for this project (saved to .mitra/plan.md)"),
-        ("/plan",         "Show the current active plan"),
-        ("/plan approve", "Approve the saved plan for execution"),
-        ("/plan next",    "Execute exactly one approved pending plan step"),
-        ("/plan run",     "Execute all approved pending plan steps"),
-        ("/plan pause",   "Pause active plan execution without losing progress"),
-        ("/brainstorm <topic>", "Brainstorm ideas in a lighter chat mode and save them to .mitra/brainstorm.md"),
-        ("/brainstorm",   "Show saved brainstorm notes"),
-        ("/understand <idea>", "Ask focused questions about an idea and save the answers to .mitra/understand.md"),
-        ("/understand",   "Show saved understanding notes"),
-        ("/prd <idea>",   "Draft or update a PRD and save it to PRD.md"),
-        ("/prd",          "Show the current PRD draft"),
-        ("/memory",       "Show saved workspace artifacts like context, plan, and brainstorm notes"),
-        ("/context",      "Show live context-window usage, compact threshold, and session load"),
-        ("/status",       "Show workspace, model, plan, approval, and session status"),
-        ("/start [--mode X] [--playbook NAME] <goal>", "Create a plan for a new goal and optionally seed it from a project playbook"),
-        ("/next [--mode X]",  "Run the next approved workflow step from the active plan"),
-        ("/build [--mode X]", "Run all approved pending workflow steps from the active plan"),
-        ("/test [cmd]",   "Run a test command in the workspace (defaults to `pytest`)"),
-        ("/playbooks",    "List available project playbooks and their starter stacks"),
-        ("/mcp",          "MCP servers: list, test, tools, on/off, trust, import, call"),
-        ("/logs [name]",  "Inspect `.mitra` logs such as history, trace, errors, decisions, or tasks"),
-        ("/permissions",  "Show current execution policy, workspace scope, and tool restrictions"),
-        ("/resume",       "Show the saved session summary, plan state, undo state, and recent activity"),
-        ("/rename <name>", "Rename the current workspace session"),
-        ("/mode [name]",  "Show or change session mode: read-only, plan, approve, auto"),
-        ("/thinking on|off", "Show or hide raw reasoning panels when models emit them"),
-        ("/model",        "Show the active chat and codegen models"),
-        ("/model list",   "Show installed local Ollama models and highlight the active one"),
-        ("/model remove <name>", "Delete a local Ollama model you no longer want"),
-        ("/history",      "Show the recent saved conversation history from .mitra/activity.md"),
-        ("/diff",         "Show the current git diff or the last Mitra change set"),
-        ("/review [staged]", "Review the current or staged git diff, or the last Mitra change set, for material issues"),
-        ("/explain <file>", "Explain what a specific file does, including important flows and editing risks"),
-        ("/symbols <name>", "Show symbol-focused code intelligence: definitions plus usages across the workspace"),
-        ("/diagnostics [path]", "Run available local language servers and show LSP diagnostics for a file or workspace"),
-        ("/policy [show|edit|reset]", "View or edit the deny-first policy engine rules (allow/ask/deny)"),
-        ("/config [show|edit <layer>|reset <layer>]", "View or edit layered config (user|project|local)"),
-        ("/search <query>", "Search the web for public docs, references, tutorials, or other online information"),
-        ("/open-url <url>", "Read and summarize a specific webpage"),
-        ("/undo",         "Undo the last recorded file change set applied by Mitra"),
-        ("/commit [msg]", "Commit staged changes; use --generate to auto-suggest a conventional message"),
-        ("/fix <cmd>",    "Run a bounded test-fix-retry loop for a failing command"),
-        ("/tasks",        "List tracked background tasks and show their current status"),
-        ("/tasks show <id>", "Show details and recent output for one background task"),
-        ("/tasks stop <id>", "Stop a running background task"),
-        ("/skills",       "List available Mitra skills discovered in this workspace"),
-        ("/skills show <name>", "Show one skill's instructions"),
-        ("/plugins",      "Show loaded workspace plugin slash commands and any load issues"),
-        ("/resources",    "Show live CPU, RAM, GPU, and reclaimable process usage"),
-        ("/make-space",   "Stop detected local AI and user-owned GPU processes to free CPU and GPU memory"),
-        ("/recommend",    "Suggest the best local models for your hardware and optionally apply them to mitra.toml"),
-        ("/create",       "Guided wizard: build a Skill, Workflow, or Agent through a series of plain-English questions"),
-        ("/compact",      "Summarise + compress conversation history to free context window"),
-        ("/hibernate",   "Save session memory, unload the active local model, clear chat history, and continue fresh"),
-        ("/reset",        "Clear conversation history (memory files are kept)"),
-        ("/help",         "Show this help"),
-        ("exit / quit",   "Exit Mitra"),
+        ("/help",          "Show this help"),
+        ("/init",          "Create MITRA.md + mitra.toml in this folder"),
+        ("/status",        "Workspace, model, mode and session status"),
+        ("/doctor",        "Machine and setup check: RAM, GPU, Ollama, permissions, MCP"),
+        ("/model",         "Show the active models (/model list: installed Ollama models)"),
+        ("/context",       "Context-window use and when the session compacts"),
+        ("/think on|off",  "Show or hide the model's reasoning"),
+        ("/mode [name]",   "Show or change the session mode"),
+        ("! <command>",    "Run a shell command in the workspace (e.g. ! pytest -q)"),
+        ("/test [cmd]",    "Run the tests (default: pytest)"),
+        ("/fix <cmd>",     "Run a command, and edit + retry until it passes (bounded)"),
+        ("/diff",          "Show the git diff or Mitra's last change set"),
+        ("/undo",          "Undo Mitra's last change set"),
+        ("/commit [msg]",  "Commit staged changes (--generate drafts the message); never pushes"),
+        ("/review [staged]", "Review the current or staged diff for real problems"),
+        ("/mcp",           "MCP servers: list, test, tools, on/off, trust, import, call"),
+        ("/skills",        "List skills (/skills show <name>)"),
+        ("/logs [name]",   "Inspect .mitra logs"),
+        ("/resume",        "Saved session summary and recent activity"),
+        ("/compact",       "Compress the conversation to free context"),
+        ("/clear",         "Clear the conversation (saved files are kept)"),
+        ("exit / quit",    "Exit Mitra"),
     ]
-    for command in extra_commands or []:
-        commands.append((command.name, f"{command.description} [plugin:{command.plugin_name}]"))
     for cmd, desc in commands:
         table.add_row(cmd, desc)
     console.print(Panel(table, title="[bold cyan]Slash Commands[/bold cyan]", border_style="cyan"))

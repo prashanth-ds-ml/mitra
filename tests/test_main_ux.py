@@ -15,24 +15,15 @@ from app.main import (
     _build_bottom_toolbar,
     _build_context_reply,
     _build_commit_readiness,
-    _build_hibernation_reply,
-    _build_tasks_reply,
     _build_resources_reply,
-    _cmd_make_space,
     _cmd_fix,
-    _cmd_brainstorm,
-    _cmd_diagnostics,
-    _cmd_explain,
-    _cmd_rename,
     _cmd_resume,
     _cmd_review,
-    _cmd_symbols,
     _clear_terminal,
     _confirm_shell,
     _confirm_tool,
     _build_intent_progress_message,
     _build_model_inventory_reply,
-    _build_progress_message,
     _build_permissions_reply,
     _build_project_instructions_prompt,
     _build_skills_prompt,
@@ -48,13 +39,11 @@ from app.main import (
     _build_fix_usage,
     _build_greeting_reply,
     _build_git_summary,
-    _build_history_reply,
     _build_current_folder_reply,
     _build_next_steps_reply,
     _handle_cleanup_request,
     _build_model_reply,
     _build_mode_reply,
-    _extract_work_mode_and_payload,
     _build_prompt_label,
     _build_reasoning_reply,
     _build_project_summary,
@@ -64,13 +53,11 @@ from app.main import (
     _build_run_command_reply,
     _build_status_reply,
     _build_startup_status,
-    _build_startup_walkthrough,
     _classify_intent,
     _confirm_plan_start,
     _detect_project_state,
     _friendly_error,
     _handle_model_command,
-    _hibernate_session,
     _extract_navigation_target,
     _extract_simple_change_action,
     _extract_url_from_input,
@@ -82,7 +69,6 @@ from app.main import (
     _resolve_cleanup_root,
     _extract_fix_command,
     _parse_review_target,
-    _parse_run_command,
     _is_simple_change_request,
     _is_brainstorm_request,
     _is_bang_command,
@@ -176,8 +162,13 @@ class TestExtractCommand:
 
 class TestSlashCommands:
     def test_all_expected_commands_present(self):
-        expected = {"/init", "/run", "/plan", "/brainstorm", "/memory", "/context", "/status", "/resume", "/rename", "/mode", "/thinking", "/model", "/history", "/diff", "/review", "/explain", "/symbols", "/diagnostics", "/search", "/open-url", "/undo", "/fix", "/tasks", "/skills", "/plugins", "/resources", "/make-space", "/permissions", "/hibernate", "/reset", "/help", "/start", "/next", "/build", "/test", "/playbooks", "/mcp", "/logs"}
-        assert expected.issubset(set(_SLASH_COMMANDS))
+        expected = {"/help", "/init", "/status", "/doctor", "/model", "/context", "/think", "/mode", "/test", "/fix",
+                    "/diff", "/undo", "/commit", "/review", "/mcp", "/skills", "/logs", "/resume", "/compact", "/clear"}
+        assert set(_SLASH_COMMANDS) - {"exit", "quit"} == expected
+
+    def test_removed_commands_are_gone(self):
+        for removed in ("/brainstorm", "/prd", "/start", "/playbooks", "/hibernate", "/make-space", "/search", "/thinking", "/reset"):
+            assert removed not in _SLASH_COMMANDS
 
 
 # ── _make_completer ───────────────────────────────────────────────────────────
@@ -187,7 +178,7 @@ class TestMakeCompleter:
         completer = _make_completer(str(tmp_path))
         words = set(completer.words)
         assert "/help" in words
-        assert "/run" in words
+        assert "/mcp" in words
 
     def test_completer_includes_workspace_files(self, tmp_path):
         (tmp_path / "main.py").write_text("pass")
@@ -391,10 +382,6 @@ class TestTerminalSurfaceHelpers:
         assert "50%" in reply
         assert "/compact" in reply
 
-    def test_build_progress_message_uses_activity_icon(self):
-        reply = _build_progress_message("Thinking through the request", "Working on it.")
-        assert "🧠 Thinking through the request" in reply
-        assert "Working on it." in reply
 
     def test_permissions_reply_includes_mode_and_roots(self, monkeypatch):
         from app import main as main_module
@@ -432,53 +419,6 @@ class TestTerminalSurfaceHelpers:
         assert "📖 Inspecting the workspace first" in toolbar
         assert "Ctrl+G editor" in toolbar
 
-    def test_hibernation_reply_mentions_reset_and_unload(self):
-        reply = _build_hibernation_reply(
-            workspace=r"C:\Users\dev\projects\local-codex",
-            model="qwen3.5:latest",
-            session_name="local-codex",
-            shell_cwd=r"C:\Users\dev\projects\local-codex",
-            total_tokens=42000,
-            auto_compact_threshold=120000,
-            free_ram_before=2.6,
-            free_ram_after=5.1,
-            unload_detail="Stopped `qwen3.5:latest`.",
-        )
-        assert "Session hibernated" in reply
-        assert "42,000 tokens" in reply
-        assert "2.6 GB" in reply
-        assert "Stopped `qwen3.5:latest`." in reply
-
-    def test_hibernate_session_resets_messages_and_persists_state(self, monkeypatch, tmp_path):
-        from app import main as main_module
-        from app import config
-        from app.agents import session as session_module
-
-        monkeypatch.setattr(session_module, "ensure_session", lambda workspace: {"name": "Demo"})
-        monkeypatch.setattr(main_module.shell_agent, "get_cwd", lambda: str(tmp_path))
-        monkeypatch.setattr(config, "get_available_system_memory_gib", lambda: 3.0)
-        monkeypatch.setattr(config, "stop_local_model", lambda model: (True, f"Stopped `{model}`."))
-
-        messages, sess_in, sess_out, reply = _hibernate_session(
-            workspace=str(tmp_path),
-            model="qwen3.5:latest",
-            system_prompt="SYSTEM",
-            total_tokens=60000,
-            auto_compact_threshold=120000,
-        )
-
-        assert sess_in == 0
-        assert sess_out == 0
-        assert len(messages) == 1
-        assert messages[0].content == "SYSTEM"
-        assert "Session hibernated" in reply
-        metadata = memory.load_session_metadata(str(tmp_path))
-        assert metadata is not None
-        assert metadata["last_hibernated_model"] == "qwen3.5:latest"
-        history = memory.load_recent_activity(str(tmp_path), limit=1)
-        assert history
-        assert "/hibernate" in history[-1]["user"]
-
 
 class TestTerminalHelpers:
     def test_clear_terminal_uses_console(self, monkeypatch):
@@ -491,10 +431,6 @@ class TestTerminalHelpers:
 
 
 class TestProgressMessages:
-    def test_build_progress_message_includes_detail(self):
-        message = _build_progress_message("Inspecting the workspace first", "I’ll summarize purpose and blockers.")
-        assert message.startswith("📖 Inspecting the workspace first")
-        assert "summarize purpose and blockers" in message
 
     def test_intent_progress_message_for_brainstorm(self):
         message = _build_intent_progress_message(
@@ -534,11 +470,6 @@ class TestWorkModes:
 
     def test_work_mode_summary_mentions_style(self):
         assert "pair" in _work_mode_summary("collaborator")
-
-    def test_extract_work_mode_and_payload_parses_options(self):
-        mode, payload = _extract_work_mode_and_payload('/start --mode mentor "Build a snake game"', "builder")
-        assert mode == "mentor"
-        assert payload == "Build a snake game"
 
 
 class TestGreetingHelpers:
@@ -635,15 +566,6 @@ class TestCommandHelp:
         assert _extract_url_from_input("read this page https://example.com/docs?q=1.") == "https://example.com/docs?q=1"
         assert _extract_url_from_input("no link here") is None
 
-    def test_parse_run_command_detects_background_flag(self):
-        command, background = _parse_run_command("/run --background python -m http.server")
-        assert background is True
-        assert command == "python -m http.server"
-
-    def test_parse_run_command_defaults_to_foreground(self):
-        command, background = _parse_run_command("/run pytest -q")
-        assert background is False
-        assert command == "pytest -q"
 
     def test_build_run_command_reply_uses_powershell_activation(self, tmp_path):
         src = tmp_path / "src" / "snake_agent"
@@ -898,15 +820,6 @@ class TestProjectDetection:
         brief = _build_startup_project_brief(str(tmp_path))
         assert brief is None
 
-    def test_build_startup_walkthrough_panel(self):
-        panel = _build_startup_walkthrough()
-        rendered = _render_rich(panel)
-        assert "Start Here" in rendered
-        assert "what do you understand about this project?" in rendered
-        assert "/plan build a goal tracker app" in rendered
-        assert "/search" in rendered
-        assert "/review" in rendered
-
 
 class TestOperatorReplies:
     def test_build_model_reply_reports_local_only_mode(self):
@@ -1004,39 +917,6 @@ class TestOperatorReplies:
         assert "python.exe" in reply
         assert "/make-space" in reply
 
-    def test_cmd_make_space_skips_when_no_processes(self, monkeypatch):
-        from app import config
-
-        monkeypatch.setattr(config, "list_reclaimable_processes", lambda: [])
-
-        reply = _cmd_make_space()
-
-        assert "No reclaimable local AI or user-owned GPU processes" in reply
-
-    def test_cmd_make_space_stops_processes(self, monkeypatch):
-        from app import main as main_mod
-        from app import config
-
-        processes = [
-            SimpleNamespace(name="ollama.exe", pid=1234, memory_gib=2.1, category="local-ai"),
-            SimpleNamespace(name="python.exe", pid=4321, memory_gib=1.1, category="gpu"),
-        ]
-        monkeypatch.setattr(config, "list_reclaimable_processes", lambda: processes)
-        monkeypatch.setattr(main_mod, "_confirm_make_space", lambda items: True)
-        monkeypatch.setattr(config, "stop_reclaimable_processes", lambda: (processes, []))
-        monkeypatch.setattr(config, "get_cpu_usage_pct", lambda: 12.0)
-        monkeypatch.setattr(
-            config,
-            "get_gpu_memory_info",
-            lambda: SimpleNamespace(total_gib=8.0, free_gib=6.5),
-        )
-
-        reply = _cmd_make_space()
-
-        assert "Processes stopped" in reply
-        assert "`2`" in reply
-        assert "CPU usage now" in reply
-        assert "GPU free now" in reply
 
     def test_handle_model_command_removes_model(self, monkeypatch):
         from app import config
@@ -1067,48 +947,6 @@ class TestOperatorReplies:
         )
         assert "Cannot remove the active chat model" in reply
 
-    def test_build_tasks_reply_for_empty_background_queue(self):
-        from app.agents import shell as shell_agent
-
-        shell_agent.reset_background_tasks()
-        reply = _build_tasks_reply("/tasks")
-
-        assert "No background tasks yet" in reply
-        assert "/run --background <command>" in reply
-
-    def test_build_tasks_reply_lists_running_task(self, monkeypatch):
-        from app import main as main_mod
-
-        task = SimpleNamespace(
-            id="bg-1",
-            command="python -m http.server",
-            cwd=r"C:\Users\dev\projects\demo",
-            status="running",
-            exit_code=None,
-        )
-        monkeypatch.setattr(main_mod.shell_agent, "list_background_tasks", lambda: [task])
-
-        reply = _build_tasks_reply("/tasks")
-
-        assert "Background tasks" in reply
-        assert "bg-1" in reply
-        assert "python -m http.server" in reply
-
-    def test_build_tasks_reply_stop_reports_existing_completed_task(self, monkeypatch):
-        from app import main as main_mod
-
-        task = SimpleNamespace(
-            id="bg-1",
-            command="python worker.py",
-            cwd=r"C:\Users\dev\projects\demo",
-            status="completed",
-        )
-        monkeypatch.setattr(main_mod.shell_agent, "get_background_task", lambda task_id: task if task_id == "bg-1" else None)
-        monkeypatch.setattr(main_mod.shell_agent, "stop_background_task", lambda task_id: pytest.fail("stop should not be called for completed tasks"))
-
-        reply = _build_tasks_reply("/tasks stop bg-1")
-
-        assert "already `completed`" in reply
 
     def test_pick_model_uses_only_recommended_models(self, monkeypatch):
         from app import config
@@ -1270,13 +1108,6 @@ class TestOperatorReplies:
 
         assert _build_commit_readiness(str(tmp_path)) == "Partially ready: 1 staged, 1 unstaged and 1 untracked outside the commit"
 
-    def test_build_history_reply_reads_recent_activity(self, tmp_path):
-        memory.append_activity(str(tmp_path), "first ask", "first reply")
-        memory.append_activity(str(tmp_path), "second ask", "second reply")
-        reply = _build_history_reply(str(tmp_path), limit=2)
-        assert "Recent history" in reply
-        assert "second ask" in reply
-        assert "second reply" in reply
 
     def test_build_change_set_diff_reply_uses_recorded_change(self, tmp_path):
         memory.record_last_change_set(
@@ -1425,67 +1256,6 @@ class TestOperatorReplies:
         assert str(tmp_path) in reply
         assert "first ask" in reply
 
-    def test_cmd_rename_sets_session_name(self, tmp_path):
-        reply = _cmd_rename("/rename Deep Work", str(tmp_path))
-        assert "Deep Work" in reply
-        metadata = memory.load_session_metadata(str(tmp_path))
-        assert metadata is not None
-        assert metadata["name"] == "Deep Work"
-
-    def test_cmd_rename_without_name_shows_current_name(self, tmp_path):
-        memory.ensure_session_metadata(str(tmp_path), default_name="demo")
-        reply = _cmd_rename("/rename", str(tmp_path))
-        assert "Current session name" in reply
-        assert "demo" in reply
-
-    def test_cmd_explain_requires_file(self, tmp_path):
-        reply = _cmd_explain("/explain", str(tmp_path), SimpleNamespace())
-        assert "Usage:" in reply
-
-    def test_cmd_explain_reads_file_and_returns_summary(self, monkeypatch, tmp_path):
-        from app import main as main_mod
-
-        target = tmp_path / "app.py"
-        target.write_text("def run():\n    return 1\n", encoding="utf-8")
-        monkeypatch.setattr(main_mod.console, "print", lambda *args, **kwargs: None)
-
-        class FakeExplainLLM:
-            def invoke(self, messages):
-                return SimpleNamespace(content="This file exposes a small run entrypoint.")
-
-        reply = _cmd_explain(f"/explain {target.name}", str(tmp_path), FakeExplainLLM())
-        assert "run entrypoint" in reply
-
-    def test_cmd_symbols_requires_name(self, tmp_path):
-        reply = _cmd_symbols("/symbols", str(tmp_path))
-        assert "Usage:" in reply
-
-    def test_cmd_symbols_returns_definition_and_usage_summary(self, monkeypatch, tmp_path):
-        from app import main as main_mod
-
-        (tmp_path / "main.py").write_text("from utils import helper\nhelper()\n", encoding="utf-8")
-        (tmp_path / "utils.py").write_text("def helper():\n    pass\n", encoding="utf-8")
-        monkeypatch.setattr(main_mod.console, "print", lambda *args, **kwargs: None)
-
-        reply = _cmd_symbols("/symbols helper", str(tmp_path))
-        assert "Symbol: `helper`" in reply
-        assert "Definitions" in reply
-        assert "Usages" in reply
-
-    def test_cmd_diagnostics_returns_summary(self, monkeypatch, tmp_path):
-        from app import main as main_mod
-
-        monkeypatch.setattr(main_mod.console, "print", lambda *args, **kwargs: None)
-        monkeypatch.setattr(
-            main_mod.diagnostics_agent,
-            "run",
-            lambda workspace, target: SimpleNamespace(summary=f"Diagnostics for {target or '.'}"),
-        )
-        monkeypatch.setattr(main_mod.diagnostics_agent, "render", lambda response: response.summary)
-
-        reply = _cmd_diagnostics("/diagnostics src", str(tmp_path))
-
-        assert "Diagnostics for src" in reply
 
     def test_build_fix_usage_mentions_last_command(self):
         reply = _build_fix_usage("pytest -q")
@@ -1553,19 +1323,6 @@ class TestOperatorReplies:
         reply = _cmd_fix("pytest", str(tmp_path), codegen_llm=SimpleNamespace())
 
         assert "no code changes were applied" in reply.lower()
-
-    def test_cmd_brainstorm_saves_note(self, tmp_path):
-        class FakeLLM:
-            def invoke(self, messages):
-                return SimpleNamespace(content="Here are three strong directions.")
-
-        reply = _cmd_brainstorm("/brainstorm build something fun", str(tmp_path), FakeLLM())
-
-        assert "Saved in brainstorm notes" in reply
-        saved = memory.load_brainstorm(str(tmp_path))
-        assert saved is not None
-        assert "build something fun" in saved
-        assert "three strong directions" in saved
 
 
 class TestCleanupFlow:
