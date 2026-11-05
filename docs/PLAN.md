@@ -3,11 +3,11 @@
 Tick items as they are done (`[x]`) with the date, e.g. `[x] ... (2026-10-28)`. Scope and reasons are in
 [SCOPE.md](SCOPE.md); decisions in [DECISIONS.md](DECISIONS.md). No dates or weeks: the next unticked item is the work.
 Every milestone ends with the "Every release" list at the bottom (public release + LinkedIn post).
+Plan v2 (2026-11-05, D-017); v1 is in [archive/PLAN-v1-2026-10-24.md](archive/PLAN-v1-2026-10-24.md).
 
-**Rule for new ideas (D-011):** a new idea goes into "Ideas to test" in SCOPE.md, never straight into this plan. It
-becomes a milestone only after its impact score is agreed.
+**Rule for new ideas (D-011):** a new idea goes into "Ideas to test" in SCOPE.md, never straight into this plan.
 
-**Progress:** Before starting 4/4 · Phase 1 0/5 · Phase 2 0/4 · Phase 3 0/3
+**Progress:** Before starting 4/4 · M0-M7 0/8
 
 ---
 
@@ -18,10 +18,6 @@ becomes a milestone only after its impact score is agreed.
 - [x] "Go on M0" given (2026-10-24)
 
 ---
-
-# Phase 1: core portfolio project
-The one question: how much everyday coding work can a small local model do with an agent built for it, and does
-test-gated escalation to a frontier model cut cost without hurting the success rate?
 
 ## M0 Repo + measure the problem
 - [x] Public repo created under prashanth-ds-ml, MIT licence, local-codex code imported with credit (2026-10-24)
@@ -41,10 +37,11 @@ test-gated escalation to a frontier model cut cost without hurting the success r
 - [x] Prompt overhead measured for each stock agent (Claude Code, Codex, OpenCode, Aider, deepagents-code): 2.7K-12.2K tokens on the first work call (`run.py --overhead`, EVALS, 2026-10-26)
 - [x] Ollama context set correctly for each (`OLLAMA_CONTEXT_LENGTH`); configs saved in `bench/configs/`: bench server at 64K (D-016), preflight checks the loaded context; Aider sets its own `num_ctx` (stock behaviour, kept) (2026-10-26)
 - [ ] Baseline runs: stock agents × qwen3.5:4b and qwen3.5:9b on benchmark v0; raw results in `results/`
-- [ ] **Kill check 1:** if stock agents already pass most tasks, write that up and stop
+- [ ] **Kill check 1:** if stock agents already pass most tasks, the best one becomes the builder (SCOPE kill rule)
 - [ ] Release v0.0 + post: "Why coding agents break on your laptop" (prompt-overhead chart)
 
-## M1 `mitra solve`: harness built for small models
+## M1 Core agent loop + `mitra solve` (one task, built for small models)
+The same loop runs the terminal assistant (M2), the plan runner (M3) and the benchmark.
 - [ ] Built on LangGraph (already in local-codex); LangChain / Deep Agents middleware used only where it fits the prompt budget, with our own short prompts
 - [ ] Headless command `mitra solve "task" --test "pytest ..." --json` (exit 0/1)
 - [ ] Prompt + tool descriptions under ~3K tokens, checked in CI
@@ -62,78 +59,75 @@ test-gated escalation to a frontier model cut cost without hurting the success r
 - [ ] Tests run in a temp copy with a timeout; full output saved to a file, model sees head/tail + the path (dsh `spill-policy`)
 - [ ] Stable prompt prefix, append-only history inside a round, so Ollama reuses its prompt cache; prompt-eval time logged (dsh "KV cache effect")
 - [ ] Prompt tokens and context use logged on every call; warning before the context limit (L-001)
+- [ ] Model settings in config: context length, KV-cache type (`q8_0` option on the bench server), thinking on/off and thinking budget (D-020)
 - [ ] Fresh round after a failed test run, with a short handoff note (status, evidence, next step) (dsh `tool-ralph`)
 - [ ] Rollback when rounds run out
+- [ ] Every run saved with authorship per part (Mitra / Claude / me) and secrets scrubbed, so it can become training data later (D-022)
 - [ ] Record/replay: recorded model replies replay in tests without Ollama (I-1, dsh `llm-replay`)
 - [ ] Fault tests: a scripted fake model returns malformed tool calls, empty replies, stalls and errors; harness must recover or fail cleanly (dsh `llm-mock-server`)
 - [ ] Unit tests for every part above
 - [ ] Release v0.1 + post: "Cutting the agent prompt from ~12K to ~3K tokens"
 
-## M2 Same-model comparison
-- [ ] Benchmark grown to ~20 tasks + a small public-benchmark slice
+## M2 Terminal assistant (`mitra`)
+- [ ] Reuse local-codex's terminal app, trimmed to what the new loop needs; old commands that don't fit are removed
+- [ ] Chat in the terminal: it reads, searches and edits code, and runs tests and commands, on the M1 loop
+- [ ] Shows every diff and asks before edits and commands; modes: ask each time / auto-edit / plan only (read-only)
+- [ ] Slash commands: `/model`, `/context`, `/think`, `/test`, `/mcp`, `/run <plan>`, `/status`, `/clear`
+- [ ] Session saved and resumable; long sessions handled by fresh rounds with a handoff note (no extra summary call)
+- [ ] AGENTS.md / project notes loaded with the byte budget from M1
+- [ ] Shows prompt tokens and context use as it goes
+- [ ] Used for a week on small real tasks in my projects; problems logged in ERROR_LOG
+- [ ] Release v0.2 + post: "A coding assistant that actually works on a 4B model"
+
+## M3 Local planning + unattended runner
+- [ ] Plan format (one Markdown file): feature, design notes, tasks with files, expected behaviour, test command, order
+- [ ] `/plan`: Mitra writes a plan in that format with the local 9B (thinking on); I can edit it before running (D-025)
+- [ ] Plan check: every task has a test command and files; a plan that fails the check is rewritten before running
+- [ ] `mitra run plan.md` (also `/run` inside the terminal app): works through tasks on a feature branch, one commit per task, never touches `main`
+- [ ] Stuck task (rounds used up) → "needs help" brief (failing output, `file:line`, what was tried); runner moves on; tasks that depend on it are skipped
+- [ ] RAM guard: pauses when free RAM drops below the preflight rule, resumes when it recovers
+- [ ] Stop and resume: a killed run picks up at the next unfinished task
+- [ ] Report when done: tasks done / needs help, diffs, time, local tokens
+- [ ] Tested on playground levels 1-2 (snake, second game) and one small real feature in one of my projects
+- [ ] Release v0.3 + post: "My laptop built a feature while I was at work"
+
+## M4 Comparison: settings, MCP, Harness²
+- [ ] Benchmark grown to ~20 single tasks + feature tasks from the `mitra-playground` ladder (levels 1-6) and my projects + a small public-benchmark slice
 - [ ] `mitra bench` reruns everything; results JSON committed
-- [ ] Table per agent × model: pass rate, prompt overhead, broken tool calls, turns, time
-- [ ] Per-model instructions tuned on the tuning half only (Harness² lite, by hand: change one thing, keep it only if more tuning tasks pass); reported on the held-out half (I-2)
+- [ ] Settings sweep on the tuning half: context 32K / 64K / 128K, thinking off / on; best setting per model kept, reported on held-out
+- [ ] Tool registry (`find_tool`), Serena and Context7 connected through it
+- [ ] MCP test: stock agent with Serena + Context7 vs Mitra with the registry (prompt tokens, pass rate)
+- [ ] Harness² tuning in WSL (Codex executor pointed at local Ollama) on the tuning half; three columns: stock, stock + Harness², Mitra
 - [ ] Failure analysis from trajectories: every failed run labelled (broken tool call, wrong file, gave up, loop, timeout, test tampering, infra); counts in EVALS.md
 - [ ] EVALS.md: method, every config, every result
-- [ ] **Kill check 2:** if Mitra does not clearly beat stock agents, publish findings and stop
-- [ ] Release v0.2 + post: the comparison table
+- [ ] **Kill check 2:** if Mitra does not clearly beat stock agents, the best stock agent becomes the builder engine behind Mitra's terminal app
+- [ ] Release v0.4 + post: the comparison table
 
-## M3 Test-gated escalation + cost meter
-- [ ] Local fails the tests after N rounds → frontier model gets the handoff note + failing output (not the whole chat)
-- [ ] Frontier model choice and API key via config; works with no key (local only)
-- [ ] Meter per task: local tokens, frontier tokens, ₹, GPU Wh (`nvidia-smi`), wall time
-- [ ] Experiment on the same tasks: frontier only vs local first + escalation (pass rate, ₹, Wh, time)
-- [ ] Release v0.3 + post: "% solved on my GPU, and what the cloud cost for the rest"
+## M5 Review + lessons loop
+- [ ] Review view in the terminal app: report + diffs per run; I accept, reject with a comment, or split a "needs help" task
+- [ ] Fallback: a "needs help" brief I can paste into Claude Code; its tokens are counted
+- [ ] Review comments and failure labels turned into lesson proposals for Mitra's skills file
+- [ ] A lesson is kept only if more tuning tasks pass; reported on held-out; I see each one
+- [ ] Lessons file capped at ~1K tokens; lessons that stop helping are dropped
+- [ ] Meter: share of tasks and features done fully locally; Claude tokens spent on fallbacks (from Claude Code session logs)
+- [ ] Release v0.5 + post: "How far up the ladder a 9B model climbs on its own"
 
-## M4 Ship v1.0 (portfolio version)
+## M6 Daily use + v1.0
+- [ ] Used on my own projects for real features; every run saved to the training log
+- [ ] Weekly numbers in PROGRESS_LOG: tasks done locally, needs help, Claude fallback tokens, lessons kept, highest ladder level passed
 - [ ] README rebuilt around the results; quick start tested from a fresh clone
 - [ ] 2-minute demo video
 - [ ] CASE_STUDY.md (one page) + PROGRESS_LOG.md complete
 - [ ] Article (LinkedIn / blog): method, results, honest limits
-- [ ] Portfolio updated: ROADMAP.md, GitHub pin, LinkedIn Featured
 - [ ] Release v1.0 + post: the article
 
----
-
-# Phase 2: extensions, by impact score (only if phase 1 numbers are good)
-
-## M5 Bigtool ops pack (former slot 02)
-- [ ] Tool registry with `find_tool(query)` (BM25 first; local embeddings only if BM25 misses)
-- [ ] Ops pack: ~200 fake internal APIs (billing, inventory, ticketing) + task set with checks
-- [ ] Experiment: all tools in prompt vs retrieval vs core only (pass rate, prompt tokens, wrong-tool calls, retrieval hit rate)
-- [ ] MCP servers connected through the registry
+## M7 Personal fine-tune (only with enough data)
+- [ ] Dataset builder: Mitra-only passing runs (authorship filter), secret scrub, dedupe, train / held-out split by project and date
+- [ ] Licensed public coding data mixed in (licence of each source written in EVALS.md)
+- [ ] Gate: a few hundred passing runs before the first training run
+- [ ] QLoRA fine-tune of the small model locally (e.g. Unsloth); 9B only if a short rented GPU is needed
+- [ ] Compare on held-out: base + lessons vs fine-tuned + lessons; keep the fine-tune only if it wins
 - [ ] Release + post
-
-## M6 Data pack
-- [ ] Analysis tasks: the model writes a plan or code, the engine computes
-- [ ] Verifier recomputes every number (shared idea with Aryabhatta 07)
-- [ ] Benchmark of analysis questions with known answers; local vs escalation numbers
-- [ ] Release + post
-
-## M7 MCP server mode
-- [ ] Mitra exposed as an MCP server (`mitra_solve`, later the data pack)
-- [ ] Claude Code / Codex hand routine tasks to the local model; frontier tokens saved measured
-- [ ] Release + post
-
-## M8 Experiments (each kept only if the numbers support it)
-- [ ] E1 Debug brief: code-only evidence (stack trace, logs, diffs, `git bisect`) + local investigators → brief; frontier fixes from bug report only vs brief; compare fix rate, tokens, ₹, time
-- [ ] E2 Learning from escalations: lesson/skill proposed when frontier fixes what local could not; kept only if held-out tasks improve; you review each one; chart of escalation rate over time
-- [ ] Each experiment: result written in EVALS.md (kept or dropped) + post
-
-## Later (built only if users ask; not milestones)
-- [ ] Escalation ladder (tiny local → stronger local → cheap cloud → frontier → ask you) + monthly ₹ budget
-- [ ] `mitra doctor`: GPU/RAM check, model and context picks, Ollama 4K-default warning
-- [ ] "What could have been local?" usage audit
-- [ ] Review brief (crowded space: CodeRabbit, BugBot)
-- [ ] Docs/PDF pack with checked citations (Open WebUI already covers plain PDF chat)
-
----
-
-# Phase 3: Vipplav offer
-- [ ] Conversations with 5-10 engineering leads / SME owners (start during phase 2)
-- [ ] Offer chosen from: AI cost and privacy audit · local AI box for a team · "make your agent reliable on your data"
-- [ ] 3 teams agree to a paid pilot (until then it stays a portfolio project)
 
 ---
 

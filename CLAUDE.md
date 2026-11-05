@@ -1,7 +1,8 @@
 # Mitra: rules for working in this repo
 
-Portfolio project 05. A local-first coding agent built for small models: checked by tests, escalating to a frontier
-model only when the check fails. Built in public, one release + one LinkedIn post per milestone.
+Portfolio project 05. A local coding assistant for my own projects, built for small models: it thinks, plans and builds
+with local models only, in the terminal or unattended; Claude Code is only a fallback (D-017, D-023, D-025). Built in public,
+one release + one LinkedIn post per milestone.
 
 ## Read first, every session (in this order)
 1. `docs/STATUS.md`: where things stand and the next unticked item
