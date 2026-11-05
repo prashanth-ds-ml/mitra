@@ -53,12 +53,12 @@ the code, shows each diff, asks before edits and commands, and runs the tests.
 | `mitra solve` | One task: prompt + tools under ~3K tokens, 5 built-in tools, tolerant tool-call parsing, fresh rounds, rollback |
 | Terminal assistant | `mitra`: chat in the terminal, diffs shown and approved, slash commands, resumable sessions; reuses local-codex's terminal app (D-023) |
 | Plan + runner | Plan format Mitra writes (`/plan`, local); `mitra run` works through it unattended on a branch, with a RAM guard and a report |
-| MCP tools | Serena and Context7, loaded through a tool registry (only the tool needed goes into the prompt) |
+| MCP | General MCP client (stdio + HTTP, standard `mcpServers` config, approvals for write tools) in M2 with Git, Context7, AWS Documentation; tool registry + Serena, GitHub, SQLite/Postgres, Docker, AWS, Research Desk server and an ops sandbox in M4 (D-028) |
 | Model settings | Context 32K / 64K / 128K (with Ollama KV-cache `q8_0`), thinking off / on with a budget; picked by measurement |
 | Harness² tuning | Per-model prompt and skill tuning on the tuning half, reported on the held-out half |
 | Review + lessons | Batch review by me (Claude Code only as fallback); lessons capped at ~1K tokens, kept only if they help |
 | Meter | Share of tasks and features done fully locally, Claude tokens spent on fallbacks, local tokens, wall time; GPU Wh as a side note |
-| Playground | Separate repo `mitra-playground`: a ladder of practice projects, each with a plan and tests; AI apps there may call OpenRouter / NVIDIA APIs at runtime (D-026, D-027) |
+| Playground | Separate repo `mitra-playground`: a ladder of practice projects (level 07 = ops sandbox for MCP), each with a plan and tests; AI apps there may call OpenRouter / NVIDIA APIs at runtime (D-026, D-027) |
 | Training log + fine-tune | Mitra-only passing runs + licensed public data → QLoRA fine-tune of the small model, kept only if it wins on held-out tasks |
 
 ## Training data rules (D-022)
@@ -82,7 +82,7 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   tasks; slow and RAM-tight. Test after the baselines.
 
 ## Later (not milestones)
-Bigtool ops pack (~200 fake APIs), data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,
+Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,
 `mitra doctor`, usage audit.
 
 ## Out of scope

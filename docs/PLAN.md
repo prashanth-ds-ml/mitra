@@ -36,7 +36,8 @@ Plan v2 (2026-11-05, D-017); v1 is in [archive/PLAN-v1-2026-10-24.md](archive/PL
 - [x] Model check on the two picks: native tool calls via Ollama, speed, GPU fit at 32K/64K (`bench/model_screen.py`): 4B 9/12, 81 tok/s, fits; 9B 11/12, 20 tok/s, 64% on GPU at 64K (EVALS, 2026-10-26)
 - [x] Prompt overhead measured for each stock agent (Claude Code, Codex, OpenCode, Aider, deepagents-code): 2.7K-12.2K tokens on the first work call (`run.py --overhead`, EVALS, 2026-10-26)
 - [x] Ollama context set correctly for each (`OLLAMA_CONTEXT_LENGTH`); configs saved in `bench/configs/`: bench server at 64K (D-016), preflight checks the loaded context; Aider sets its own `num_ctx` (stock behaviour, kept) (2026-10-26)
-- [ ] Baseline runs: stock agents × qwen3.5:4b and qwen3.5:9b on benchmark v0; raw results in `results/`
+- [ ] Model check on `mimo-v2.6:9b` (Qwen3.5-9B fine-tune, reports better agent scores than qwen3.5:9b) with `bench/model_screen.py`; it replaces qwen3.5:9b only if it scores at least as well at similar speed (D-029)
+- [ ] Baseline runs: stock agents × the small and mid models on benchmark v0; raw results in `results/`
 - [ ] **Kill check 1:** if stock agents already pass most tasks, the best one becomes the builder (SCOPE kill rule)
 - [ ] Release v0.0 + post: "Why coding agents break on your laptop" (prompt-overhead chart)
 
@@ -69,14 +70,22 @@ The same loop runs the terminal assistant (M2), the plan runner (M3) and the ben
 - [ ] Release v0.1 + post: "Cutting the agent prompt from ~12K to ~3K tokens"
 
 ## M2 Terminal assistant (`mitra`)
-- [ ] Reuse local-codex's terminal app, trimmed to what the new loop needs; old commands that don't fit are removed
-- [ ] Chat in the terminal: it reads, searches and edits code, and runs tests and commands, on the M1 loop
-- [ ] Shows every diff and asks before edits and commands; modes: ask each time / auto-edit / plan only (read-only)
-- [ ] Slash commands: `/model`, `/context`, `/think`, `/test`, `/mcp`, `/run <plan>`, `/status`, `/clear`
-- [ ] Session saved and resumable; long sessions handled by fresh rounds with a handoff note (no extra summary call)
-- [ ] AGENTS.md / project notes loaded with the byte budget from M1
-- [ ] Shows prompt tokens and context use as it goes
-- [ ] Used for a week on small real tasks in my projects; problems logged in ERROR_LOG
+Design, ability list and what happens to local-codex's code: [M2_PLAN.md](M2_PLAN.md).
+- [ ] Spike: official MCP SDK vs `langchain-mcp-adapters` with Context7 over stdio on Windows; choice in DECISIONS
+- [ ] `main.py` split into a REPL shell + `app/commands/`; commands outside the v1 list removed; tests for every kept command
+- [ ] Chat on the M1 loop: explain with `file:line`, find, edit, run, fix loop
+- [ ] Modes: ask each time / auto-edit / plan only (read-only); diff approval screen
+- [ ] `/undo` (last change, whole session), `/diff`, `/commit` (drafted message, you approve, never pushes)
+- [ ] Session saved per project, `/resume`, fresh round with a handoff note when context fills
+- [ ] `/model`, `/context`, `/think`; prompt tokens and context use in the status line, warning before the limit
+- [ ] Project notes (AGENTS.md / CLAUDE.md) within the byte budget; skills loaded on demand (FastAPI, LangGraph, Next.js, uv on Windows)
+- [ ] `/doctor`: free RAM, GPU/VRAM, Ollama up, model loaded, context really applied
+- [ ] MCP client (D-028): stdio + Streamable HTTP, standard `mcpServers` config (`.mitra/mcp.json`), `/mcp` list / on / off / test / import (from Claude Code)
+- [ ] MCP safety: read tools free, every write tool asks (even in auto-edit), no write tools in unattended runs, secrets never in prompt or logs, every call logged and timed, big results trimmed
+- [ ] First servers connected and tested on Windows: Git, Context7, AWS Documentation
+- [ ] local-codex parts not in the v1 list archived (git history), per M2_PLAN.md
+- [ ] Fresh-clone install on Windows; Linux CI blocking
+- [ ] Used for a week on small real tasks in my projects; problems logged in ERROR_LOG and fixed
 - [ ] Release v0.2 + post: "A coding assistant that actually works on a 4B model"
 
 ## M3 Local planning + unattended runner
@@ -95,13 +104,16 @@ The same loop runs the terminal assistant (M2), the plan runner (M3) and the ben
 - [ ] Benchmark grown to ~20 single tasks + feature tasks from the `mitra-playground` ladder (levels 1-6) and my projects + a small public-benchmark slice
 - [ ] `mitra bench` reruns everything; results JSON committed
 - [ ] Settings sweep on the tuning half: context 32K / 64K / 128K, thinking off / on; best setting per model kept, reported on held-out
-- [ ] Tool registry (`find_tool`), Serena and Context7 connected through it
-- [ ] MCP test: stock agent with Serena + Context7 vs Mitra with the registry (prompt tokens, pass rate)
+- [ ] Tool registry (`find_tool`) over every connected MCP server: short descriptions of our own, only the 1-2 tools a step needs go into the prompt
+- [ ] More servers through the registry: Serena, GitHub (test repo, scoped token), SQLite/Postgres (read-only SQL by default), Docker, AWS (LocalStack, or a read-only IAM profile)
+- [ ] Research Desk MCP server added to project 04: `search_library`, `get_report` (read-only)
+- [ ] Ops sandbox = playground level 07: Docker Compose (demo API, seeded Postgres, LocalStack), test GitHub repo, planted problems with checkable answers
+- [ ] MCP comparison on the same model and tasks: all tools in the prompt vs registry vs core only (pass rate, right-tool rate, prompt tokens, time, blocked unsafe calls)
 - [ ] Harness² tuning in WSL (Codex executor pointed at local Ollama) on the tuning half; three columns: stock, stock + Harness², Mitra
 - [ ] Failure analysis from trajectories: every failed run labelled (broken tool call, wrong file, gave up, loop, timeout, test tampering, infra); counts in EVALS.md
 - [ ] EVALS.md: method, every config, every result
 - [ ] **Kill check 2:** if Mitra does not clearly beat stock agents, the best stock agent becomes the builder engine behind Mitra's terminal app
-- [ ] Release v0.4 + post: the comparison table
+- [ ] Release v0.4 + posts: the comparison table; "One laptop, a 9B model, 6 real MCP servers: an incident solved end to end"
 
 ## M5 Review + lessons loop
 - [ ] Review view in the terminal app: report + diffs per run; I accept, reject with a comment, or split a "needs help" task
