@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import pathlib
 import platform
 import re
@@ -36,6 +37,8 @@ _DEFAULT_TOOLS: set[str] = {
     "git_commit",
     "create_markdown_file",
     "update_markdown_file",
+    "mcp_find",
+    "mcp_call",
 }
 
 # Tools that modify or destroy existing content — require user confirmation.
@@ -151,7 +154,6 @@ class PermissionGuard:
 # Module-level guard — replace with configure() to change settings.
 _guard = PermissionGuard()
 _active_change_set: list[dict] | None = None
-_mcp_servers_config: list[dict] | None = None
 
 
 def configure(
@@ -163,7 +165,6 @@ def configure(
     require_diff_approval: bool = False,
     policy: Policy | None = None,
     policy_path: str | None = None,
-    mcp_servers: list[dict] | None = None,
 ) -> None:
     """
     Update the permission guard for this session.
@@ -179,7 +180,7 @@ def configure(
         allowed_tools=filesystem._DEFAULT_TOOLS | {"delete_file", "run_command"},
     )
     """
-    global _guard, _mcp_servers_config
+    global _guard
     _guard = PermissionGuard(
         workspace=workspace,
         allowed_roots=allowed_roots,
@@ -190,7 +191,6 @@ def configure(
         policy=policy,
         policy_path=policy_path,
     )
-    _mcp_servers_config = list(mcp_servers) if mcp_servers is not None else None
 
 
 # ─── System prompt ─── (defined in app/prompts.py as FILESYSTEM_SYSTEM_PROMPT)
@@ -284,26 +284,6 @@ def _is_sensitive_path(path: pathlib.Path) -> bool:
     return False
 
 
-def _filesystem_mcp_server():
-    if not _guard.workspace or _mcp_servers_config is None:
-        return None
-    servers = mcp_registry.discover(_mcp_servers_config)
-    server = mcp_registry.find(servers, "filesystem")
-    if not server or not server.enabled or not server.command:
-        return None
-    return server
-
-
-def _route_filesystem_mcp(tool_name: str, arguments: dict, fallback):
-    server = _filesystem_mcp_server()
-    if server is None:
-        return None
-    result = mcp_registry.call_tool(server, str(_guard.workspace), tool_name, arguments)
-    if result.ok and result.text.strip():
-        return result.text.strip()
-    return fallback()
-
-
 @tool
 def read_file(path: str) -> str:
     """Read and return the full text content of a file."""
@@ -315,8 +295,7 @@ def read_file(path: str) -> str:
         except Exception as exc:
             return f"✗ read_file failed: {exc}"
 
-    routed = _route_filesystem_mcp("read_file", {"path": path}, _fallback)
-    return routed if routed is not None else _fallback()
+    return _fallback()
 
 
 @tool
@@ -365,8 +344,7 @@ def list_directory(path: str = ".") -> str:
         except Exception as exc:
             return f"✗ list_directory failed: {exc}"
 
-    routed = _route_filesystem_mcp("list_files", {"path": path}, _fallback)
-    return routed if routed is not None else _fallback()
+    return _fallback()
 
 
 @tool
@@ -848,6 +826,42 @@ def execute_cleanup(paths: list[str], request: str = "Apply approved cleanup pla
         _guard.confirm_fn = saved_confirm
 
 
+# ─── MCP tools (D-028): the model sees two small tools, not every server's tool list ──
+
+def _mcp_workspace() -> str:
+    return str(_guard.workspace or pathlib.Path.cwd())
+
+
+@tool
+def mcp_find(query: str) -> str:
+    """Find tools on connected MCP servers (git history, GitHub, library docs, code review, file search).
+    Describe what you need in a few words; returns server, tool name, what it does and its arguments."""
+    try:
+        return mcp_registry.format_search(_mcp_workspace(), mcp_registry.search_tools(_mcp_workspace(), query))
+    except Exception as exc:  # noqa: BLE001 - shown to the model
+        return f"✗ mcp_find failed: {exc}"
+
+
+@tool
+def mcp_call(server: str, tool: str, arguments: dict | str | None = None) -> str:
+    """Call one MCP tool found with mcp_find. `arguments` is a JSON object of the tool's arguments."""
+    if isinstance(arguments, str):
+        try:
+            arguments = json.loads(arguments) if arguments.strip() else {}
+        except json.JSONDecodeError as exc:
+            return f"✗ arguments must be a JSON object: {exc}"
+    if arguments is not None and not isinstance(arguments, dict):
+        return "✗ arguments must be a JSON object"
+
+    def approve(_spec, tool_name: str, args: dict) -> bool:
+        if _guard.confirm_fn is None:
+            return False
+        return bool(_guard.confirm_fn("mcp_call", {"server": server, "tool": tool_name, "arguments": args}))
+
+    result = mcp_registry.call_tool(_mcp_workspace(), server, tool, arguments or {}, approve=approve)
+    return result.text
+
+
 def _should_confirm_write(tool_name: str, args: dict) -> bool:
     """Return True when a write tool should show a diff preview before execution."""
     if tool_name not in _WRITE_PREVIEW_TOOLS or not _guard.require_diff_approval:
@@ -889,6 +903,8 @@ _ALL_TOOLS = [
     git_commit,
     create_markdown_file,
     update_markdown_file,
+    mcp_find,
+    mcp_call,
 ]
 
 

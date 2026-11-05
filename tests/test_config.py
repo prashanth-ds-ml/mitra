@@ -159,13 +159,10 @@ def test_load_exposes_default_plugin_dirs(tmp_path):
     assert cfg["plugin_dirs"] == ["plugins", ".mitra/plugins"]
 
 
-def test_load_exposes_default_mcp_servers(tmp_path):
+def test_mcp_servers_are_not_in_mitra_toml_config(tmp_path):
     cfg = config.load(cwd=str(tmp_path))
 
-    assert [server["name"] for server in cfg["mcp_servers"]] == ["filesystem", "git", "sqlite", "context7"]
-    assert cfg["mcp_servers"][0]["command"] == "python"
-    assert cfg["mcp_servers"][0]["args"] == ["-m", "app.mcp_servers.filesystem"]
-    assert cfg["mcp_servers"][0]["enabled"] is True
+    assert "mcp_servers" not in cfg  # MCP lives in .mitra/mcp.json now (D-028)
 
 
 def test_load_exposes_default_agent_model_mapping(tmp_path):

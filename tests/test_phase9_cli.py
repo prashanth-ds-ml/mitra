@@ -15,8 +15,8 @@ def test_mcp_command_lists_profiles(tmp_path):
     result = runner.invoke(cli, ["mcp", "--cwd", str(tmp_path)])
 
     assert result.exit_code == 0
-    assert "MCP integration" in result.stdout
-    assert "filesystem" in result.stdout
+    assert "MCP servers" in result.stdout
+    assert "git" in result.stdout
     assert "context7" in result.stdout
 
 
@@ -24,4 +24,4 @@ def test_mcp_command_supports_slash_alias(tmp_path):
     result = runner.invoke(cli, ["/mcp", "--cwd", str(tmp_path)])
 
     assert result.exit_code == 0
-    assert "filesystem" in result.stdout
+    assert "github" in result.stdout

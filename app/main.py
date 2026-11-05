@@ -2,6 +2,7 @@ import difflib
 import shlex
 import gc
 import os
+import json
 import pathlib
 import re
 import shutil
@@ -162,12 +163,7 @@ instruction_files = ["AGENTS.md", "CLAUDE.md", ".mitra/instructions.md", ".githu
 skill_dirs = ["skills", ".mitra/skills"]
 playbook_dirs = ["playbooks", ".mitra/playbooks"]
 plugin_dirs = ["plugins", ".mitra/plugins"]
-mcp_servers = [
-    {"name": "filesystem", "description": "Workspace file access through MCP-compatible filesystem servers.", "fallback": "Built-in filesystem tools", "transport": "local-fallback", "command": "python", "args": ["-m", "app.mcp_servers.filesystem"], "enabled": true},
-    {"name": "git", "description": "Repository inspection through an MCP git server.", "fallback": "Built-in git helpers", "transport": "local-fallback"},
-    {"name": "sqlite", "description": "Structured local memory through an MCP SQLite server.", "fallback": "Built-in memory and trace storage", "transport": "local-fallback"},
-    {"name": "context7", "description": "Reference lookup through a Context7-compatible MCP server.", "fallback": "Built-in web and docs tools", "transport": "local-fallback"},
-]
+# MCP servers live in .mitra/mcp.json (project) and ~/.mitra/mcp.json (you); see /mcp
 
 [agent_models]
 planner = "qwen3:14b"
@@ -417,10 +413,13 @@ def cmd_playbooks(cwd: str | None = typer.Option(None, "--cwd", help="Start path
     console.print(Panel(Markdown(reply), title="[bold cyan]Project Playbooks[/bold cyan]", border_style="cyan"))
 
 
-def cmd_mcp(cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection.")) -> None:
-    """List MCP profiles and their local fallbacks."""
+def cmd_mcp(
+    args: list[str] | None = typer.Argument(None, help="list | test <name> | tools <name> | on|off <name> | trust | import | call <server> <tool> {json}"),
+    cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection."),
+) -> None:
+    """List, test and manage MCP servers."""
     cfg, workspace = _phase5_workspace(cwd)
-    reply = _build_mcp_reply(workspace, cfg)
+    reply = _build_mcp_reply(workspace, cfg, " ".join(args or []))
     console.print(Panel(Markdown(reply), title="[bold cyan]MCP Integration[/bold cyan]", border_style="cyan"))
 
 
@@ -2207,7 +2206,6 @@ def _build_status_reply(
     auto_compact_threshold: int,
     num_ctx: int,
     agent_models: dict[str, str] | None = None,
-    mcp_servers: list[dict] | None = None,
 ) -> str:
     state = _detect_project_state(
         workspace,
@@ -2229,7 +2227,7 @@ def _build_status_reply(
     if gpu_info is not None:
         resource_parts.append(f"GPU `{gpu_info.free_gib:.1f} / {gpu_info.total_gib:.1f} GB free`")
     agent_models = agent_models or {}
-    mcp_summary = mcp_registry.summarize(mcp_registry.discover(mcp_servers))
+    mcp_summary = mcp_registry.summarize(mcp_registry.discover(workspace))
     return (
         "## Session status\n\n"
         f"- **Session:** `{session_meta.get('name', pathlib.Path(workspace).resolve().name)}`\n"
@@ -2969,9 +2967,8 @@ def _build_playbooks_reply(workspace: str, cfg: dict | None = None) -> str:
     return playbook_registry.format_prompt(playbooks)
 
 
-def _build_mcp_reply(workspace: str, cfg: dict | None = None) -> str:
-    servers = mcp_registry.discover((cfg or {}).get("mcp_servers"))
-    return mcp_registry.build_reply(workspace, servers)
+def _build_mcp_reply(workspace: str, cfg: dict | None = None, args: str = "") -> str:
+    return mcp_registry.handle_command(workspace, args)
 
 
 def _resolve_playbook(workspace: str, query: str, cfg: dict | None = None):
@@ -3798,7 +3795,6 @@ def _apply_session_mode(cfg: dict, session_mode: str) -> None:
         confirm_fn=confirm_tool,
         require_diff_approval=require_diff,
         policy=policy,
-        mcp_servers=cfg.get("mcp_servers"),
     )
     reader_agent.configure(workspace=cfg["workspace"], allowed_roots=allowed_roots)
     shell_agent.configure(
@@ -4433,7 +4429,6 @@ def _chat():
                 auto_compact_threshold=auto_compact_threshold,
                 num_ctx=num_ctx,
                 agent_models=agent_models,
-                mcp_servers=cfg.get("mcp_servers"),
             )
             console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
@@ -4492,8 +4487,8 @@ def _chat():
             memory.update_context(cfg["workspace"], user_input)
             continue
 
-        if cmd == "/mcp":
-            ai_reply = _build_mcp_reply(cfg["workspace"], cfg)
+        if cmd == "/mcp" or cmd.startswith("/mcp "):
+            ai_reply = _build_mcp_reply(cfg["workspace"], cfg, user_input.strip()[len("/mcp"):].strip())
             console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
@@ -5727,11 +5722,14 @@ def _confirm_tool(tool_name: str, args: dict) -> bool:
         "create_file":   ("Overwrite file", "yellow"),
         "edit_file":     ("Edit file", "yellow"),
         "update_markdown_file": ("Edit markdown file", "yellow"),
+        "mcp_call":      ("Call MCP tool", "yellow"),
     }
     label, _colour = _LABELS.get(tool_name, (tool_name, "yellow"))
 
     if tool_name == "move_file":
         detail = f"{args.get('src', '?')}  →  {args.get('dest', '?')}"
+    elif tool_name == "mcp_call":
+        detail = f"{args.get('server', '?')} / {args.get('tool', '?')}"
     else:
         detail = args.get("path", "?")
 
@@ -5745,6 +5743,9 @@ def _confirm_tool(tool_name: str, args: dict) -> bool:
     elif tool_name == "move_file":
         preview = _build_move_preview(args.get("src", ""), args.get("dest", ""))
         title = "Destructive operation"
+    elif tool_name == "mcp_call":
+        preview = "Arguments:\n" + json.dumps(mcp_registry.mask(args.get("arguments") or {}), indent=2)[:2000]
+        title = "MCP tool call (not on the free list)"
     else:
         title = "Destructive operation"
 
@@ -6026,7 +6027,7 @@ def _print_help(extra_commands=None):
         ("/build [--mode X]", "Run all approved pending workflow steps from the active plan"),
         ("/test [cmd]",   "Run a test command in the workspace (defaults to `pytest`)"),
         ("/playbooks",    "List available project playbooks and their starter stacks"),
-        ("/mcp",          "List MCP profiles and their local fallback tool paths"),
+        ("/mcp",          "MCP servers: list, test, tools, on/off, trust, import, call"),
         ("/logs [name]",  "Inspect `.mitra` logs such as history, trace, errors, decisions, or tasks"),
         ("/permissions",  "Show current execution policy, workspace scope, and tool restrictions"),
         ("/resume",       "Show the saved session summary, plan state, undo state, and recent activity"),

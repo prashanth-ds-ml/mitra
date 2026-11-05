@@ -16,3 +16,7 @@ bench/runs/
 
 # bench Ollama server log (local paths, not a result)
 results/ollama-bench.log
+
+# Mitra runtime files (logs, trimmed MCP outputs)
+.mitra/logs/
+.mitra/mcp-output/

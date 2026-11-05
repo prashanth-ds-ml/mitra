@@ -47,35 +47,6 @@ _DEFAULT_PLUGIN_DIRS = [
     "plugins",
     ".mitra/plugins",
 ]
-_DEFAULT_MCP_SERVERS = [
-    {
-        "name": "filesystem",
-        "description": "Workspace file access through MCP-compatible filesystem servers.",
-        "fallback": "Built-in filesystem tools",
-        "transport": "local-fallback",
-        "command": "python",
-        "args": ["-m", "app.mcp_servers.filesystem"],
-        "enabled": True,
-    },
-    {
-        "name": "git",
-        "description": "Repository inspection through an MCP git server.",
-        "fallback": "Built-in git helpers",
-        "transport": "local-fallback",
-    },
-    {
-        "name": "sqlite",
-        "description": "Structured local memory through an MCP SQLite server.",
-        "fallback": "Built-in memory and trace storage",
-        "transport": "local-fallback",
-    },
-    {
-        "name": "context7",
-        "description": "Reference lookup through a Context7-compatible MCP server.",
-        "fallback": "Built-in web and docs tools",
-        "transport": "local-fallback",
-    },
-]
 _MAX_INSTRUCTION_CHARS = 12000
 _BYTES_PER_GIB = 1024 ** 3
 
@@ -113,7 +84,6 @@ _DEFAULTS: dict = {
     "skill_dirs": list(_DEFAULT_SKILL_DIRS),
     "playbook_dirs": ["playbooks", ".mitra/playbooks"],
     "plugin_dirs": list(_DEFAULT_PLUGIN_DIRS),
-    "mcp_servers": list(_DEFAULT_MCP_SERVERS),
 }
 
 
@@ -755,10 +725,6 @@ def load(cwd: str | None = None, cli_overrides: dict | None = None) -> dict:
     if isinstance(raw_plugin_dirs, str):
         raw_plugin_dirs = [raw_plugin_dirs]
     cfg["plugin_dirs"] = list(raw_plugin_dirs)
-    raw_mcp_servers = cfg.get("mcp_servers") or []
-    if isinstance(raw_mcp_servers, dict):
-        raw_mcp_servers = [raw_mcp_servers]
-    cfg["mcp_servers"] = list(raw_mcp_servers)
 
     return cfg
 

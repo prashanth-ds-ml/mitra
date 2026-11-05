@@ -69,8 +69,9 @@ The same loop runs the terminal assistant (M2), the plan runner (M3) and the ben
 - [ ] Release v0.1 + post: "Cutting the agent prompt from ~12K to ~3K tokens"
 
 ## M2 Terminal assistant (`mitra`)
+- [x] Code renamed CodeMitra -> Mitra (files, config, `.mitra/`, banner); 615 tests pass (2026-11-05)
 Design, ability list and what happens to local-codex's code: [M2_PLAN.md](M2_PLAN.md).
-- [ ] Spike: official MCP SDK vs `langchain-mcp-adapters` with Context7 over stdio on Windows; choice in DECISIONS
+- [x] MCP SDK choice: official `mcp` 2.3.0, tested on Windows against a stdio server (D-030, F-008) (2026-11-05)
 - [ ] `main.py` split into a REPL shell + `app/commands/`; commands outside the v1 list removed; tests for every kept command
 - [ ] Chat on the M1 loop: explain with `file:line`, find, edit, run, fix loop
 - [ ] Modes: ask each time / auto-edit / plan only (read-only); diff approval screen
@@ -79,9 +80,9 @@ Design, ability list and what happens to local-codex's code: [M2_PLAN.md](M2_PLA
 - [ ] `/model`, `/context`, `/think`; prompt tokens and context use in the status line, warning before the limit
 - [ ] Project notes (AGENTS.md / CLAUDE.md) within the byte budget; skills loaded on demand (FastAPI, LangGraph, Next.js, uv on Windows)
 - [ ] `/doctor`: free RAM, GPU/VRAM, Ollama up, model loaded, context really applied
-- [ ] MCP client (D-028): stdio + Streamable HTTP, standard `mcpServers` config (`.mitra/mcp.json`), `/mcp` list / on / off / test / import (from Claude Code)
-- [ ] MCP safety: read tools free, every write tool asks (even in auto-edit), no write tools in unattended runs, secrets never in prompt or logs, every call logged and timed, big results trimmed
-- [ ] First servers connected and tested on Windows: Git, Context7, AWS Documentation
+- [x] MCP client (D-028): stdio + Streamable HTTP, standard `mcpServers` config (`.mitra/mcp.json`), `/mcp` list / on / off / test / import (from Claude Code) / trust / call (2026-11-05)
+- [x] MCP safety: read tools free, every write tool asks (even in auto-edit), refused when no one can approve, secrets masked in results and logs, every call logged and timed, big results trimmed (2026-11-05)
+- [ ] Day-one servers started and tested on Windows with real packages: git, GitHub, Context7, filesystem, Semgrep (configured as defaults 2026-11-05; first real start needs the user's OK to download them); versions pinned after
 - [ ] local-codex parts not in the v1 list archived (git history), per M2_PLAN.md
 - [ ] Fresh-clone install on Windows; Linux CI blocking
 - [ ] Used for a week on small real tasks in my projects; problems logged in ERROR_LOG and fixed

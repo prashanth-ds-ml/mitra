@@ -8,6 +8,8 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-013 | 2026-11-05 | M2 | Medium | new test | `env_commands` with a quoted path failed on Windows: non-POSIX split kept the quotes | closed | F-009 |
+| E-012 | 2026-11-05 | M2 | High | code review | local-codex MCP client could not talk to real MCP servers (`Content-Length` framing; MCP stdio is one JSON message per line), started a process per call, had no read timeout; built-in `read_file`/`list_directory` went through it | closed | F-008 |
 | E-011 | 2026-10-26 | M0 | High | live run (Aider overhead) | Bench counted lookups (`POST /api/show`) as model calls and took the first call (OpenCode's title call, 0 tools) as the work call; Codex's Responses-API requests showed 0 messages and 0 system chars | closed | F-007 |
 | E-010 | 2026-10-26 | M0 | High | live run (Codex overhead) | Codex exited at once: per-run `CODEX_HOME` folder was never created | closed | F-006 |
 | E-009 | 2026-10-26 | M0 | Medium | live run (second agent in a row) | Preflight blocked every run after the first: the loaded model's RAM was counted again as needed | closed | F-005 |
@@ -37,6 +39,31 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-013: Quoted path in `env_commands` not found on Windows
+
+- **Date found:** 2026-11-05 · **Milestone:** M2 · **Severity:** Medium · **Found by:** `test_resolve_expands_workspace_env_commands_and_env`
+- **Status:** closed
+
+**What happened:** an env command like `"C:\...\python.exe" -c "..."` failed with `FileNotFoundError`.
+**Root cause:** `shlex.split(..., posix=False)` keeps the surrounding quotes in each token.
+**Fix:** F-009.
+**Regression test:** `test_resolve_expands_workspace_env_commands_and_env`.
+**Lesson?** L-019 (portability) covers it.
+
+### E-012: local-codex MCP client could not reach real MCP servers
+
+- **Date found:** 2026-11-05 · **Milestone:** M2 · **Severity:** High · **Found by:** code review before connecting servers
+- **Status:** closed
+
+**What happened:** `app/mcp.py` framed messages with `Content-Length` headers (the LSP style), so it only worked with
+its own `app/mcp_servers/filesystem.py`. It also started a new process for every tool call, and its blocking `readline`
+had no timeout. Built-in `read_file` and `list_directory` were routed through it, so every file read started a process.
+**Root cause:** hand-written protocol code, tested only against its own server.
+**Fix:** F-008.
+**Regression test:** `tests/test_mcp.py` (25 tests against a fake server built with the official SDK, including
+timeouts), `TestReadFile.test_reads_locally_without_starting_an_mcp_server`.
+**Lesson?** L-024.
 
 ### E-011: Lookups counted as model calls; title call taken as the work call; Codex requests unread
 

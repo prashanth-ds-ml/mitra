@@ -24,7 +24,8 @@ dependencies = [
     "PyYAML",
     "requests",
     "pydantic",
-    "tenacity"
+    "tenacity",
+    "mcp>=2.3.0,<3"
 ]
 
 [project.optional-dependencies]

@@ -295,96 +295,61 @@ class TestListDirectory:
         result = filesystem.list_directory.invoke({"path": "."})
         assert "inside.txt" in result
 
-    def test_routes_through_mcp_when_configured(self, tmp_path, monkeypatch):
-        filesystem.configure(
-            workspace=str(tmp_path),
-            mcp_servers=[
-                {
-                    "name": "filesystem",
-                    "description": "Workspace file access through MCP-compatible filesystem servers.",
-                    "fallback": "Built-in filesystem tools",
-                    "command": "python",
-                    "args": ["-m", "app.mcp_servers.filesystem"],
-                    "enabled": True,
-                }
-            ],
-        )
-        captured = {}
-
-        def fake_call_tool(server, workspace, tool_name, arguments):
-            captured["server"] = server.name
-            captured["tool"] = tool_name
-            captured["workspace"] = workspace
-            captured["arguments"] = arguments
-            return SimpleNamespace(ok=True, text="remote listing")
-
-        monkeypatch.setattr(filesystem.mcp_registry, "call_tool", fake_call_tool)
+    def test_lists_locally_without_starting_an_mcp_server(self, tmp_path, monkeypatch):
+        (tmp_path / "a.txt").write_text("x", encoding="utf-8")
+        monkeypatch.setattr(filesystem.mcp_registry, "call_tool", lambda *a, **k: pytest.fail("MCP was called"))
 
         result = filesystem.list_directory.invoke({"path": str(tmp_path)})
 
-        assert result == "remote listing"
-        assert captured["server"] == "filesystem"
-        assert captured["tool"] == "list_files"
+        assert "a.txt" in result
 
 
 class TestReadFile:
-    def test_routes_through_mcp_when_configured(self, tmp_path, monkeypatch):
+    def test_reads_locally_without_starting_an_mcp_server(self, tmp_path, monkeypatch):
         target = tmp_path / "note.txt"
         target.write_text("local content", encoding="utf-8")
-        filesystem.configure(
-            workspace=str(tmp_path),
-            mcp_servers=[
-                {
-                    "name": "filesystem",
-                    "description": "Workspace file access through MCP-compatible filesystem servers.",
-                    "fallback": "Built-in filesystem tools",
-                    "command": "python",
-                    "args": ["-m", "app.mcp_servers.filesystem"],
-                    "enabled": True,
-                }
-            ],
-        )
-        captured = {}
-
-        def fake_call_tool(server, workspace, tool_name, arguments):
-            captured["server"] = server.name
-            captured["tool"] = tool_name
-            captured["workspace"] = workspace
-            captured["arguments"] = arguments
-            return SimpleNamespace(ok=True, text="remote content")
-
-        monkeypatch.setattr(filesystem.mcp_registry, "call_tool", fake_call_tool)
+        monkeypatch.setattr(filesystem.mcp_registry, "call_tool", lambda *a, **k: pytest.fail("MCP was called"))
 
         result = filesystem.read_file.invoke({"path": str(target)})
 
-        assert result == "remote content"
-        assert captured["tool"] == "read_file"
+        assert result == "local content"
 
-    def test_falls_back_when_mcp_call_fails(self, tmp_path, monkeypatch):
-        target = tmp_path / "note.txt"
-        target.write_text("local content", encoding="utf-8")
-        filesystem.configure(
-            workspace=str(tmp_path),
-            mcp_servers=[
-                {
-                    "name": "filesystem",
-                    "description": "Workspace file access through MCP-compatible filesystem servers.",
-                    "fallback": "Built-in filesystem tools",
-                    "command": "python",
-                    "args": ["-m", "app.mcp_servers.filesystem"],
-                    "enabled": True,
-                }
-            ],
-        )
 
-        def fake_call_tool(server, workspace, tool_name, arguments):
-            return SimpleNamespace(ok=False, text="", message="failed")
+class TestMcpTools:
+    def test_mcp_call_asks_through_confirm_fn(self, tmp_path, monkeypatch):
+        asked = {}
+
+        def confirm(tool_name, args):
+            asked["tool_name"], asked["args"] = tool_name, args
+            return False
+
+        def fake_call_tool(workspace, server, tool, arguments, approve=None):
+            approved = approve(None, tool, arguments)
+            return SimpleNamespace(text=f"approved={approved}")
+
+        filesystem.configure(workspace=str(tmp_path), confirm_fn=confirm)
+        monkeypatch.setattr(filesystem.mcp_registry, "call_tool", fake_call_tool)
+
+        result = filesystem.mcp_call.invoke({"server": "github", "tool": "create_issue", "arguments": '{"title": "t"}'})
+
+        assert result == "approved=False"
+        assert asked["tool_name"] == "mcp_call"
+        assert asked["args"] == {"server": "github", "tool": "create_issue", "arguments": {"title": "t"}}
+
+    def test_mcp_call_without_confirm_fn_never_approves(self, tmp_path, monkeypatch):
+        def fake_call_tool(workspace, server, tool, arguments, approve=None):
+            return SimpleNamespace(text=f"approved={approve(None, tool, arguments)}")
 
         monkeypatch.setattr(filesystem.mcp_registry, "call_tool", fake_call_tool)
 
-        result = filesystem.read_file.invoke({"path": str(target)})
+        assert filesystem.mcp_call.invoke({"server": "s", "tool": "t", "arguments": {}}) == "approved=False"
 
-        assert "local content" in result
+    def test_mcp_call_rejects_bad_json(self):
+        result = filesystem.mcp_call.invoke({"server": "s", "tool": "t", "arguments": "{not json"})
+        assert result.startswith("✗ arguments must be a JSON object")
+
+    def test_mcp_tools_are_on_by_default(self):
+        assert {"mcp_find", "mcp_call"} <= filesystem._DEFAULT_TOOLS
 
 
 class TestSearchText:

@@ -1189,7 +1189,6 @@ class TestOperatorReplies:
                 "tester": "qwen2.5-coder:7b",
                 "docs": "qwen2.5-coder:7b",
             },
-            mcp_servers=[{"name": "filesystem", "description": "Workspace file access", "fallback": "Built-in filesystem tools"}],
         )
         assert "Work mode" in reply
         assert "mentor" in reply
