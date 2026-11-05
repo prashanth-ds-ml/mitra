@@ -16,7 +16,7 @@ runner = CliRunner()
 def test_build_idea_llm_prefers_best_local_model(monkeypatch):
     captured = {}
 
-    monkeypatch.setattr("app.main.config.get_local_model_inventory", lambda: ["inventory"])
+    monkeypatch.setattr("app.main.config.get_local_model_inventory", lambda **_kw: ["inventory"])
     monkeypatch.setattr("app.main.config.get_gpu_vram_gib", lambda: 8.0)
     monkeypatch.setattr("app.main.config.get_total_system_memory_gib", lambda: 24.0)
     monkeypatch.setattr("app.main.model_advisor.get_best_local_model", lambda inventory, vram_gib, ram_gib: "qwen3.5:latest")

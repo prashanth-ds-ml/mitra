@@ -8,6 +8,8 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-015 | 2026-11-05 | M2 | High | user (terminal test) | A bare `/run` went to the model, which used `qwen3:14b` (hard-coded role default the user does not have): 404. Startup also asked for an Ollama cloud key though Mitra is local-only | closed | F-011 |
+| E-014 | 2026-11-05 | M2 | High | user (terminal test) | `! mkdir snake_game` refused: "command 'mkdir' denied by policy" (default policy ends with deny `*`; `mkdir` is also a shell built-in) | closed | F-010 |
 | E-013 | 2026-11-05 | M2 | Medium | new test | `env_commands` with a quoted path failed on Windows: non-POSIX split kept the quotes | closed | F-009 |
 | E-012 | 2026-11-05 | M2 | High | code review | local-codex MCP client could not talk to real MCP servers (`Content-Length` framing; MCP stdio is one JSON message per line), started a process per call, had no read timeout; built-in `read_file`/`list_directory` went through it | closed | F-008 |
 | E-011 | 2026-10-26 | M0 | High | live run (Aider overhead) | Bench counted lookups (`POST /api/show`) as model calls and took the first call (OpenCode's title call, 0 tools) as the work call; Codex's Responses-API requests showed 0 messages and 0 system chars | closed | F-007 |
@@ -39,6 +41,33 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-015: Unknown slash command went to the model, which used a model the user does not have
+
+- **Date found:** 2026-11-05 · **Milestone:** M2 · **Severity:** High · **Found by:** user, first terminal test
+- **Status:** closed
+
+**What happened:** typing `/run` (no argument) fell through to the chat model; routing picked the `planner` role,
+whose default model was `qwen3:14b`, not installed: `model 'qwen3:14b' not found (status code: 404)`. Startup also
+prompted for an Ollama cloud API key every time.
+**Root cause:** local-codex hard-coded per-role models (`qwen3:14b`, `qwen2.5-coder:14b`, `qwen2.5-coder:7b`) in
+`config.py` and `agents/registry.py`; unknown slash commands had no handler; the cloud-key prompt predates D-025.
+**Fix:** F-011.
+**Regression test:** `test_no_role_defaults_to_a_model_the_user_may_not_have`, `test_load_exposes_default_agent_model_mapping`,
+`TestSlashCommands`.
+**Lesson?** L-025.
+
+### E-014: Commands the user typed with `!` were blocked by the model's allow-list
+
+- **Date found:** 2026-11-05 · **Milestone:** M2 · **Severity:** High · **Found by:** user, first terminal test
+- **Status:** closed
+
+**What happened:** `! mkdir snake_game` printed `Permission denied: command 'mkdir' denied by policy`.
+**Root cause:** typed commands went through the same allow-list and deny-first policy as model-run commands, and
+were split and started without a shell, so built-ins like `mkdir` could not run anyway.
+**Fix:** F-010.
+**Regression test:** `TestTypedByUser` in `tests/test_shell.py` (5 tests, incl. the model path still blocked).
+**Lesson?** L-025.
 
 ### E-013: Quoted path in `env_commands` not found on Windows
 

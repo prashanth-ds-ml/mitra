@@ -258,3 +258,42 @@ class TestRender:
         r = ShellResult(command="sleep 999", cwd=".", exit_code=1, output_lines=[], timed_out=True)
         panel = shell_agent.render(r)
         assert panel is not None
+
+
+# ── Commands the user typed (`! <command>`, E-014) ───────────────────────────
+
+class TestTypedByUser:
+    def test_user_typed_mkdir_runs_in_the_users_shell(self, tmp_path):
+        result = shell_agent.execute("mkdir snake_game", cwd=str(tmp_path), typed_by_user=True)
+
+        assert result.ok, result.output_lines
+        assert (tmp_path / "snake_game").is_dir()
+
+    def test_same_command_from_the_model_is_still_blocked(self, tmp_path):
+        result = shell_agent.execute("mkdir snake_game", cwd=str(tmp_path))
+
+        assert not result.ok
+        assert "Permission denied" in "\n".join(result.output_lines)
+        assert not (tmp_path / "snake_game").exists()
+
+    def test_user_typed_command_skips_the_confirm_step(self, tmp_path):
+        asked = []
+        shell_agent.configure(workspace=str(tmp_path), stream_to_console=False,
+                              confirm_fn=lambda *a, **k: asked.append(a) or None)
+
+        result = shell_agent.execute("python --version", cwd=str(tmp_path), typed_by_user=True)
+
+        assert result.ok and asked == []
+
+    def test_user_typed_command_still_stays_inside_the_workspace(self, tmp_path):
+        outside = tmp_path.parent
+
+        result = shell_agent.execute("python --version", cwd=str(outside), typed_by_user=True)
+
+        assert not result.ok
+
+    def test_user_typed_command_still_times_out(self, tmp_path):
+        result = shell_agent.execute('python -c "import time; time.sleep(10)"', cwd=str(tmp_path),
+                                     timeout=1, typed_by_user=True)
+
+        assert not result.ok

@@ -32,7 +32,7 @@ def test_resolve_agent_models_prefers_configured_overrides():
 
     assert resolved["planner"] == "custom-planner"
     assert resolved["coder"] == "custom-coder"
-    assert resolved["reviewer"] == registry.default_agent_models()["reviewer"]
+    assert resolved["reviewer"] == "chat-local"  # no override: the picked model (E-015)
 
 
 def test_summarize_agent_models_groups_roles():
@@ -53,3 +53,10 @@ def test_summarize_agent_models_groups_roles():
     assert "reviewer `b`" in summary
     assert "coder `c`" in summary
     assert "docs `d`" in summary
+
+
+def test_no_role_defaults_to_a_model_the_user_may_not_have():
+    """E-015: roles defaulted to qwen3:14b / qwen2.5-coder:14b; a bare /run then hit a 404 from Ollama."""
+    resolved = registry.resolve_agent_models({}, chat_model="qwen3.5:4b", codegen_model="", cloud_codegen_enabled=False)
+
+    assert set(resolved.values()) == {"qwen3.5:4b"}

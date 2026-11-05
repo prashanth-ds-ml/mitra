@@ -54,15 +54,15 @@ _DEFAULTS: dict = {
     "model": "",          # legacy fallback; prefer local_model
     "local_model": "",    # empty = prompt user to pick at startup
     "codegen_model": "",  # empty = use local_model for code generation too
-    "agent_models": {
-        "planner": "qwen3:14b",
-        "prd": "qwen3:14b",
-        "task": "qwen3:14b",
-        "coder": "qwen2.5-coder:14b",
-        "tester": "qwen2.5-coder:7b",
-        "reviewer": "qwen3:14b",
-        "docs": "qwen2.5-coder:7b",
-        "decision": "qwen3:14b",
+    "agent_models": {  # empty = the model you picked (E-015)
+        "planner": "",
+        "prd": "",
+        "task": "",
+        "coder": "",
+        "tester": "",
+        "reviewer": "",
+        "docs": "",
+        "decision": "",
     },
     "temperature": 0.2,
     "session_mode": "approve",
@@ -94,6 +94,8 @@ class LocalModelInfo:
     size_gib: float | None = None
     recommended: bool = True
     placement: str = "gpu"   # "gpu" | "split" | "cpu"
+    capabilities: tuple[str, ...] = ()
+    compatible: bool = True  # a chat model with native tool calling (or unknown)
 
 
 @dataclass(frozen=True)
@@ -525,8 +527,80 @@ def get_recommended_model_budget_gib() -> float | None:
     return round(max(2.0, total_gib * 0.5), 1)
 
 
-def get_local_model_inventory() -> list[LocalModelInfo]:
-    """Return local Ollama models with parsed sizes and hardware guidance."""
+REQUIRED_CAPABILITIES = ("completion", "tools")
+MIN_PARAMETERS = 1_500_000_000   # smaller models cannot drive a coding agent
+MIN_CONTEXT = 32_768             # Mitra's prompt + code + tool results need room
+_facts_cache: dict[str, dict | None] = {}
+
+
+def _ollama_base_url() -> str:
+    host = (os.environ.get("OLLAMA_HOST") or "127.0.0.1:11434").strip()
+    if not host.startswith(("http://", "https://")):
+        host = "http://" + host
+    return host.rstrip("/")
+
+
+def get_model_facts(name: str) -> dict | None:
+    """What Ollama reports for a model: capabilities, parameter count, context length. None if unknown."""
+    if name in _facts_cache:
+        return _facts_cache[name]
+    facts: dict | None = None
+    try:
+        import json as _json
+        import urllib.request
+
+        req = urllib.request.Request(
+            f"{_ollama_base_url()}/api/show",
+            data=_json.dumps({"model": name}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+        info = data.get("model_info") or {}
+        context = next((v for k, v in info.items() if k.endswith(".context_length") and isinstance(v, int)), None)
+        params = info.get("general.parameter_count")
+        facts = {
+            "capabilities": tuple(str(c) for c in data.get("capabilities") or ()),
+            "parameters": params if isinstance(params, int) else None,
+            "context": context,
+        }
+    except Exception:
+        facts = None
+    _facts_cache[name] = facts
+    return facts
+
+
+def get_model_capabilities(name: str) -> tuple[str, ...] | None:
+    facts = get_model_facts(name)
+    return facts["capabilities"] if facts else None
+
+
+def compatibility_problem(facts: dict | None) -> str | None:
+    """Why a model cannot run Mitra, or None if it can (unknown facts get the benefit of the doubt)."""
+    if not facts:
+        return None
+    caps = facts.get("capabilities") or ()
+    if "completion" not in caps:
+        return "not a chat model"
+    if "tools" not in caps:
+        return "no tool calling"
+    if facts.get("parameters") and facts["parameters"] < MIN_PARAMETERS:
+        return f"too small ({facts['parameters'] / 1e9:.1f}B parameters)"
+    if facts.get("context") and facts["context"] < MIN_CONTEXT:
+        return f"context too short ({facts['context'] // 1024}K)"
+    return None
+
+
+def is_compatible_model(facts: dict | None) -> bool:
+    return compatibility_problem(facts) is None
+
+
+def get_local_model_inventory(*, include_incompatible: bool = False) -> list[LocalModelInfo]:
+    """Return local Ollama models with parsed sizes and hardware guidance.
+
+    Only models Mitra can run (chat + native tool calling) are returned unless include_incompatible is True;
+    embedding, OCR and other models that cannot call tools are left out.
+    """
     try:
         result = subprocess.run(
             ["ollama", "list"],
@@ -550,6 +624,11 @@ def get_local_model_inventory() -> list[LocalModelInfo]:
             placement = get_model_placement(size_gib, vram_gib)
             # Recommended = fits in GPU or is worth splitting (not pure CPU)
             recommended = placement in ("gpu", "split")
+            facts = get_model_facts(name)
+            caps = facts["capabilities"] if facts else None
+            compatible = is_compatible_model(facts)
+            if not compatible and not include_incompatible:
+                continue
             models.append(
                 LocalModelInfo(
                     name=name,
@@ -557,6 +636,8 @@ def get_local_model_inventory() -> list[LocalModelInfo]:
                     size_gib=size_gib,
                     recommended=recommended,
                     placement=placement,
+                    capabilities=caps or (),
+                    compatible=compatible,
                 )
             )
         return models

@@ -5,15 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+# Empty = use the model the user picked (E-015). Set a role in mitra.toml [agent_models] to override.
 _DEFAULT_AGENT_MODELS = {
-    "planner": "qwen3:14b",
-    "prd": "qwen3:14b",
-    "task": "qwen3:14b",
-    "coder": "qwen2.5-coder:14b",
-    "tester": "qwen2.5-coder:7b",
-    "reviewer": "qwen3:14b",
-    "docs": "qwen2.5-coder:7b",
-    "decision": "qwen3:14b",
+    "planner": "",
+    "prd": "",
+    "task": "",
+    "coder": "",
+    "tester": "",
+    "reviewer": "",
+    "docs": "",
+    "decision": "",
 }
 
 

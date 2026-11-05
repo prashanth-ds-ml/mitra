@@ -162,9 +162,9 @@ def test_write_tool_is_refused_without_approval_and_runs_with_it(workspace):
 
 
 def test_timeout_is_reported_and_the_server_keeps_working(workspace):
-    write_user_servers({"fake": fake_entry(timeout_s=1)})
+    write_user_servers({"fake": fake_entry(timeout_s=2)})
 
-    slow = mcp.call_tool(workspace, "fake", "slow", {"seconds": 5})
+    slow = mcp.call_tool(workspace, "fake", "slow", {"seconds": 8})
     after = mcp.call_tool(workspace, "fake", "echo", {"text": "still here"})
 
     assert not slow.ok and "timed out" in slow.text

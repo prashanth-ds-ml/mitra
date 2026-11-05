@@ -15,6 +15,7 @@ import pathlib
 import platform
 import re
 import shlex
+import shutil
 import subprocess
 import threading
 import itertools
@@ -514,17 +515,30 @@ def _run_builtin(command: str, cwd: str) -> ShellResult | None:
     return None
 
 
+def _user_shell_args(command: str) -> list[str]:
+    """A command the user typed runs in their shell, so built-ins like `mkdir`, `dir` and pipes work."""
+    if platform.system() == "Windows":
+        exe = shutil.which("pwsh") or shutil.which("powershell") or "powershell"
+        return [exe, "-NoLogo", "-NoProfile", "-Command", command]
+    return [os.environ.get("SHELL") or "/bin/sh", "-c", command]
+
+
 def execute(
     command: str,
     cwd: str | None = None,
     timeout: int | None = None,
     console: Console | None = None,
+    *,
+    typed_by_user: bool = False,
 ) -> ShellResult:
     """
     Run *command* in *cwd*, stream output, and return a ShellResult.
 
     - Output is streamed line-by-line to *console* if provided and stream_to_console is True.
     - Process is killed after *timeout* seconds (default: _config.default_timeout).
+    - typed_by_user: the user typed it (`! <command>`), so it runs in their shell without the allow-list, the policy
+      or a confirm step; it still runs only inside the workspace and under the timeout (E-014). Commands the model
+      asks for always go through the allow-list, policy, mode and approval.
     """
     resolved_cwd = _resolve_cwd(cwd)
     timeout = timeout if timeout is not None else _config.default_timeout
@@ -537,7 +551,9 @@ def execute(
     if builtin_result is not None:
         return builtin_result
 
-    if _config.session_mode in {"read-only", "plan"}:
+    if typed_by_user:
+        pass  # the user is the author: no mode, policy or confirm checks
+    elif _config.session_mode in {"read-only", "plan"}:
         return ShellResult(
             command=command,
             cwd=resolved_cwd,
@@ -548,12 +564,12 @@ def execute(
             ],
         )
 
-    # Permission check
-    if err := _check_executable(command):
+    # Permission check (model-run commands only)
+    if not typed_by_user and (err := _check_executable(command)):
         return ShellResult(command=command, cwd=resolved_cwd, exit_code=1, output_lines=[f"✗ Permission denied: {err}"])
 
     # User confirmation — confirm_fn may return an amended command string or None (denied)
-    if _config.confirm_fn is not None:
+    if _config.confirm_fn is not None and not typed_by_user:
         approved_command = _confirm_command(command, resolved_cwd)
         if approved_command is None:
             return ShellResult(command=command, cwd=resolved_cwd, exit_code=1, output_lines=["Skipped: user declined"], denied=True)
@@ -578,7 +594,7 @@ def execute(
 
     try:
         proc = subprocess.Popen(
-            _split_command(command),
+            _user_shell_args(command) if typed_by_user else _split_command(command),
             cwd=resolved_cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

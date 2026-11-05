@@ -8,6 +8,8 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-011 | 2026-11-05 | E-015 | Role models default to the picked model; unknown slash commands answered locally; no cloud-key prompt | `app/config.py`, `app/agents/registry.py`, `app/main.py` | `test_no_role_defaults_to_a_model_the_user_may_not_have` | works |
+| F-010 | 2026-11-05 | E-014 | `execute(typed_by_user=True)`: user's shell (PowerShell / sh), no allow-list, policy or confirm; still workspace-only with a timeout | `app/agents/shell.py`, `app/main.py` | `TestTypedByUser` | works |
 | F-009 | 2026-11-05 | E-013 | Strip quotes from tokens after the Windows split | `app/mcp.py` | `test_resolve_expands_workspace_env_commands_and_env` | works |
 | F-008 | 2026-11-05 | E-012 | New MCP client on the official SDK (stdio + HTTP, long-lived sessions, timeouts, approvals, masking, trimming, call log); built-in file tools read locally; custom server removed | `app/mcp.py`, `app/agents/filesystem.py`, `app/main.py`, `app/config.py` | `tests/test_mcp.py` | works |
 | F-007 | 2026-10-26 | E-011 | Count only generation endpoints; overhead = first call with tools (`sends_tools = false` for Aider); proxy reads Responses API | `bench/run.py`, `bench/proxy.py`, `bench/configs/aider.toml` | `test_summarize_counts_only_generation_calls` + 2 | works |
@@ -34,6 +36,19 @@ again.
 ```
 
 ## Entries
+
+### F-011: No hard-coded models (E-015)
+**Change:** every role in `agent_models` defaults to empty, which resolves to the model picked at startup; `mitra.toml`
+can still set one per role. Unknown slash commands print "Unknown command" instead of reaching the model. The startup
+cloud-key prompt is gone (a key in config still works).
+**Test:** `test_no_role_defaults_to_a_model_the_user_may_not_have`; 3 tests that pinned `qwen3:14b` updated.
+
+### F-010: Typed commands run in the user's shell (E-014)
+**Change:** `shell.execute(..., typed_by_user=True)` from `! <command>`: runs through PowerShell (Windows) or `$SHELL`
+without the allow-list, policy, mode or confirm step, still only inside the workspace and under the timeout.
+Model-run commands are unchanged.
+**Test:** `TestTypedByUser` (5). A first attempt edited the matching lines in `start_background` instead of `execute`
+(the same code appears twice); the tests caught it before commit (L-025).
 
 ### F-009: Windows quotes in env commands (E-013)
 **Change:** after `shlex.split(posix=False)`, remove one pair of matching quotes around a token.

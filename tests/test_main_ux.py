@@ -859,7 +859,7 @@ class TestOperatorReplies:
         monkeypatch.setattr(
             config,
             "get_local_model_inventory",
-            lambda: [
+            lambda **_kw: [
                 SimpleNamespace(name="qwen3.5:latest", size_text="6.6 GB", recommended=True, placement="gpu"),
                 SimpleNamespace(name="gpt-oss:20b", size_text="13 GB", recommended=False, placement="cpu"),
             ],
@@ -925,7 +925,7 @@ class TestOperatorReplies:
         monkeypatch.setattr(
             config,
             "get_local_model_inventory",
-            lambda: [SimpleNamespace(name="qwen3.5:latest", size_text="6.6 GB", recommended=True)],
+            lambda **_kw: [SimpleNamespace(name="qwen3.5:latest", size_text="6.6 GB", recommended=True)],
         )
         monkeypatch.setattr(config, "get_total_system_memory_gib", lambda: 23.6)
         monkeypatch.setattr(config, "get_recommended_model_budget_gib", lambda: 11.8)
@@ -955,7 +955,7 @@ class TestOperatorReplies:
         monkeypatch.setattr(
             config,
             "get_local_model_inventory",
-            lambda: [
+            lambda **_kw: [
                 SimpleNamespace(name="gpt-oss:20b", size_text="13 GB", recommended=False, placement="cpu"),
                 SimpleNamespace(name="qwen2.5-coder:7b", size_text="4.7 GB", recommended=True, placement="gpu"),
                 SimpleNamespace(name="qwen3.5:4b", size_text="3.4 GB", recommended=True, placement="gpu"),
@@ -978,7 +978,7 @@ class TestOperatorReplies:
         monkeypatch.setattr(
             config,
             "get_local_model_inventory",
-            lambda: [SimpleNamespace(name="qwen3.5:latest", size_text="6.6 GB", recommended=True, placement="gpu")],
+            lambda **_kw: [SimpleNamespace(name="qwen3.5:latest", size_text="6.6 GB", recommended=True, placement="gpu")],
         )
         monkeypatch.setattr(config, "get_total_system_memory_gib", lambda: 23.6)
         monkeypatch.setattr(config, "get_recommended_model_budget_gib", lambda: 7.4)

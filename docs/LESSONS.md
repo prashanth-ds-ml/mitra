@@ -28,6 +28,7 @@ local-codex review and this project's planning. Add a lesson whenever an error c
 | L-020 | Benchmarks | The agent's environment must match the grader's: same `python` on PATH, same packages; check it with a test before any real run | E-006 |
 | L-021 | Git | `git diff` ignores untracked files; `git add -A` then `git diff --cached <start>` to capture everything an agent changed | E-007 |
 | L-022 | Tests | Any test that depends on prompt length asserts the prompt tokens Ollama reports; measure the size, never estimate it in a comment. A cut prompt is a void case, not a model failure | E-008 |
+| L-025 | Editing | When a scripted edit targets a line that appears more than once, anchor it inside the target function (find the function first, then the line) and assert the count; and treat the user's own typed input differently from model requests: the user is the author | E-014, E-015 |
 | L-024 | Protocols | Never hand-write a protocol client that has an official SDK; and test any client against a server you did not write, or it only proves it talks to itself | E-012 |
 | L-023 | Benchmarks | Fakes only prove what they imitate. Before a benchmark, run every agent config once for real (one call) and read its log: real agents call lookup endpoints, send title calls first, use other APIs (Responses) and need their own folders | E-010, E-011 |
 

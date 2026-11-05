@@ -6,7 +6,6 @@ import re
 import subprocess
 import sys
 import traceback
-import getpass
 from datetime import datetime
 
 import typer
@@ -157,14 +156,8 @@ plugin_dirs = ["plugins", ".mitra/plugins"]
 # MCP servers live in .mitra/mcp.json (project) and ~/.mitra/mcp.json (you); see /mcp
 
 [agent_models]
-planner = "qwen3:14b"
-prd = "qwen3:14b"
-task = "qwen3:14b"
-coder = "qwen2.5-coder:14b"
-tester = "qwen2.5-coder:7b"
-reviewer = "qwen3:14b"
-docs = "qwen2.5-coder:7b"
-decision = "qwen3:14b"
+# Optional: a different model per role (planner, coder, tester, reviewer, docs, ...).
+# Empty or missing = the model you picked at startup.
 """
 
 _DEFAULT_CLOUD_CODEGEN_MODEL = "kimi-k2.5:cloud"
@@ -280,12 +273,12 @@ def _print_phase0_config(cwd: str | None = None) -> None:
     console.print(value_table)
 
 
-def _print_phase0_models(cwd: str | None = None) -> None:
+def _print_phase0_models(cwd: str | None = None, show_all: bool = False) -> None:
     workspace = _resolve_phase0_workspace(cwd)
     cfg = config.load(cwd=str(workspace))
     logger = app_logs.setup_logging(str(workspace))
     ollama_ok, ollama_message = probe_ollama(cfg.get("ollama_local_base_url"))
-    inventory = config.get_local_model_inventory()
+    inventory = config.get_local_model_inventory(include_incompatible=show_all)
 
     logger.info("models command workspace=%s model_count=%s", workspace, len(inventory))
 
@@ -293,19 +286,24 @@ def _print_phase0_models(cwd: str | None = None) -> None:
         console.print(Panel(ollama_message if not ollama_ok else "No local models found.", title="Local Models", border_style="cyan"))
         return
 
-    table = Table(title="Local Models")
+    table = Table(title="Local Models" + ("" if show_all else " (compatible with Mitra)"))
     table.add_column("Model", style="cyan")
     table.add_column("Size", style="white")
     table.add_column("Placement", style="white")
     table.add_column("Recommended", style="white")
+    if show_all:
+        table.add_column("Mitra", style="white")
     for item in inventory:
-        table.add_row(
-            item.name,
-            item.size_text or "-",
-            item.placement,
-            "yes" if item.recommended else "no",
-        )
+        row = [item.name, item.size_text or "-", item.placement, "yes" if item.recommended else "no"]
+        if show_all:
+            problem = config.compatibility_problem(config.get_model_facts(item.name))
+            row.append("ok" if problem is None else f"hidden: {problem}")
+        table.add_row(*row)
     console.print(table)
+    if not show_all:
+        hidden = len(config.get_local_model_inventory(include_incompatible=True)) - len(inventory)
+        if hidden:
+            console.print(f"[dim]{hidden} more installed model(s) cannot run Mitra; `mitra models --all` shows why.[/dim]")
 
 
 def cmd_status(cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection.")) -> None:
@@ -318,9 +316,12 @@ def cmd_config(cwd: str | None = typer.Option(None, "--cwd", help="Start path fo
     _print_phase0_config(cwd)
 
 
-def cmd_models(cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection.")) -> None:
-    """List local Ollama models."""
-    _print_phase0_models(cwd)
+def cmd_models(
+    cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection."),
+    show_all: bool = typer.Option(False, "--all", help="Also list models Mitra cannot use, and why."),
+) -> None:
+    """List local Ollama models Mitra can use (chat + tool calling, >= 1.5B, >= 32K context)."""
+    _print_phase0_models(cwd, show_all=show_all)
 
 
 def cmd_test(command: str = typer.Argument("pytest"), cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection.")) -> None:
@@ -2992,8 +2993,17 @@ def _pick_model(cfg: dict) -> str:
     while True:
         inventory = config.get_local_model_inventory()
         if not inventory:
-            console.print("[red]No local Ollama models found. Run 'ollama pull <model>' first.[/red]")
+            console.print(
+                "[red]No compatible local Ollama models found. Mitra needs a chat model with tool calling, "
+                "e.g. 'ollama pull qwen3.5:4b'.[/red]"
+            )
             raise SystemExit(1)
+        incompatible = len(config.get_local_model_inventory(include_incompatible=True)) - len(inventory)
+        if incompatible > 0:
+            console.print(
+                f"[dim]  {incompatible} installed model(s) hidden: not a chat model with tool calling "
+                "(embedding, OCR, too small, or under 32K context). `mitra models --all` lists them.[/dim]"
+            )
 
         recommended_models = [model for model in inventory if model.recommended]
         hidden_models = [model for model in inventory if not model.recommended]
@@ -3092,15 +3102,13 @@ def _resolve_cloud_api_key(cfg: dict, prompt_fn=None) -> str:
     if configured:
         return configured
 
-    prompt_fn = prompt_fn or getpass.getpass
-    console.print(
-        "[dim]Optional: enter an Ollama API key to enable cloud code generation. "
-        "Press Enter to stay local-only.[/dim]"
-    )
-    try:
-        return (prompt_fn("Ollama API key (optional): ") or "").strip()
-    except (EOFError, KeyboardInterrupt):
-        return ""
+    # Mitra is local-only (D-025): no startup prompt. A key set in config is still honoured.
+    if prompt_fn is not None:
+        try:
+            return (prompt_fn("Ollama API key (optional): ") or "").strip()
+        except (EOFError, KeyboardInterrupt):
+            return ""
+    return ""
 
 
 def _print_hint_bar() -> None:
@@ -4190,14 +4198,14 @@ def _confirm_shell(command: str, cwd: str) -> str | None:
 
 
 def _cmd_run(command: str, workspace: str | None = None) -> None:
-    """/run <command> — execute a command directly in the workspace."""
+    """`! <command>`: run a command the user typed, in their shell, inside the workspace."""
     if not command:
-        console.print("[dim]Usage: [cyan]/run <command>[/cyan]  e.g. /run python main.py[/dim]")
+        console.print("[dim]Usage: [cyan]! <command>[/cyan]  e.g. ! pytest -q[/dim]")
         return
     global _LAST_SHELL_COMMAND
     _LAST_SHELL_COMMAND = command
     _print_progress_message("Running shell command", command, color="blue")
-    result = shell_agent.execute(command=command, cwd=workspace, console=console)
+    result = shell_agent.execute(command=command, cwd=workspace, console=console, typed_by_user=True)
     console.print(shell_agent.render(result))
 
 

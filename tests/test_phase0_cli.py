@@ -56,7 +56,7 @@ def test_models_command_supports_slash_alias(monkeypatch, tmp_path):
     monkeypatch.setattr("app.main.probe_ollama", lambda *_args, **_kwargs: (True, "Connected"))
     monkeypatch.setattr(
         "app.main.config.get_local_model_inventory",
-        lambda: [SimpleNamespace(name="qwen2.5-coder:14b", size_text="9 GB", placement="gpu", recommended=True)],
+        lambda **_kw: [SimpleNamespace(name="qwen2.5-coder:14b", size_text="9 GB", placement="gpu", recommended=True)],
     )
 
     result = runner.invoke(cli, ["/models", "--cwd", str(tmp_path)])
@@ -70,7 +70,7 @@ def test_models_command_lists_inventory(monkeypatch, tmp_path):
     monkeypatch.setattr("app.main.probe_ollama", lambda *_args, **_kwargs: (True, "Connected"))
     monkeypatch.setattr(
         "app.main.config.get_local_model_inventory",
-        lambda: [SimpleNamespace(name="qwen2.5-coder:14b", size_text="9 GB", placement="gpu", recommended=True)],
+        lambda **_kw: [SimpleNamespace(name="qwen2.5-coder:14b", size_text="9 GB", placement="gpu", recommended=True)],
     )
 
     result = runner.invoke(cli, ["models", "--cwd", str(tmp_path)])

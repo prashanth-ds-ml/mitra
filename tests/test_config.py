@@ -1,3 +1,4 @@
+import pytest
 from types import SimpleNamespace
 
 from app import config
@@ -168,8 +169,9 @@ def test_mcp_servers_are_not_in_mitra_toml_config(tmp_path):
 def test_load_exposes_default_agent_model_mapping(tmp_path):
     cfg = config.load(cwd=str(tmp_path))
 
-    assert cfg["agent_models"]["planner"] == "qwen3:14b"
-    assert cfg["agent_models"]["coder"] == "qwen2.5-coder:14b"
+    # No hard-coded models: every role uses the model the user picked unless mitra.toml sets one (E-015)
+    assert set(cfg["agent_models"].values()) == {""}
+    assert {"planner", "coder", "reviewer"} <= set(cfg["agent_models"])
 
 
 def test_load_exposes_default_work_mode(tmp_path):
@@ -188,4 +190,32 @@ def test_load_merges_agent_model_overrides(tmp_path):
 
     assert cfg["agent_models"]["planner"] == "custom-planner"
     assert cfg["agent_models"]["docs"] == "custom-docs"
-    assert cfg["agent_models"]["reviewer"] == "qwen3:14b"
+    assert cfg["agent_models"]["reviewer"] == ""
+
+
+# ── Compatible models only (user request 2026-11-05) ─────────────────────────
+
+@pytest.mark.parametrize("facts,problem", [
+    ({"capabilities": ("completion", "tools", "thinking"), "parameters": 4_700_000_000, "context": 262_144}, None),
+    ({"capabilities": ("tools", "embedding"), "parameters": 4_000_000_000, "context": 40_960}, "not a chat model"),
+    ({"capabilities": ("completion", "vision"), "parameters": 4_300_000_000, "context": 131_072}, "no tool calling"),
+    ({"capabilities": ("completion", "tools"), "parameters": 268_000_000, "context": 32_768}, "too small (0.3B parameters)"),
+    ({"capabilities": ("completion", "tools", "vision"), "parameters": 2_500_000_000, "context": 16_384}, "context too short (16K)"),
+    (None, None),  # Ollama could not say: keep it listed
+])
+def test_compatibility_problem(facts, problem):
+    assert config.compatibility_problem(facts) == problem
+
+
+def test_inventory_hides_incompatible_models_unless_asked(monkeypatch):
+    listing = "NAME ID SIZE MODIFIED\nqwen3.5:4b a 3.4 GB 1d\nnomic-embed-text:latest b 274 MB 1d\n"
+    monkeypatch.setattr(config.subprocess, "run", lambda *a, **k: type("R", (), {"stdout": listing})())
+    facts = {
+        "qwen3.5:4b": {"capabilities": ("completion", "tools"), "parameters": 4_700_000_000, "context": 262_144},
+        "nomic-embed-text:latest": {"capabilities": ("embedding",), "parameters": 137_000_000, "context": 2048},
+    }
+    monkeypatch.setattr(config, "get_model_facts", lambda name: facts[name])
+
+    assert [m.name for m in config.get_local_model_inventory()] == ["qwen3.5:4b"]
+    everything = config.get_local_model_inventory(include_incompatible=True)
+    assert [(m.name, m.compatible) for m in everything] == [("qwen3.5:4b", True), ("nomic-embed-text:latest", False)]
