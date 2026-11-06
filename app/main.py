@@ -2188,8 +2188,11 @@ def _chat():
             continue
 
         if cmd == "/doctor":
+            from app.doctor import ollama_report
+            ollama_url = cfg.get("ollama_local_base_url") or "http://127.0.0.1:11434"
             ai_reply = "\n\n".join([
                 _build_resources_reply(),
+                "## Ollama\n\n" + ollama_report(model, num_ctx, base_url=ollama_url),
                 _build_permissions_reply(cfg, session_mode),
                 "## MCP\n\n" + mcp_registry.summarize(mcp_registry.discover(cfg["workspace"])),
             ])
