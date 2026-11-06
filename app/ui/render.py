@@ -19,7 +19,8 @@ _ACTIONS = {
     "create_folder": "Create", "move_file": "Move", "delete_file": "Delete", "delete_folder": "Delete",
     "create_venv": "Setup", "install_packages": "Install", "run_command": "Bash",
     "git_status": "Git", "git_diff": "Git", "git_commit": "Commit",
-    "mcp_find": "MCP", "mcp_call": "MCP",
+    "mcp_find": "MCP", "mcp_call": "MCP", "write_file": "Write", "run_tests": "Tests", "search": "Search",
+    "list_files": "List",
 }
 
 

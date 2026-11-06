@@ -329,6 +329,25 @@ cli.command("/status", hidden=True)(cmd_status)
 cli.command("config")(cmd_config)
 cli.command("/config", hidden=True)(cmd_config)
 cli.command("models")(cmd_models)
+
+
+def cmd_solve(
+    task: str = typer.Argument("", help="What to do. Leave empty with --plan."),
+    test: str = typer.Option("python -m pytest -q", "--test", help="Command that decides when the task is done."),
+    plan: str = typer.Option("", "--plan", help="A plan file: do its tasks one at a time (plan, implement, test, fix)."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Project folder."),
+    model: str = typer.Option("", "--model", help="Local model (default: the last one used, else qwen3.5:4b)."),
+    max_steps: int = typer.Option(40, "--max-steps", help="Model calls per task before stopping."),
+    as_json: bool = typer.Option(False, "--json", help="Print a JSON result instead of progress."),
+) -> None:
+    """Work on a task until its tests pass (the core loop, M1). Exit 0 = tests pass."""
+    from app.core.cli import cmd_solve as _solve
+
+    raise typer.Exit(_solve(task, test=test, plan=plan, workspace=workspace, model=model,
+                            max_steps=max_steps, as_json=as_json))
+
+
+cli.command("solve")(cmd_solve)
 cli.command("/models", hidden=True)(cmd_models)
 cli.command("test")(cmd_test)
 cli.command("/test", hidden=True)(cmd_test)

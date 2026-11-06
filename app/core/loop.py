@@ -1,0 +1,289 @@
+"""The core agent loop (M1): model -> tools -> results -> repeat, until the tests pass or a limit is hit.
+
+One loop for everything: `mitra solve`, the plan runner, and (next) the terminal chat. Built for small models:
+- the tests decide "done", not the model: a passing test run ends the task;
+- a step limit, a repeat guard and a cap on failed test runs stop a stuck model;
+- one retry on a failed model call; an empty reply is a mistake the model is told about, never a pass (L-002);
+- old tool output is dropped when the context fills, so a long task stays inside num_ctx (L-001);
+- every event is recorded to a JSONL file with authorship "mitra" (D-022).
+"""
+from __future__ import annotations
+
+import json
+import re
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Callable
+
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+
+from app.agents.limits import RepeatGuard
+from app.core import tools as T
+
+SYSTEM_PROMPT = """You are Mitra, a coding agent. You work inside one project folder using tools.
+
+How to work:
+1. Look first: list_files, then read the files that matter (the task, plan.md, the tests).
+2. Make small changes. Read a file before you edit it. Create new files with write_file.
+3. Run run_tests after each change. Read the failures and fix the code.
+4. Never change files under tests/. Make the code pass the tests as they are.
+5. When the tests pass you are done; call finish with one line about what you did.
+
+Keep replies short. Use tools instead of describing what you would do. Paths are relative to the project folder."""
+
+COMPACT_AT = 0.75        # share of num_ctx at which old tool output is dropped
+KEEP_RECENT = 8          # messages always kept in full
+
+
+@dataclass
+class Event:
+    kind: str            # "think" | "say" | "tool" | "result" | "tests" | "note" | "done"
+    data: dict
+
+
+@dataclass
+class RunResult:
+    status: str                      # "passed" | "failed" | "stopped" | "error"
+    summary: str
+    steps: int = 0
+    tests: T.TestRun | None = None
+    tokens_in: int = 0
+    tokens_out: int = 0
+    seconds: float = 0.0
+    changed: list[str] = field(default_factory=list)
+    record_path: str = ""
+
+    def to_json(self) -> dict:
+        return {"status": self.status, "summary": self.summary, "steps": self.steps,
+                "tests_passed": bool(self.tests and self.tests.passed),
+                "tests": self.tests.summary if self.tests else "", "tokens_in": self.tokens_in,
+                "tokens_out": self.tokens_out, "seconds": round(self.seconds, 1), "changed": self.changed,
+                "record": self.record_path}
+
+
+class Recorder:
+    """Append-only JSONL record of a run (authorship per part, D-022)."""
+
+    def __init__(self, path: Path | None):
+        self.path = path
+        if path:
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+    def write(self, kind: str, **data) -> None:
+        if not self.path:
+            return
+        row = {"t": time.time(), "kind": kind, "author": data.pop("author", "mitra"), **data}
+        with self.path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
+
+
+def _tokens(msg) -> tuple[int, int]:
+    meta = getattr(msg, "usage_metadata", None) or {}
+    return int(meta.get("input_tokens", 0) or 0), int(meta.get("output_tokens", 0) or 0)
+
+
+def _strip_think(text: str) -> str:
+    return re.sub(r"<think>.*?</think>", "", text or "", flags=re.S).strip()
+
+
+def _compact(messages: list) -> int:
+    """Drop the content of old tool results (keeps the conversation shape). Returns how many were dropped."""
+    n = 0
+    for m in messages[2:-KEEP_RECENT]:
+        if isinstance(m, ToolMessage) and not str(m.content).startswith("[old output removed"):
+            m.content = "[old output removed to save context; call the tool again if you need it]"
+            n += 1
+    return n
+
+
+def run_tool(ws: T.Workspace, name: str, args: dict) -> tuple[str, T.TestRun | None]:
+    """Run one tool; mistakes come back as text starting with ✗ (never an exception)."""
+    args = args or {}
+    try:
+        if name == "list_files":
+            return T.list_files(ws, args.get("path", ".")), None
+        if name == "read_file":
+            return T.read_file(ws, args.get("path", ""), args.get("start", 1), args.get("end", 0)), None
+        if name == "search":
+            return T.search(ws, args.get("pattern", ""), args.get("path", ".")), None
+        if name == "write_file":
+            return T.write_file(ws, args.get("path", ""), args.get("content", "")), None
+        if name == "edit_file":
+            return T.edit_file(ws, args.get("path", ""), args.get("old", ""), args.get("new", "")), None
+        if name == "run_tests":
+            run = T.run_tests(ws)
+            head = "PASSED" if run.passed else "FAILED"
+            return f"{head}: {run.summary}\n\n{run.output}", run
+        return f"✗ Unknown tool '{name}'. Tools: list_files, read_file, search, write_file, edit_file, run_tests, finish.", None
+    except T.ToolError as exc:
+        return f"✗ {exc}", None
+    except Exception as exc:  # a crash in a tool is reported, never fatal (E-018)
+        return f"✗ {name} failed: {type(exc).__name__}: {exc}", None
+
+
+def solve(
+    task: str,
+    ws: T.Workspace,
+    llm,
+    *,
+    max_steps: int = 40,
+    max_failed_finishes: int = 3,
+    num_ctx: int = 65536,
+    on_event: Callable[[Event], None] | None = None,
+    record_path: Path | None = None,
+    context: str = "",
+) -> RunResult:
+    """Work on `task` in `ws` until `ws.test_command` passes or a limit is hit."""
+    emit = on_event or (lambda e: None)
+    rec = Recorder(record_path)
+    t0 = time.monotonic()
+    result = RunResult(status="stopped", summary="", record_path=str(record_path or ""))
+    rec.write("start", task=task, test_command=ws.test_command, workspace=str(ws.root), max_steps=max_steps)
+
+    files = T.list_files(ws)
+    user = (f"Task:\n{task}\n\n" + (f"{context}\n\n" if context else "")
+            + f"Test command: {ws.test_command}\n\nFiles in the project:\n{files}")
+    messages: list = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=user)]
+    bound = llm.bind_tools(T.TOOL_SPECS)
+    guard = RepeatGuard(max_repeats=2, max_failures=4)
+    failed_finishes = empty_replies = 0
+
+    def finish_with(status: str, summary: str) -> RunResult:
+        result.status, result.summary = status, summary
+        result.seconds = time.monotonic() - t0
+        result.changed = sorted(ws.changed)
+        rec.write("end", **result.to_json())
+        emit(Event("done", result.to_json()))
+        return result
+
+    for step in range(1, max_steps + 1):
+        result.steps = step
+        reply = None
+        for attempt in range(2):  # one retry on a failed call
+            try:
+                reply = bound.invoke(messages)
+                break
+            except Exception as exc:
+                rec.write("model_error", error=str(exc), attempt=attempt)
+                emit(Event("note", {"text": f"model call failed: {exc}", "ok": False}))
+                time.sleep(1)
+        if reply is None:
+            return finish_with("error", "The model call failed twice. Is Ollama running?")
+
+        t_in, t_out = _tokens(reply)
+        result.tokens_in += t_in
+        result.tokens_out += t_out
+        messages.append(reply)
+        thinking = (getattr(reply, "additional_kwargs", None) or {}).get("reasoning_content", "")
+        text = _strip_think(reply.content if isinstance(reply.content, str) else "")
+        rec.write("model", step=step, text=text, thinking=thinking[:4000], tool_calls=reply.tool_calls,
+                  tokens_in=t_in, tokens_out=t_out)
+        if thinking:
+            emit(Event("think", {"tokens": len(thinking) // 4}))
+        if text:
+            emit(Event("say", {"text": text}))
+
+        if t_in > num_ctx * COMPACT_AT:
+            dropped = _compact(messages)
+            if dropped:
+                rec.write("compact", dropped=dropped, tokens_in=t_in)
+                emit(Event("note", {"text": f"context {t_in:,} tokens: dropped {dropped} old tool outputs"}))
+
+        if not reply.tool_calls:
+            empty_replies += 1
+            if empty_replies >= 3:
+                return finish_with("stopped", "The model stopped using tools before the tests passed.")
+            messages.append(HumanMessage(content=(
+                "Use the tools to continue: change the code, then run_tests. Call finish only when the tests pass.")))
+            continue
+        empty_replies = 0
+
+        for tc in reply.tool_calls:
+            name, args = tc["name"], tc.get("args") or {}
+            if name == "finish":
+                run = T.run_tests(ws)
+                result.tests = run
+                emit(Event("tests", {"passed": run.passed, "summary": run.summary}))
+                rec.write("tests", passed=run.passed, summary=run.summary, full=run.full_path)
+                if run.passed:
+                    messages.append(ToolMessage(content="Tests pass. Done.", tool_call_id=tc["id"]))
+                    return finish_with("passed", str(args.get("summary") or text or "Tests pass."))
+                failed_finishes += 1
+                messages.append(ToolMessage(content=(
+                    f"✗ Not done: the tests still fail ({run.summary}).\n\n{run.output}\n\nFix the code and run_tests."),
+                    tool_call_id=tc["id"]))
+                if failed_finishes >= max_failed_finishes:
+                    return finish_with("failed", f"Called finish {failed_finishes} times with failing tests ({run.summary}).")
+                continue
+
+            emit(Event("tool", {"name": name, "args": args}))
+            refused = guard.before(name, args)
+            if refused:
+                output, run = refused, None
+            else:
+                output, run = run_tool(ws, name, args)
+            ok = run.passed if run is not None else not output.startswith("✗")
+            emit(Event("result", {"name": name, "args": args, "ok": ok, "output": output}))
+            rec.write("tool", name=name, args=args, ok=ok, output=output[:4000])
+            messages.append(ToolMessage(content=output, tool_call_id=tc["id"]))
+            if run is not None:
+                result.tests = run
+                emit(Event("tests", {"passed": run.passed, "summary": run.summary}))
+                if run.passed:
+                    return finish_with("passed", text or f"Tests pass: {run.summary}")
+            stop = guard.after(name, output)
+            if stop:
+                return finish_with("stopped", stop)
+
+    return finish_with("stopped", f"Step limit reached ({max_steps}) before the tests passed.")
+
+
+# ── plan runner: the user's loop (plan -> implement -> test -> fix -> repeat), one plan task at a time ──────
+
+@dataclass
+class PlanTask:
+    id: str
+    title: str
+    body: str
+    test_command: str
+    needs: list[str]
+
+
+def parse_plan(text: str) -> tuple[str, list[PlanTask]]:
+    """Split a plan in the playground format (docs/PLAN_FORMAT.md) into its header and tasks."""
+    parts = re.split(r"^### (T\d+):\s*(.*)$", text, flags=re.M)
+    header = parts[0].replace("## Tasks", "").strip()
+    tasks = []
+    for i in range(1, len(parts) - 2, 3):
+        tid, title, body = parts[i], parts[i + 1].strip(), parts[i + 2].strip()
+        cmd = re.search(r"Done when:\s*`([^`]+)`", body)
+        needs = re.search(r"Needs:\s*(.*)", body)
+        need_ids = re.findall(r"T\d+", needs.group(1)) if needs else []
+        tasks.append(PlanTask(tid, title, body, cmd.group(1) if cmd else "", need_ids))
+    return header, tasks
+
+
+def run_plan(plan_text: str, ws: T.Workspace, llm, *, full_test_command: str, max_steps: int = 30,
+             on_event: Callable[[Event], None] | None = None, record_dir: Path | None = None,
+             num_ctx: int = 65536) -> dict:
+    """For each task: implement until its 'Done when' command passes; then run the full tests."""
+    emit = on_event or (lambda e: None)
+    header, tasks = parse_plan(plan_text)
+    results: dict[str, RunResult] = {}
+    for task in tasks:
+        if any(results.get(n) is None or results[n].status != "passed" for n in task.needs):
+            emit(Event("note", {"text": f"{task.id} skipped: needs {', '.join(task.needs)}", "ok": False}))
+            continue
+        emit(Event("task", {"id": task.id, "title": task.title}))
+        ws.test_command = task.test_command or full_test_command
+        rec = (record_dir / f"{task.id}.jsonl") if record_dir else None
+        results[task.id] = solve(f"{task.id}: {task.title}\n{task.body}", ws, llm, max_steps=max_steps,
+                                 on_event=on_event, record_path=rec, context=f"The plan's shared notes:\n{header}",
+                                 num_ctx=num_ctx)
+    ws.test_command = full_test_command
+    final = T.run_tests(ws)
+    emit(Event("tests", {"passed": final.passed, "summary": final.summary, "final": True}))
+    return {"tasks": {k: v.to_json() for k, v in results.items()},
+            "passed_tasks": sum(1 for v in results.values() if v.status == "passed"),
+            "total_tasks": len(tasks), "final_tests_passed": final.passed, "final_tests": final.summary}
