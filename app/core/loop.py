@@ -16,10 +16,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from app.agents.limits import RepeatGuard
 from app.core import tools as T
+from app.core.parse import text_tool_calls
 
 SYSTEM_PROMPT = """You are Mitra, a coding agent. You work inside one project folder using tools.
 
@@ -33,7 +34,9 @@ How to work:
 Keep replies short. Use tools instead of describing what you would do. Paths are relative to the project folder."""
 
 COMPACT_AT = 0.75        # share of num_ctx at which old tool output is dropped
+FRESH_AT = 0.9           # share of num_ctx at which a fresh round starts (with a handoff note)
 KEEP_RECENT = 8          # messages always kept in full
+CALL_TIMEOUT_S = 600     # one model call; a stalled call counts as a failed call
 
 
 @dataclass
@@ -97,6 +100,32 @@ def _compact(messages: list) -> int:
     return n
 
 
+def call_model(bound, messages: list, timeout: float):
+    """bound.invoke(messages) with a time limit (E: a stalled model must not hang the loop forever)."""
+    import concurrent.futures
+
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    future = pool.submit(bound.invoke, messages)
+    try:
+        return future.result(timeout=timeout)
+    except concurrent.futures.TimeoutError:
+        raise TimeoutError(f"the model did not answer within {timeout:.0f}s") from None
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+
+def handoff_note(task: str, ws: T.Workspace, last: T.TestRun | None, round_no: int, reason: str) -> str:
+    """Short status for a fresh round (dsh tool-ralph): what was done, the evidence, the next step."""
+    tail = "\n".join((last.output if last else "").splitlines()[-25:])
+    changed = ", ".join(sorted(ws.changed)) or "none"
+    return (f"Task:\n{task}\n\nThis is round {round_no}; the previous round ended because {reason}.\n"
+            f"- Files changed so far (kept on disk): {changed}\n"
+            f"- Last test result: {last.summary if last else 'not run yet'}\n"
+            + (f"- Last test output (end):\n{tail}\n" if tail else "")
+            + "- Next step: read the failing test and the code it calls, fix the cause, then run_tests.\n"
+            f"Test command: {ws.test_command}")
+
+
 def run_tool(ws: T.Workspace, name: str, args: dict) -> tuple[str, T.TestRun | None]:
     """Run one tool; mistakes come back as text starting with ✗ (never an exception)."""
     args = args or {}
@@ -133,6 +162,10 @@ def solve(
     on_event: Callable[[Event], None] | None = None,
     record_path: Path | None = None,
     context: str = "",
+    call_timeout: float = CALL_TIMEOUT_S,
+    fresh_round_after: int = 3,
+    max_rounds: int = 3,
+    rollback: bool = False,
 ) -> RunResult:
     """Work on `task` in `ws` until `ws.test_command` passes or a limit is hit."""
     emit = on_event or (lambda e: None)
@@ -146,10 +179,31 @@ def solve(
             + f"Test command: {ws.test_command}\n\nFiles in the project:\n{files}")
     messages: list = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=user)]
     bound = llm.bind_tools(T.TOOL_SPECS)
+    known = {s["name"] for s in T.TOOL_SPECS}
     guard = RepeatGuard(max_repeats=2, max_failures=4)
-    failed_finishes = empty_replies = 0
+    failed_finishes = empty_replies = failing_runs = 0
+    round_no = 1
+    if ws.journal is None:
+        ws.journal = []
+    journal_start = len(ws.journal)
+
+    def fresh_round(reason: str) -> None:
+        nonlocal messages, guard, failing_runs, round_no
+        round_no += 1
+        note = handoff_note(task, ws, result.tests, round_no, reason)
+        messages = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=note)]
+        guard = RepeatGuard(max_repeats=2, max_failures=4)
+        failing_runs = 0
+        rec.write("fresh_round", round=round_no, reason=reason)
+        emit(Event("note", {"text": f"fresh round {round_no}: {reason}"}))
 
     def finish_with(status: str, summary: str) -> RunResult:
+        if status != "passed" and rollback:
+            undone = T.rollback(ws.journal[journal_start:])
+            del ws.journal[journal_start:]
+            if undone:
+                summary += f" Rolled back {undone} file change(s)."
+                rec.write("rollback", files=undone)
         result.status, result.summary = status, summary
         result.seconds = time.monotonic() - t0
         result.changed = sorted(ws.changed)
@@ -162,7 +216,7 @@ def solve(
         reply = None
         for attempt in range(2):  # one retry on a failed call
             try:
-                reply = bound.invoke(messages)
+                reply = call_model(bound, messages, call_timeout)
                 break
             except Exception as exc:
                 rec.write("model_error", error=str(exc), attempt=attempt)
@@ -174,9 +228,16 @@ def solve(
         t_in, t_out = _tokens(reply)
         result.tokens_in += t_in
         result.tokens_out += t_out
-        messages.append(reply)
         thinking = (getattr(reply, "additional_kwargs", None) or {}).get("reasoning_content", "")
         text = _strip_think(reply.content if isinstance(reply.content, str) else "")
+        parse_error = ""
+        if not reply.tool_calls and text:
+            calls, parse_error = text_tool_calls(text, known)
+            if calls:  # the model wrote the call as text: run it as a real call
+                reply = AIMessage(content=reply.content, tool_calls=calls,
+                                  usage_metadata=getattr(reply, "usage_metadata", None))
+                rec.write("text_tool_calls", calls=calls)
+        messages.append(reply)
         rec.write("model", step=step, text=text, thinking=thinking[:4000], tool_calls=reply.tool_calls,
                   tokens_in=t_in, tokens_out=t_out)
         if thinking:
@@ -184,6 +245,9 @@ def solve(
         if text:
             emit(Event("say", {"text": text}))
 
+        if t_in > num_ctx * FRESH_AT and round_no < max_rounds and not reply.tool_calls:
+            fresh_round(f"the context was {t_in:,} tokens")
+            continue
         if t_in > num_ctx * COMPACT_AT:
             dropped = _compact(messages)
             if dropped:
@@ -191,6 +255,9 @@ def solve(
                 emit(Event("note", {"text": f"context {t_in:,} tokens: dropped {dropped} old tool outputs"}))
 
         if not reply.tool_calls:
+            if parse_error:
+                messages.append(HumanMessage(content=parse_error))
+                continue
             empty_replies += 1
             if empty_replies >= 3:
                 return finish_with("stopped", "The model stopped using tools before the tests passed.")
@@ -232,9 +299,15 @@ def solve(
                 emit(Event("tests", {"passed": run.passed, "summary": run.summary}))
                 if run.passed:
                     return finish_with("passed", text or f"Tests pass: {run.summary}")
+                failing_runs += 1
             stop = guard.after(name, output)
             if stop:
                 return finish_with("stopped", stop)
+        if failing_runs >= fresh_round_after:
+            if round_no >= max_rounds:
+                return finish_with("failed", f"Tests still fail after {round_no} rounds "
+                                             f"({result.tests.summary if result.tests else 'no test run'}).")
+            fresh_round(f"the tests failed {failing_runs} times in a row")
 
     return finish_with("stopped", f"Step limit reached ({max_steps}) before the tests passed.")
 
@@ -264,13 +337,62 @@ def parse_plan(text: str) -> tuple[str, list[PlanTask]]:
     return header, tasks
 
 
+def _git(ws: T.Workspace, *args: str) -> tuple[int, str]:
+    import subprocess
+
+    try:
+        p = subprocess.run(["git", *args], cwd=ws.root, capture_output=True, text=True, timeout=60,
+                           encoding="utf-8", errors="replace")
+        return p.returncode, (p.stdout + p.stderr).strip()
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return 1, str(exc)
+
+
+def start_branch(ws: T.Workspace) -> tuple[str, str]:
+    """Work on a new branch mitra/plan-<time> so the user's branch is never touched. Returns (branch, error)."""
+    code, top = _git(ws, "rev-parse", "--show-toplevel")
+    if code != 0:
+        return "", "not a git repository"
+    branch = time.strftime("mitra/plan-%Y%m%d-%H%M%S")
+    code, out = _git(ws, "switch", "-c", branch)
+    return (branch, "") if code == 0 else ("", out)
+
+
+def commit_task(ws: T.Workspace, files: list[str], message: str) -> str:
+    """Commit only the task's files. Returns the short hash, or "" if nothing was committed."""
+    if not files:
+        return ""
+    _git(ws, "add", "--", *files)
+    code, _ = _git(ws, "commit", "-m", message, "--", *files)
+    if code != 0:
+        return ""
+    return _git(ws, "rev-parse", "--short", "HEAD")[1]
+
+
+def needs_help(task: "PlanTask", res: RunResult, files: list[str]) -> str:
+    out = res.tests.output if res.tests else ""
+    tail = "\n".join(out.splitlines()[-20:])
+    return (f"### {task.id}: {task.title}: needs help\n- Result: {res.status}: {res.summary}\n"
+            f"- Files it tried: {', '.join(files) or 'none'} (changes rolled back)\n"
+            f"- Test command: `{task.test_command}`\n" + (f"- Last test output:\n```\n{tail}\n```\n" if tail else ""))
+
+
 def run_plan(plan_text: str, ws: T.Workspace, llm, *, full_test_command: str, max_steps: int = 30,
              on_event: Callable[[Event], None] | None = None, record_dir: Path | None = None,
-             num_ctx: int = 65536) -> dict:
+             num_ctx: int = 65536, git: bool = True, rollback: bool = True) -> dict:
     """For each task: implement until its 'Done when' command passes; then run the full tests."""
     emit = on_event or (lambda e: None)
+    t0 = time.monotonic()
     header, tasks = parse_plan(plan_text)
     results: dict[str, RunResult] = {}
+    helps: list[str] = []
+    commits: dict[str, str] = {}
+    branch = ""
+    if git:
+        branch, why = start_branch(ws)
+        emit(Event("note", {"text": f"working on branch {branch}" if branch else f"no git branch ({why})"}))
+    if ws.journal is None:
+        ws.journal = []
     for task in tasks:
         if any(results.get(n) is None or results[n].status != "passed" for n in task.needs):
             emit(Event("note", {"text": f"{task.id} skipped: needs {', '.join(task.needs)}", "ok": False}))
@@ -278,12 +400,29 @@ def run_plan(plan_text: str, ws: T.Workspace, llm, *, full_test_command: str, ma
         emit(Event("task", {"id": task.id, "title": task.title}))
         ws.test_command = task.test_command or full_test_command
         rec = (record_dir / f"{task.id}.jsonl") if record_dir else None
-        results[task.id] = solve(f"{task.id}: {task.title}\n{task.body}", ws, llm, max_steps=max_steps,
-                                 on_event=on_event, record_path=rec, context=f"The plan's shared notes:\n{header}",
-                                 num_ctx=num_ctx)
+        start = len(ws.journal)
+        res = solve(f"{task.id}: {task.title}\n{task.body}", ws, llm, max_steps=max_steps,
+                    on_event=on_event, record_path=rec, context=f"The plan's shared notes:\n{header}",
+                    num_ctx=num_ctx, rollback=rollback)
+        results[task.id] = res
+        files = sorted({T.Path(e["path"]).resolve().relative_to(ws.root).as_posix() for e in ws.journal[start:]}
+                       | set(res.changed))
+        if res.status == "passed" and branch:
+            commits[task.id] = commit_task(ws, files, f"mitra: {task.id} {task.title}")
+        elif res.status != "passed":
+            helps.append(needs_help(task, res, files))
     ws.test_command = full_test_command
     final = T.run_tests(ws)
     emit(Event("tests", {"passed": final.passed, "summary": final.summary, "final": True}))
-    return {"tasks": {k: v.to_json() for k, v in results.items()},
-            "passed_tasks": sum(1 for v in results.values() if v.status == "passed"),
-            "total_tasks": len(tasks), "final_tests_passed": final.passed, "final_tests": final.summary}
+    report = {"tasks": {k: v.to_json() for k, v in results.items()},
+              "passed_tasks": sum(1 for v in results.values() if v.status == "passed"),
+              "total_tasks": len(tasks), "final_tests_passed": final.passed, "final_tests": final.summary,
+              "needs_help": helps, "branch": branch, "commits": commits,
+              "seconds": round(time.monotonic() - t0), "tokens_in": sum(v.tokens_in for v in results.values()),
+              "tokens_out": sum(v.tokens_out for v in results.values())}
+    if record_dir:
+        record_dir.mkdir(parents=True, exist_ok=True)
+        (record_dir / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+        if helps:
+            (record_dir / "needs-help.md").write_text("# Needs help\n\n" + "\n".join(helps), encoding="utf-8")
+    return report

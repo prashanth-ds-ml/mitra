@@ -202,6 +202,22 @@ def edit_file(ws: Workspace, path: str, old: str, new: str) -> str:
     return f"Edited {rel}."
 
 
+def rollback(entries: list[dict]) -> int:
+    """Undo journal entries (newest first): restore old content, delete files that did not exist. Returns count."""
+    n = 0
+    for e in reversed(entries):
+        p = Path(e["path"])
+        try:
+            if e.get("existed"):
+                p.write_text(e.get("before") or "", encoding="utf-8")
+            elif p.exists():
+                p.unlink()
+            n += 1
+        except OSError:
+            continue
+    return n
+
+
 @dataclass
 class TestRun:
     passed: bool

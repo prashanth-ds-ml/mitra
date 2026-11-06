@@ -16,7 +16,7 @@ from rich.markdown import Markdown
 from rich.table import Table
 from rich.text import Text
 
-from app.llm import get_local_llm, probe_ollama
+from app.llm import get_local_llm, probe_ollama, thinking_setting
 from app.agents import filesystem
 from app.agents import reviewer as reviewer_agent
 from app.agents import session as session_agent
@@ -87,7 +87,8 @@ local_model = ""             # leave empty to pick at startup
 codegen_model = "kimi-k2.5:cloud"  # used only when cloud codegen is enabled
 temperature = 0.2
 session_mode = "approve"     # read-only | plan | approve | auto
-show_reasoning = false       # show <think> output panels when available
+show_reasoning = false       # show the model's thinking text (ctrl+o shows it anyway)
+thinking = "auto"            # auto | on | off: off answers faster but plans less (D-020)
 memory_enabled = false
 require_diff_approval = true
 auto_compact_threshold = 120000  # auto-compact when session tokens exceed this
@@ -420,7 +421,7 @@ _COMMAND_HELP = [
         ("/test [cmd]",    "Run the tests (default: pytest)"),
         ("/fix <cmd>",     "Run a command, and edit + retry until it passes (bounded)"),
         ("/diff",          "Show the git diff or Mitra's last change set"),
-        ("/undo",          "Undo Mitra's last change set"),
+        ("/undo [all]",    "Undo Mitra's last change (all: every change this session)"),
         ("/commit [msg]",  "Commit staged changes (--generate drafts the message); never pushes"),
         ("/review [staged]", "Review the current or staged diff for real problems"),
         ("/mcp",           "MCP servers: list, test, tools, on/off, trust, import, call"),
@@ -1846,7 +1847,7 @@ def _chat():
 
     cloud_api_key = ""  # Mitra is local-only (D-025)
     local_llm = get_local_llm(model, temperature, base_url=cfg.get("ollama_local_base_url"),
-                              num_ctx=num_ctx, num_gpu=num_gpu)
+                              num_ctx=num_ctx, num_gpu=num_gpu, reasoning=thinking_setting(cfg.get("thinking")))
     review_llm = codegen_llm = local_llm  # one model for everything (M1)
 
     # Compact before the model's context is full: at most 80% of num_ctx (D-033).
@@ -1972,6 +1973,7 @@ def _chat():
         print_folded=_print_folded,
     )
     typed_ahead = ""
+    session_changes: list[list[dict]] = []  # one journal per turn, for /undo all
     messages = [SystemMessage(content=system_prompt)]
     sess_in = sess_out = 0  # cumulative session token counts (work done)
     ctx_used = 0            # prompt tokens of the latest model call = how full the context is (E-025)
@@ -2147,7 +2149,14 @@ def _chat():
             memory.update_context(cfg["workspace"], user_input)
             continue
 
-        if cmd == "/undo":
+        if cmd in ("/undo", "/undo all"):
+            if cmd == "/undo all":
+                entries = [e for journal in session_changes for e in journal]
+                if entries:
+                    memory.record_last_change_set(cfg["workspace"], {"entries": entries})
+                session_changes.clear()
+            elif session_changes:
+                session_changes.pop()
             ai_reply = filesystem.undo_last_change_set(cfg["workspace"])
             _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
@@ -2224,6 +2233,7 @@ def _chat():
             ai_reply = turn.text.strip()
             if turn.journal:
                 memory.record_last_change_set(cfg["workspace"], {"entries": turn.journal})
+                session_changes.append(list(turn.journal))
             if turn.stopped and turn.stop_reason:
                 console.print(ui.tool_line("Stopped", ok=False, detail=turn.stop_reason))
             elif not ai_reply:

@@ -8,6 +8,7 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-026 | 2026-11-06 | E-026 | `RepeatGuard`: `run_tests` and `run_command` are never repeats; any successful write clears the repeat memory | `app/agents/limits.py` | `test_repeat_guard_allows_rerunning_tests_and_rereading_after_an_edit` | works |
 | F-025 | 2026-11-06 | E-025 | `ctx_used` = prompt tokens of the latest model call; status line shows it against num_ctx; auto-compact, `/status`, `/context` and `/compact` use it | `app/main.py` | `test_context_use_is_the_latest_prompt_not_the_sum_of_calls` | works |
 | F-024 | 2026-11-06 | E-024 | `search_sources.py`: Wikipedia, Hugging Face, GitHub, arXiv and the Ollama library in parallel (no key), DuckDuckGo first and skipped after one failure, short-name fallback; `fetch_url` reads the README of Hugging Face and GitHub pages; a stopped search makes one final no-tools call for the answer; failed calls add a note instead of replacing the answer | `app/agents/search_sources.py`, `app/agents/web.py` | `tests/test_web_search.py` | works |
 | F-023 | 2026-11-06 | E-023 | `RepeatGuard` in the web, reader and file agents: an identical call is not rerun (the model is told the result will not change); the agent stops after 3 refused repeats or 3 failures of one tool in a row and says why ("may be offline" for search) | `app/agents/limits.py`, `web.py`, `reader.py`, `filesystem.py` | `test_web_agent_stops_when_search_keeps_failing` | works |

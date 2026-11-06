@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-026 | 2026-11-06 | M1 | High | Claude (test for fresh rounds) | The repeat guard refused the 3rd `run_tests` (always called with `{}`) and re-reading a file after editing it, so a normal fix loop (change, test, change, test) was stopped as "kept repeating" | closed | F-026 |
 | E-025 | 2026-11-06 | M2 | High | user ("why is it stopped after the compaction") | The chat compacted at "193,304 tokens" on a 64K model: context use was the sum of every call's tokens, not the size of the latest prompt; the same turn ended after the old file agent hit its 20-call limit and wrote 4 files into `levels/01-snake/` | closed | F-025 |
 | E-024 | 2026-11-06 | M2 | High | user ("its mitra job") | Mitra could not research anything: its only search was DuckDuckGo's HTML page, which times out from this machine; a stopped search gave no answer; one failed call replaced the whole answer with an error line | closed | F-024 |
 | E-023 | 2026-11-06 | M2 | High | user (terminal test) | "search about 3.5+ series models": the web agent ran 100+ `search_web` calls, most with the identical query, while every search timed out | closed | F-023 |
@@ -51,6 +52,20 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-026: The repeat guard stopped normal fix loops
+
+- **Date found:** 2026-11-06 · **Milestone:** M1 · **Severity:** High · **Found by:** Claude, writing the fresh-round test
+- **Status:** closed
+
+**What happened:** a scripted loop of write, run_tests, search, run_tests, list, run_tests ended "stopped": the third
+`run_tests` was refused as a repeat because its arguments are always `{}`.
+**Root cause:** the guard (E-023) treated any identical call as pointless, but tests and commands are meant to be
+re-run after changes, and a file's content changes after an edit.
+**Fix:** F-026.
+**Regression test:** `test_repeat_guard_allows_rerunning_tests_and_rereading_after_an_edit`,
+`test_fresh_round_after_repeated_failures_keeps_files_and_hands_off`.
+**Lesson?** -
 
 ### E-025: Context use counted every call; compaction fired far too early
 

@@ -76,6 +76,17 @@ def get_local_llm(
     )
 
 
+def thinking_setting(value) -> bool | str:
+    """mitra.toml `thinking`: "on" -> think, "off" -> no thinking (faster), anything else -> auto (on for models
+    that support it). D-020."""
+    v = str(value or "auto").strip().lower()
+    if v in ("on", "true", "yes"):
+        return True
+    if v in ("off", "false", "no"):
+        return False
+    return "auto"
+
+
 def model_supports_thinking(model: str) -> bool | None:
     """True for thinking models, None (model default) when unknown or not a thinking model."""
     try:

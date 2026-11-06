@@ -50,7 +50,7 @@ The same loop runs the terminal assistant (M2), the plan runner (M3) and the ben
 - [ ] `docs/MODEL_VIEW.md`: for every feature, the exact text the model sees and its token cost (dsh "Model Experience" convention)
 - [x] 7 tools: list, read, search, write, edit (forgiving match), run_tests, finish (2026-11-06)
 - [x] Read before edit, and reject an edit if the file changed since it was read; the error tells the model to re-read (dsh `fs-observation-policy`)
-- [ ] Tolerant tool-call parsing (native or JSON in text) + one retry with the error message
+- [x] Tolerant tool-call parsing (native or JSON in text) + one retry with the error message (2026-11-06: app/core/parse.py, in solve and the chat)
 - [x] Model-call retry on transport errors (bounded, logged); empty reply = error (dsh `llm-retry`, L-002)
 - [x] Step limit and repeat-call guard with a reminder at 3 repeats, stop at the limit (dsh `repeat-tool-reminder`; fixes E-002) (E-002, E-023)
 - [x] Fix E-001: `edit_file` added to mutating tools; test covers every tool in the set (fixed, then the old fix workflow was removed with the old engine)
@@ -59,11 +59,11 @@ The same loop runs the terminal assistant (M2), the plan runner (M3) and the ben
 - [x] Tests run with a timeout; full output saved to a file, model sees head/tail (dsh `spill-policy`); runs on a level use a fresh temp workspace (run_level.py)
 - [ ] Stable prompt prefix, append-only history inside a round, so Ollama reuses its prompt cache; prompt-eval time logged (dsh "KV cache effect")
 - [ ] Prompt tokens and context use logged on every call; warning before the context limit (L-001)
-- [ ] Model settings in config: context length, KV-cache type (`q8_0` option on the bench server), thinking on/off and thinking budget (D-020)
-- [ ] Fresh round after a failed test run, with a short handoff note (status, evidence, next step) (dsh `tool-ralph`)
-- [ ] Rollback when rounds run out
+- [ ] Model settings in config: context length, KV-cache type (`q8_0` option on the bench server), thinking on/off and thinking budget (D-020) (context per model and `thinking = auto|on|off` done 2026-11-06; KV-cache type is an Ollama server setting; no thinking budget in Ollama for qwen3.5)
+- [x] Fresh round after a failed test run, with a short handoff note (status, evidence, next step) (dsh `tool-ralph`) (2026-11-06: after 3 failing test runs or a 90% full context; up to 3 rounds)
+- [x] Rollback when rounds run out (2026-11-06: solve(rollback=True); run_plan rolls back failed tasks)
 - [ ] Every run saved with authorship per part (Mitra / Claude / me) and secrets scrubbed, so it can become training data later (D-022) (JSONL record with author "mitra" done 2026-11-06; secret scrubbing still to do)
-- [ ] Record/replay: recorded model replies replay in tests without Ollama (I-1, dsh `llm-replay`)
+- [x] Record/replay: recorded model replies replay in tests without Ollama (I-1, dsh `llm-replay`) (2026-11-06: app/core/replay.py)
 - [ ] Fault tests: a scripted fake model returns malformed tool calls, empty replies, stalls and errors; harness must recover or fail cleanly (dsh `llm-mock-server`) (empty replies, errors, repeats, bad tool calls done in tests/test_core.py and test_chat_core.py; stalls to do)
 - [ ] Unit tests for every part above
 - [ ] Release v0.1 + post: "Cutting the agent prompt from ~12K to ~3K tokens"
@@ -100,7 +100,7 @@ Design, ability list and what happens to local-codex's code: [M2_PLAN.md](M2_PLA
 - [ ] Plan format (one Markdown file): feature, design notes, tasks with files, expected behaviour, test command, order
 - [ ] `/plan`: Mitra writes a plan in that format with the local 9B (thinking on); I can edit it before running (D-025)
 - [ ] Plan check: every task has a test command and files; a plan that fails the check is rewritten before running
-- [ ] `mitra run plan.md` (also `/run` inside the terminal app): works through tasks on a feature branch, one commit per task, never touches `main`
+- [ ] `mitra run plan.md` (also `/run` inside the terminal app): works through tasks on a feature branch, one commit per task, never touches `main` (run_plan does branch + commit per task + needs-help + report since 2026-11-06; the `mitra run` command, resume and RAM guard still to do)
 - [ ] Stuck task (rounds used up) → "needs help" brief (failing output, `file:line`, what was tried); runner moves on; tasks that depend on it are skipped
 - [ ] RAM guard: pauses when free RAM drops below the preflight rule, resumes when it recovers
 - [ ] Stop and resume: a killed run picks up at the next unfinished task

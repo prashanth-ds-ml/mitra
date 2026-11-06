@@ -18,6 +18,11 @@ class RepeatGuard:
     after(): returns a stop message once one tool has failed `max_failures` times in a row.
     """
 
+    # Checking again is never a pointless repeat: tests and commands are re-run after changes (E-026).
+    EXEMPT = frozenset({"run_tests", "run_command"})
+    # Tools that change files: after one of them, earlier reads may give a different answer.
+    WRITES = frozenset({"write_file", "edit_file", "run_command", "run_plan", "mcp_call"})
+
     def __init__(self, *, max_repeats: int = 1, max_failures: int = 3) -> None:
         self.max_repeats, self.max_failures = max_repeats, max_failures
         self._calls: dict[str, int] = {}
@@ -33,6 +38,8 @@ class RepeatGuard:
             return name + repr(args)
 
     def before(self, name: str, args: dict) -> str | None:
+        if name in self.EXEMPT:
+            return None
         key = self._key(name, args)
         self._calls[key] = self._calls.get(key, 0) + 1
         if self._calls[key] > self.max_repeats:
@@ -41,6 +48,8 @@ class RepeatGuard:
         return None
 
     def after(self, name: str, output: str) -> str | None:
+        if name in self.WRITES and not str(output).lstrip().startswith("✗"):
+            self._calls.clear()  # the files changed: re-reading them is not a repeat (E-026)
         if str(output).startswith("✗ Not run:"):
             self._repeats_refused += 1
             if self._repeats_refused >= self.max_failures:

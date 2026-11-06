@@ -13,11 +13,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.agents.limits import RepeatGuard
 from app.core import loop as core_loop
 from app.core import tools as T
+from app.core.parse import text_tool_calls
 
 CHAT_PROMPT = """You are Mitra, a local coding assistant working in the user's project folder.
 
@@ -187,7 +188,8 @@ class ChatSession:
         res = TurnResult()
         self.ws.journal = res.journal
         self.ws.before_write = self._before_write
-        bound = self.llm.bind_tools(tool_specs(self.mode))
+        specs = tool_specs(self.mode)
+        bound = self.llm.bind_tools(specs)
         guard = RepeatGuard(max_repeats=2, max_failures=4)
         for step in range(1, max_steps + 1):
             res.steps = step
@@ -204,6 +206,15 @@ class ChatSession:
             res.tokens_in += int(meta.get("input_tokens", 0) or 0)
             res.tokens_out += int(meta.get("output_tokens", 0) or 0)
             res.ctx_used = int(meta.get("input_tokens", 0) or 0) or res.ctx_used
+            if not reply.tool_calls and streamed.text:
+                calls, parse_error = text_tool_calls(streamed.text, {s["name"] for s in specs})
+                if calls:  # the model wrote the call as text: run it as a real call
+                    reply = AIMessage(content=reply.content, tool_calls=calls,
+                                      usage_metadata=getattr(reply, "usage_metadata", None))
+                elif parse_error:
+                    messages.append(reply)
+                    messages.append(HumanMessage(content=parse_error))
+                    continue
             messages.append(reply)
             if not reply.tool_calls:
                 res.text = streamed.text
@@ -228,8 +239,6 @@ class ChatSession:
 
     def _wrap_up(self, messages: list, res: TurnResult, reason: str) -> TurnResult:
         """The loop was cut short: one call without tools, so the user still hears what was done (E-024)."""
-        from langchain_core.messages import HumanMessage
-
         res.stopped, res.stop_reason = True, reason
         messages.append(HumanMessage(content=(
             f"[Mitra stopped the tools: {reason}.] Tell the user in a few short lines what you did, "

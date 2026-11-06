@@ -17,7 +17,7 @@ from rich.text import Text
 from app import config, ui
 from app.core.loop import Event, run_plan, solve
 from app.core.tools import Workspace
-from app.llm import get_local_llm
+from app.llm import get_local_llm, thinking_setting
 
 
 class EventPrinter:
@@ -67,7 +67,7 @@ def cmd_solve(task: str = "", *, test: str = "python -m pytest -q", plan: str = 
     stamp = time.strftime("%Y%m%d-%H%M%S")
     runs = ws.root / ".mitra" / "runs" / stamp
     ws.spill_dir = runs / "output"
-    llm = get_local_llm(model, num_ctx=num_ctx)
+    llm = get_local_llm(model, num_ctx=num_ctx, reasoning=thinking_setting(cfg.get("thinking")))
     printer = None if as_json else EventPrinter(console)
     if not as_json:
         console.print(Text(f"✻ Mitra solve · {model} · {num_ctx // 1024}K context · {ws.root}", style="m.dim"))
