@@ -5,6 +5,21 @@ every result with your tests, and calls a frontier model only when the check fai
 
 > **Building in public.** Status: planning done, M0 next. Progress: [checklist](docs/PLAN.md) · [status](docs/STATUS.md)
 
+## Install the `mitra` command
+
+Mitra installs as a command you can run in any folder, like other terminal assistants. It gets its own Python
+environment (no clash with your other projects), and code changes apply without reinstalling:
+
+```
+uv tool install --editable . --python 3.12     # from this folder, once
+mitra                                          # in any project folder: opens the chat there
+mitra solve "fix the failing test" --test "pytest -q"
+mitra --version
+```
+
+The project folder is the nearest parent with a git repo or project file (`pyproject.toml`, `package.json`, ...),
+otherwise the folder you are in. To remove it: `uv tool uninstall mitra`.
+
 ## Why
 Coding agents like Claude Code, Codex and OpenCode can connect to local models through Ollama, but they are built for
 frontier models: many tools, strict tool-call formats and a large fixed prompt (measured here: 2.7K-12.2K tokens

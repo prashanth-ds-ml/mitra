@@ -263,7 +263,7 @@ def cmd_models(
     cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection."),
     show_all: bool = typer.Option(False, "--all", help="Also list models Mitra cannot use, and why."),
 ) -> None:
-    """List local Ollama models Mitra can use (chat + tool calling, >= 1.5B, >= 32K context)."""
+    """List the local models Mitra can use (qwen3.5, 4B or larger; --all shows the others and why)."""
     _print_phase0_models(cwd, show_all=show_all)
 
 
@@ -344,9 +344,24 @@ def _phase5_workspace(cwd: str | None = None) -> tuple[dict, str]:
 
 
 
+def _version() -> str:
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("mitra")
+    except PackageNotFoundError:
+        return "dev"
+
+
 @cli.callback(invoke_without_command=True)
-def main(ctx: typer.Context):
-    """Mitra — local AI coding agent powered by Ollama."""
+def main(
+    ctx: typer.Context,
+    show_version: bool = typer.Option(False, "--version", "-V", help="Show the version and exit."),
+):
+    """Mitra: a local coding assistant on Ollama. Run `mitra` in a project folder to start the chat."""
+    if show_version:
+        console.print(f"mitra {_version()}")
+        raise typer.Exit(0)
     if ctx.invoked_subcommand is not None:
         return
     _chat()
