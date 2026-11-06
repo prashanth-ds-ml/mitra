@@ -122,7 +122,7 @@ class TestFriendlyError:
 
     def test_memory_pressure_hint(self):
         msg = _friendly_error(Exception("model requires more system memory (10.2 GiB) than is available (6.3 GiB)"))
-        assert "/hibernate" in msg
+        assert "/model use qwen3.5:4b" in msg and "/hibernate" not in msg
 
     def test_unknown_error_includes_original(self):
         msg = _friendly_error(Exception("something totally unknown happened"))
