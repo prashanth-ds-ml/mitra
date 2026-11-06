@@ -20,7 +20,8 @@ dependencies = [
     "Pillow",
     "numpy",
     "PyYAML",
-    "mcp>=2.3.0,<3"
+    "mcp>=2.3.0,<3",
+    "pytest",  # run_tests falls back to Mitra's own Python for projects without a venv (E-028)
 ]
 
 [project.optional-dependencies]

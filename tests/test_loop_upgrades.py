@@ -234,3 +234,18 @@ def test_run_records_are_scrubbed(ws, tmp_path):
     L.solve("x", ws, model, record_path=rec)
     text = rec.read_text(encoding="utf-8")
     assert token not in text and "***" in text
+
+
+def test_tests_run_with_the_projects_python(tmp_path, monkeypatch):
+    """E-028: installed as a command, Mitra's own Python had no pytest; prefer the project's venv, then PATH."""
+    venv_py = tmp_path / ".venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+    venv_py.parent.mkdir(parents=True)
+    venv_py.write_text("", encoding="utf-8")
+    assert T.project_python(tmp_path) == str(venv_py)
+    other = tmp_path / "plain"
+    other.mkdir()
+    monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/python-with-pytest" if name == "python" else None)
+    monkeypatch.setattr(T, "_has_pytest", lambda p: True)
+    assert T.project_python(other) == "/usr/bin/python-with-pytest"
+    monkeypatch.setattr(T, "_has_pytest", lambda p: False)
+    assert T.project_python(other) == sys.executable

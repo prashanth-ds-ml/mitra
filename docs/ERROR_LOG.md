@@ -8,6 +8,8 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-029 | 2026-11-06 | M1 | High | Claude (own mistake) | `uv tool install --reinstall` while the user had `mitra` open: Windows locked the tool's python.exe, uv had already deleted the tool's packages, so new `mitra` launches failed with `No module named 'app'` | closed | F-029 |
+| E-028 | 2026-11-06 | M1 | High | health check (live run step) | Installed as the `mitra` command, run_tests used Mitra's private Python: `No module named pytest`, so every test run in a user's project failed | closed | F-028 |
 | E-027 | 2026-11-06 | M2 | High | Claude (review of `/commit`) | `/commit` committed unstaged and untracked files: it used the `git_commit` tool, which runs `git add -A` first; with nothing staged, `--generate` drafted a message from "(no diff)" and committed everything | closed | F-027 |
 | E-026 | 2026-11-06 | M1 | High | Claude (test for fresh rounds) | The repeat guard refused the 3rd `run_tests` (always called with `{}`) and re-reading a file after editing it, so a normal fix loop (change, test, change, test) was stopped as "kept repeating" | closed | F-026 |
 | E-025 | 2026-11-06 | M2 | High | user ("why is it stopped after the compaction") | The chat compacted at "193,304 tokens" on a 64K model: context use was the sum of every call's tokens, not the size of the latest prompt; the same turn ended after the old file agent hit its 20-call limit and wrote 4 files into `levels/01-snake/` | closed | F-025 |
@@ -53,6 +55,35 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-029: Reinstalling the command under an open session broke it
+
+- **Date found:** 2026-11-06 · **Milestone:** M1 · **Severity:** High · **Found by:** Claude, own mistake
+- **Status:** closed
+
+**What happened:** to add pytest to Mitra's dependencies I ran `uv tool install --editable . --reinstall` while the
+user's `mitra` session (started 19:55) was open. uv deleted the tool's `Lib/site-packages`, then failed to remove
+`Scripts/` (`Access is denied`, python.exe in use). New launches failed; the open session could have failed on its
+next lazy import.
+**Root cause:** reinstall removes the whole tool environment first; on Windows a running interpreter locks its exe.
+**Fix:** F-029. Repaired by installing into the existing environment
+(`uv pip install --python <tool>/Scripts/python.exe -e .`); `mitra --version` and the live check passed after.
+**Regression test:** `scripts/health_check.py` skips the reinstall while `mitra.exe` is running.
+**Lesson?** L-035.
+
+### E-028: Tests ran with Mitra's own Python, not the project's
+
+- **Date found:** 2026-11-06 · **Milestone:** M1 · **Severity:** High · **Found by:** `scripts/health_check.py`, first full run
+- **Status:** closed
+
+**What happened:** the live step (`mitra solve` from a temp folder) stopped after 15 steps: every `run_tests` said
+`No module named pytest` from the tool's own `python.exe`.
+**Root cause:** run_tests replaced `python` with `sys.executable`; that was the shared venv while Mitra ran from
+source, but the tool's private venv once installed with `uv tool install`.
+**Fix:** F-028.
+**Regression test:** `test_tests_run_with_the_projects_python`; the health check's live step (passed after the fix:
+4 steps, 26 s).
+**Lesson?** L-035.
 
 ### E-027: `/commit` committed files the user had not staged
 

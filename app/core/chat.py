@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -122,6 +123,9 @@ class ChatSession:
         self.llm, self.hooks, self.mode, self.num_ctx = llm, hooks, mode, num_ctx
         self.ws = T.Workspace(Path(workspace), read_only=())  # in the chat the user may ask for test edits
         self.ws.spill_dir = self.ws.root / ".mitra" / "output"
+        # every step of every turn, scrubbed, one file per day: follow a session live, replay it later (D-022)
+        self.rec = core_loop.Recorder(self.ws.root / ".mitra" / "runs" / f"chat-{time.strftime('%Y%m%d')}.jsonl")
+        self.turn_no = 0
 
     # approval for edits in ask mode
     def _before_write(self, rel: str, old: str | None, new: str) -> None:
@@ -186,6 +190,18 @@ class ChatSession:
     def turn(self, messages: list, *, max_steps: int = MAX_STEPS) -> TurnResult:
         """Run the loop on `messages` (the user's message is already the last one). Appends to `messages`."""
         res = TurnResult()
+        self.turn_no += 1
+        t0 = time.monotonic()
+        user = next((m.content for m in reversed(messages) if isinstance(m, HumanMessage)), "")
+        self.rec.write("turn_start", turn=self.turn_no, mode=self.mode, user=str(user)[:2000])
+        res = self._turn(messages, res, max_steps)
+        self.rec.write("turn_end", turn=self.turn_no, steps=res.steps, stopped=res.stopped, reason=res.stop_reason,
+                       text=res.text[:2000], tokens_in=res.tokens_in, tokens_out=res.tokens_out,
+                       ctx_used=res.ctx_used, seconds=round(time.monotonic() - t0, 1),
+                       changed=[e["path"] for e in res.journal])
+        return res
+
+    def _turn(self, messages: list, res: TurnResult, max_steps: int) -> TurnResult:
         self.ws.journal = res.journal
         self.ws.before_write = self._before_write
         specs = tool_specs(self.mode)
@@ -203,11 +219,16 @@ class ChatSession:
                 res.stopped, res.stop_reason = True, "the model returned nothing"
                 return res
             meta = getattr(reply, "usage_metadata", None) or {}
+            self.rec.write("model", turn=self.turn_no, step=step, text=streamed.text[:4000],
+                           tool_calls=reply.tool_calls, tokens_in=meta.get("input_tokens", 0),
+                           tokens_out=meta.get("output_tokens", 0))
             res.tokens_in += int(meta.get("input_tokens", 0) or 0)
             res.tokens_out += int(meta.get("output_tokens", 0) or 0)
             res.ctx_used = int(meta.get("input_tokens", 0) or 0) or res.ctx_used
             if not reply.tool_calls and streamed.text:
                 calls, parse_error = text_tool_calls(streamed.text, {s["name"] for s in specs})
+                if calls or parse_error:
+                    self.rec.write("text_tool_calls", turn=self.turn_no, calls=calls, error=parse_error)
                 if calls:  # the model wrote the call as text: run it as a real call
                     reply = AIMessage(content=reply.content, tool_calls=calls,
                                       usage_metadata=getattr(reply, "usage_metadata", None))
@@ -231,6 +252,7 @@ class ChatSession:
                 else:
                     out, ok = self._run(name, args, self._run_plan)
                 self.hooks.show(name, args, out, ok)
+                self.rec.write("tool", turn=self.turn_no, step=step, name=name, args=args, ok=ok, output=out[:3000])
                 messages.append(ToolMessage(content=out, tool_call_id=tc["id"]))
                 stop = guard.after(name, out) or ""
             if stop:
@@ -240,6 +262,7 @@ class ChatSession:
     def _wrap_up(self, messages: list, res: TurnResult, reason: str) -> TurnResult:
         """The loop was cut short: one call without tools, so the user still hears what was done (E-024)."""
         res.stopped, res.stop_reason = True, reason
+        self.rec.write("stopped", turn=self.turn_no, reason=reason)
         messages.append(HumanMessage(content=(
             f"[Mitra stopped the tools: {reason}.] Tell the user in a few short lines what you did, "
             "what failed and what is left. Do not call tools.")))

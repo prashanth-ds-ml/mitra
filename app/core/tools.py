@@ -218,6 +218,39 @@ def rollback(entries: list[dict]) -> int:
     return n
 
 
+_PYTEST_CHECK: dict[str, bool] = {}
+
+
+def _has_pytest(python: str) -> bool:
+    if python not in _PYTEST_CHECK:
+        try:
+            p = subprocess.run([python, "-c", "import pytest"], capture_output=True, timeout=30)
+            _PYTEST_CHECK[python] = p.returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            _PYTEST_CHECK[python] = False
+    return _PYTEST_CHECK[python]
+
+
+def project_python(root: Path) -> str:
+    """The Python a test command's `python` should mean (E-028).
+
+    Installed as a command, Mitra runs in its own private Python without the project's packages, so tests failed
+    with "No module named pytest". Use, in order: the project's .venv / venv, then `python` on PATH if it has
+    pytest, then Mitra's own Python (which ships pytest for small projects without a venv).
+    """
+    import shutil
+
+    for venv in (".venv", "venv", "env"):
+        for exe in ("Scripts/python.exe", "bin/python"):
+            cand = Path(root) / venv / exe
+            if cand.is_file():
+                return str(cand)
+    on_path = shutil.which("python") or shutil.which("python3")
+    if on_path and "WindowsApps" not in on_path and _has_pytest(on_path):
+        return on_path
+    return sys.executable
+
+
 @dataclass
 class TestRun:
     passed: bool
@@ -230,8 +263,8 @@ class TestRun:
 def run_tests(ws: Workspace, command: str | None = None) -> TestRun:
     cmd = command or ws.test_command
     args = cmd.split()
-    if args and args[0] == "python":
-        args[0] = sys.executable
+    if args and args[0] in ("python", "python3", "py"):
+        args[0] = project_python(ws.root)
     t0 = time.monotonic()
     env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONIOENCODING": "utf-8"}
     try:

@@ -184,3 +184,14 @@ def test_a_search_that_keeps_failing_stops_and_still_answers(tmp_path):
     assert len([s for s in shown if s[0] == "web_search"]) == 4
     assert res.stopped and "failed 4 times" in res.stop_reason
     assert res.text == "Search is down; here is what I know."
+
+
+def test_every_chat_step_is_recorded_for_live_follow_up(tmp_path):
+    import json as _json
+    project(tmp_path)
+    model = Model(call(tc("read_file", 1, path="tests/test_calc.py")), AIMessage(content="It tests add."))
+    hooks, _ = fake_hooks()
+    C.ChatSession(workspace=tmp_path, llm=model, hooks=hooks).turn(msgs("what does the test check?"))
+    rec = next((tmp_path / ".mitra" / "runs").glob("chat-*.jsonl"))
+    kinds = [_json.loads(line)["kind"] for line in rec.read_text(encoding="utf-8").splitlines()]
+    assert kinds == ["turn_start", "model", "tool", "model", "turn_end"]

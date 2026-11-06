@@ -92,10 +92,21 @@ def step_clear_caches():
     return True, f"removed {n} __pycache__ folders"
 
 
+def mitra_sessions_open() -> int:
+    """Running `mitra` processes. Reinstalling under them deletes their packages mid-session (E-029)."""
+    if sys.platform != "win32":
+        return 0
+    code, out = run(["tasklist", "/FI", "IMAGENAME eq mitra.exe", "/NH"], timeout=30)
+    return sum(1 for ln in out.splitlines() if ln.lower().startswith("mitra.exe"))
+
+
 def step_reinstall():
     uv = shutil.which("uv")
     if not uv:
         return False, "uv not found on PATH"
+    open_sessions = mitra_sessions_open()
+    if open_sessions:
+        return True, f"skipped: {open_sessions} mitra session(s) open; close them, then rerun to reinstall"
     code, out = run([uv, "tool", "install", "--editable", str(ROOT), "--python", "3.12", "--reinstall"], timeout=600)
     return code == 0, last_line(out) or "installed"
 

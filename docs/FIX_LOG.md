@@ -8,6 +8,8 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-029 | 2026-11-06 | E-029 | health_check skips the reinstall while `mitra.exe` is running; repair = `uv pip install --python <tool python> -e .` | `scripts/health_check.py` | live check passed after repair | works |
+| F-028 | 2026-11-06 | E-028 | `project_python()`: the project's .venv, then `python` on PATH if it has pytest, then Mitra's own Python (pytest added to Mitra's dependencies) | `app/core/tools.py`, `pyproject.toml` | `test_tests_run_with_the_projects_python` | works |
 | F-027 | 2026-11-06 | E-027 | `/commit` refuses when nothing is staged and runs plain `git commit -m` (no `git add -A`, no push) with timeouts; the drafted message comes from `git diff --cached`; a cancelled menu or empty typed message does not commit | `app/main.py` (`_cmd_commit`, `_generate_commit_message`) | `tests/test_commit_command.py` | works |
 | F-026 | 2026-11-06 | E-026 | `RepeatGuard`: `run_tests` and `run_command` are never repeats; any successful write clears the repeat memory | `app/agents/limits.py` | `test_repeat_guard_allows_rerunning_tests_and_rereading_after_an_edit` | works |
 | F-025 | 2026-11-06 | E-025 | `ctx_used` = prompt tokens of the latest model call; status line shows it against num_ctx; auto-compact, `/status`, `/context` and `/compact` use it | `app/main.py` | `test_context_use_is_the_latest_prompt_not_the_sum_of_calls` | works |
