@@ -91,3 +91,30 @@ def test_a_command_may_repeat_after_a_file_changed():
     assert g.before("run_command", {"command": "pytest"}) is not None
     g.after("edit_file", "Edited a.py.", ok=True)
     assert g.before("run_command", {"command": "pytest"}) is None
+
+
+def test_separators_inside_quotes_are_part_of_the_argument():
+    """E-040 (live session 2026-11-06): `python -c "import pygame; print('ok')"` was split at the `;` and ran as
+    `import pygame && print(...)`, failing 4 times until the guard stopped the turn."""
+    assert shell.split_chain('python -c "import pygame; print(\'ok\')"') is None
+    assert shell.split_chain('echo "a && b"') is None
+    assert shell.split_chain("python -c 'a;b' && pytest -q") == ["python -c 'a;b'", "pytest -q"]
+    assert shell.split_chain("cd a && pytest -q") == ["cd a", "pytest -q"]
+    assert not shell.has_pipe_or_redirect('python -c "print(1 | 2 > 0)"')
+    assert shell.has_pipe_or_redirect("pytest -q | tail -5")
+    assert shell.has_pipe_or_redirect('echo "x" > out.txt')
+
+
+def test_a_program_still_running_at_the_timeout_is_not_a_failure():
+    """E-041: the game window ran until the timeout and was reported as FAILED; the model kept 'fixing' it."""
+    from app.ui.render import shell_done
+
+    r = shell.ShellResult(command="python brick_breaker.py", cwd=".", exit_code=1, timed_out=True, timeout_s=60,
+                          output_lines=["pygame 2.6.1 (SDL 2.28.4)", "UserWarning: pkg_resources is deprecated"])
+    assert r.still_running and not r.ok
+    summary = r.to_llm_summary()
+    assert "[STILL RUNNING]" in summary and "not a crash" in summary and "FAILED" not in summary
+    assert "still running after 60s" in shell_done(r).plain
+    crashed = shell.ShellResult(command="python x.py", cwd=".", exit_code=1, timed_out=True,
+                                output_lines=["Traceback (most recent call last):", "ValueError: bad"])
+    assert not crashed.still_running and "[TIMEOUT]" in crashed.to_llm_summary()

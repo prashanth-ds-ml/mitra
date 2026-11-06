@@ -103,6 +103,15 @@ class ShellResult:
     timed_out: bool = False
     denied: bool = False             # user declined
     hidden_lines: int = 0            # output lines not shown live (folded; ctrl+o shows them)
+    timeout_s: float = 0             # the limit it ran under
+
+    @property
+    def still_running(self) -> bool:
+        """Stopped at the timeout with no error in its output: a game, window or server that runs until closed."""
+        if not self.timed_out:
+            return False
+        tail = self.tail.lower()
+        return not any(w in tail for w in ("traceback", "error", "exception", "failed"))
 
     @property
     def ok(self) -> bool:
@@ -118,6 +127,12 @@ class ShellResult:
         return "\n".join(self.output_lines[-30:])
 
     def to_llm_summary(self) -> str:
+        if self.still_running:
+            return (f"Command: {self.command}\nCWD: {self.cwd}\n[STILL RUNNING] The program ran for "
+                    f"{self.timeout_s:.0f}s without an error and was stopped at the time limit. A game, window or "
+                    "server keeps running until it is closed: this is not a crash. Do not run it again to test it; "
+                    "tell the user the command to run it themselves.\n\n"
+                    f"Output (last 30 lines):\n{self.tail or '(no output)'}")
         status = "OK" if self.ok else ("TIMEOUT" if self.timed_out else ("DENIED" if self.denied else "FAILED"))
         return (
             f"Command: {self.command}\n"
@@ -248,15 +263,41 @@ def unix_to_windows_path(arg: str) -> str:
     return arg
 
 
+def _mask_quotes(command: str) -> str:
+    """The command with everything inside quotes replaced by spaces (same length), so operators are only found
+    where a shell would see them: `python -c "a; b"` has no `;` outside quotes (E-040)."""
+    out, quote = [], None
+    for ch in command:
+        if quote:
+            out.append(" " if ch != quote else ch)
+            if ch == quote:
+                quote = None
+        else:
+            if ch in "\"'":
+                quote = ch
+            out.append(ch)
+    return "".join(out)
+
+
+def has_pipe_or_redirect(command: str) -> bool:
+    return any(tok in _mask_quotes(command) for tok in ("|", ">", "<"))
+
+
 def split_chain(command: str) -> list[str] | None:
     """`cd X && pytest -q` -> ["cd X", "pytest -q"]; None for a single plain command.
 
     Model commands run without a shell, so `&&` and `cd` used to fail every time; the model retried the same chain
     30+ times (E-033). Chains of `&&` / `;` are run one part at a time; pipes and redirects are refused."""
-    if not any(tok in command for tok in ("&&", ";")):
+    masked = _mask_quotes(command)
+    if not any(tok in masked for tok in ("&&", ";")):
         return None  # a lone `cd X` stays the built-in that moves the session's folder
-    parts = [p.strip() for p in re.split(r"&&|;", command) if p.strip()]
-    return parts or None
+    parts, start = [], 0
+    for m in re.finditer(r"&&|;", masked):  # positions in the masked text are positions in the command
+        parts.append(command[start:m.start()].strip())
+        start = m.end()
+    parts.append(command[start:].strip())
+    parts = [p for p in parts if p]
+    return parts if len(parts) > 1 else None
 
 
 def _run_chain(parts: list[str], cwd: str, timeout, console) -> ShellResult:
@@ -490,7 +531,7 @@ def execute(
     timeout = timeout if timeout is not None else _config.default_timeout
 
     if not typed_by_user:
-        if any(tok in command for tok in ("|", ">", "<")) and not re.search(r"""["'][^"']*[|<>][^"']*["']""", command):
+        if has_pipe_or_redirect(command):
             return ShellResult(command=command, cwd=resolved_cwd, exit_code=1, output_lines=[
                 "✗ Pipes and redirects (| > <) are not supported for model commands. Run one command at a time."])
         chain = split_chain(command)
@@ -596,6 +637,7 @@ def execute(
         output_lines=kept,
         timed_out=timed_out,
         hidden_lines=shown["hidden"],
+        timeout_s=float(timeout or 0),
     )
 
 

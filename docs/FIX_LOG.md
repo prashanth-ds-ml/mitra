@@ -8,6 +8,8 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-041 | 2026-11-06 | E-041 | `ShellResult.still_running` (timed out, no traceback/error in the output): the model is told `[STILL RUNNING] ... not a crash, tell the user the command`, it does not count as a failure for the guard, and the screen shows `still running after Ns, no errors` | `app/agents/shell.py`, `app/main.py`, `app/ui/render.py` | `test_a_program_still_running_at_the_timeout_is_not_a_failure` | works |
+| F-040 | 2026-11-06 | E-040 | Operators are looked for only outside quotes (`_mask_quotes`, same length, so split positions map back); pipe/redirect refusal uses the same check | `app/agents/shell.py` | `test_separators_inside_quotes_are_part_of_the_argument` | works |
 | F-039 | 2026-11-06 | E-039 | Every `subprocess.run` in app/ has a timeout (git 60 s, venv 300 s, pip install 900 s); the main.py git helpers treat a timeout as no repo / no output | `app/agents/filesystem.py`, `app/main.py` | `test_every_subprocess_call_in_app_has_a_timeout`, `test_git_helpers_survive_a_hung_git` | works |
 | F-038 | 2026-11-06 | E-038 | Tool texts capped at 300 chars (`MAX_TOOL_CHARS`); CI checks the worst-case harness against the budget | `app/core/harness.py`, `tests/test_prompt_budget.py` | `test_a_full_harness_stays_under_budget` | works |
 | F-037 | 2026-11-06 | E-037 | `mitra solve --max-steps` defaults to 0 = the harness setting; `run_plan` defaults to None | `app/main.py`, `app/core/cli.py`, `app/core/loop.py` | `test_solve_uses_the_harness_step_limit_when_none_is_given` | works |

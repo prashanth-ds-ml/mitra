@@ -20,6 +20,10 @@
 - Deep dive (E-036..E-039): improve looks only at the current harness version's records, model errors and broken
   grading stop the A/B, proposer unloaded + free-RAM check, worst-case harness within the prompt budget, harness
   step limit applies to `mitra solve`, every subprocess has a timeout; health check has a self-improve step.
+- Live session 2026-11-06 (brick breaker in mitra-try, user playing): E-040 (quote-blind chain split) and E-041
+  (a running game reported as failed) fixed; chat prompt: project questions are answered from the files, not the web.
+  Open: Mitra has no way to start a program and leave it running for the user (games, servers); pip installs went
+  to the user Python, not a project venv.
 - Next: step 4 overnight runs (needs the user's ok to create a scheduled task); more run records from real sessions.
 
 2026-11-06 evening (all pushed; 431 tests; Windows + Linux CI green):

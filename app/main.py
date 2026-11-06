@@ -2092,7 +2092,7 @@ def _chat():
         result = shell_agent.execute(command=command, cwd=None, console=console)
         console.print(ui.shell_done(result))
         ui_state.folded.remember(f"Output of {command}", result.output)
-        return result.to_llm_summary(), result.ok
+        return result.to_llm_summary(), result.ok or result.still_running  # E-041: running != failed
 
     def _chat_mcp_find(query):
         return mcp_registry.format_search(cfg["workspace"], mcp_registry.search_tools(cfg["workspace"], query))

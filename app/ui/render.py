@@ -111,6 +111,8 @@ def shell_done(result) -> Text:
     t = Text("  " + ELBOW + "  ", style="m.faint")
     if getattr(result, "denied", False):
         t.append("skipped: you declined", style="m.dim")
+    elif getattr(result, "still_running", False):  # E-041: a game / server still running is not a failure
+        t.append(f"still running after {getattr(result, 'timeout_s', 0):.0f}s, no errors · stopped", style="m.info")
     elif getattr(result, "timed_out", False):
         t.append("timed out", style="m.err")
     elif result.exit_code == 0:
