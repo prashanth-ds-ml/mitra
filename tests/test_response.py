@@ -116,9 +116,7 @@ class TestRenderPanelTitle:
         r = AgentResponse(request="install", steps=[
             ToolResult(tool="install_packages", args={"project_path": "."}, output="✓ done"),
         ])
-        panel = render(r)
-        # Rich Panel title is a renderable — check it contains our string
-        assert "Installing packages" in str(panel.title)
+        assert "● Install ." in _text_of(render(r))
 
     def test_render_uses_compact_activity_labels(self):
         r = AgentResponse(
@@ -128,6 +126,13 @@ class TestRenderPanelTitle:
                 ToolResult(tool="create_file", args={"path": "app.py"}, output="✓ Created file: app.py"),
             ],
         )
-        panel = render(r)
-        body = panel.renderable
-        assert body is not None
+        out = _text_of(render(r))
+        assert "● List ." in out and "2 entries" in out and "● Write app.py" in out
+
+
+def _text_of(renderable) -> str:
+    from rich.console import Console
+    from app import ui
+    c = ui.apply(Console(record=True, width=100, color_system=None))
+    c.print(renderable)
+    return c.export_text()

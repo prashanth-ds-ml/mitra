@@ -305,7 +305,7 @@ def cmd_test(command: str = typer.Argument("pytest"), cwd: str | None = typer.Op
     _cfg, workspace = _phase5_workspace(cwd)
     output = _cmd_test(command, workspace)
     if output:
-        console.print(Panel(output, title="[bold cyan]Test Command[/bold cyan]", border_style="cyan"))
+        _say(output)
 
 
 def cmd_mcp(
@@ -2315,13 +2315,12 @@ def _cmd_commit(workspace: str, llm, message: str | None = None, *, staged: bool
     if generate:
         suggested = _generate_commit_message(workspace, llm, staged=staged)
         if suggested:
-            console.print(Panel(
-                f"[bold]Suggested commit message:[/bold]\n\n{suggested}",
-                title="[bold cyan]Commit Message Helper[/bold cyan]",
-                border_style="cyan",
-            ))
-            use_it = console.input("[dim]Use this message? [Y/n] [/dim]").strip().lower()
-            if use_it in ("", "y", "yes"):
+            console.print()
+            console.print(ui.tool_line("Commit message"))
+            console.print(ui.detail_block(suggested))
+            choice = ui.menu.choose(console, "Use this message?",
+                                    [("yes", "Yes"), ("edit", "No, I'll type my own")], default="yes")
+            if choice == "yes":
                 message = suggested
             else:
                 message = console.input("[dim]Enter custom message: [/dim]").strip()
@@ -2748,13 +2747,7 @@ def _handle_cleanup_request(user_input: str, workspace: str) -> str:
     _print_progress_message("Reviewing cleanup candidates", f"Target: `{root_display}`")
     console.print()
     console.print(Rule(style="dim"))
-    console.print(
-        Panel(
-            Markdown(f"**Cleanup target:** `{root_display}`\n\n{preview}"),
-            title="[bold cyan]Mitra[/bold cyan]",
-            border_style="cyan",
-        )
-    )
+    _say(f"**Cleanup target:** `{root_display}`\n\n{preview}")
     if not candidates:
         return f"Cleanup target: {root_display}\n\n{preview}"
     if not _confirm_cleanup_plan(candidates):
@@ -3318,13 +3311,7 @@ def _chat():
                 ai_reply = _build_project_summary(shell_agent.get_cwd())
                 console.print()
                 console.print(Rule(style="dim"))
-                console.print(
-                    Panel(
-                        Markdown(ai_reply),
-                        title="[bold cyan]Mitra[/bold cyan]",
-                        border_style="cyan",
-                    )
-                )
+                _say(ai_reply)
                 memory.append_activity(cfg["workspace"], user_input, ai_reply)
                 memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3337,13 +3324,7 @@ def _chat():
             ai_reply = _build_plan_execution_blocked_reply(session_mode)
             console.print()
             console.print(Rule(style="dim"))
-            console.print(
-                Panel(
-                    Markdown(ai_reply),
-                    title="[bold cyan]Mitra[/bold cyan]",
-                    border_style="cyan",
-                )
-            )
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3355,13 +3336,7 @@ def _chat():
             ai_reply = _build_plan_unapproved_reply()
             console.print()
             console.print(Rule(style="dim"))
-            console.print(
-                Panel(
-                    Markdown(ai_reply),
-                    title="[bold cyan]Mitra[/bold cyan]",
-                    border_style="cyan",
-                )
-            )
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3372,13 +3347,7 @@ def _chat():
             ai_reply = _build_next_steps_reply(cfg["workspace"])
             console.print()
             console.print(Rule(style="dim"))
-            console.print(
-                Panel(
-                    Markdown(ai_reply),
-                    title="[bold cyan]Mitra[/bold cyan]",
-                    border_style="cyan",
-                )
-            )
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3413,26 +3382,14 @@ def _chat():
         if intent == "chat" and _is_simple_greeting(user_input):
             console.print()
             console.print(Rule(style="dim"))
-            console.print(
-                Panel(
-                    Markdown(_build_greeting_reply()),
-                    title="[bold cyan]Mitra[/bold cyan]",
-                    border_style="cyan",
-                )
-            )
+            _say(_build_greeting_reply())
             continue
 
         if intent == "chat" and _is_small_talk(user_input):
             ai_reply = _build_small_talk_reply(user_input)
             console.print()
             console.print(Rule(style="dim"))
-            console.print(
-                Panel(
-                    Markdown(ai_reply),
-                    title="[bold cyan]Mitra[/bold cyan]",
-                    border_style="cyan",
-                )
-            )
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3452,13 +3409,7 @@ def _chat():
             )
             console.print()
             console.print(Rule(style="dim"))
-            console.print(
-                Panel(
-                    Markdown(ai_reply),
-                    title="[bold cyan]Mitra[/bold cyan]",
-                    border_style="cyan",
-                )
-            )
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3467,13 +3418,7 @@ def _chat():
             ai_reply = _build_current_folder_reply(shell_agent.get_cwd(), workspace=cfg["workspace"])
             console.print()
             console.print(Rule(style="dim"))
-            console.print(
-                Panel(
-                    Markdown(ai_reply),
-                    title="[bold cyan]Mitra[/bold cyan]",
-                    border_style="cyan",
-                )
-            )
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3482,13 +3427,7 @@ def _chat():
             ai_reply = _build_project_summary(shell_agent.get_cwd())
             console.print()
             console.print(Rule(style="dim"))
-            console.print(
-                Panel(
-                    Markdown(ai_reply),
-                    title="[bold cyan]Mitra[/bold cyan]",
-                    border_style="cyan",
-                )
-            )
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3497,13 +3436,7 @@ def _chat():
             ai_reply = _build_project_summary(shell_agent.get_cwd())
             console.print()
             console.print(Rule(style="dim"))
-            console.print(
-                Panel(
-                    Markdown(ai_reply),
-                    title="[bold cyan]Mitra[/bold cyan]",
-                    border_style="cyan",
-                )
-            )
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3518,13 +3451,7 @@ def _chat():
             ai_reply = _build_root_delete_reply(cfg["workspace"])
             console.print()
             console.print(Rule(style="dim"))
-            console.print(
-                Panel(
-                    Markdown(ai_reply),
-                    title="[bold cyan]Mitra[/bold cyan]",
-                    border_style="cyan",
-                )
-            )
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3547,13 +3474,7 @@ def _chat():
             if root_rename_reply:
                 console.print()
                 console.print(Rule(style="dim"))
-                console.print(
-                    Panel(
-                        Markdown(root_rename_reply),
-                        title="[bold cyan]Mitra[/bold cyan]",
-                        border_style="cyan",
-                    )
-                )
+                _say(root_rename_reply)
                 memory.append_activity(cfg["workspace"], user_input, root_rename_reply)
                 memory.update_context(cfg["workspace"], user_input)
                 continue
@@ -3562,13 +3483,7 @@ def _chat():
             ai_reply = _build_run_command_reply(cfg["workspace"])
             console.print()
             console.print(Rule(style="dim"))
-            console.print(
-                Panel(
-                    Markdown(ai_reply),
-                    title="[bold cyan]Mitra[/bold cyan]",
-                    border_style="cyan",
-                )
-            )
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3985,14 +3900,8 @@ def _chat():
         except Exception as e:
             _set_current_task("Ready")
             _log_error(cfg["workspace"], e)
-            console.print(
-                Panel(
-                    f"[red]⚠  {_friendly_error(e)}[/red]\n"
-                    f"[dim](Full trace saved to .mitra/errors.log)[/dim]",
-                    title="[bold red]Error[/bold red]",
-                    border_style="red",
-                )
-            )
+            console.print(ui.tool_line("Error", ok=False,
+                                       detail=f"{_friendly_error(e)} (full trace in .mitra/errors.log)"))
 
 
 # ── Guided Builder (/create) ──────────────────────────────────────────────────
@@ -4389,14 +4298,8 @@ def _compact(
                 "last_compaction": compact_meta,
             },
         )
-    console.print(
-        Panel(
-            summary,
-            title="[bold yellow]Compacted History[/bold yellow]",
-            border_style="yellow",
-        )
-    )
-    console.print("[dim]Context window cleared — summary injected as new context.[/dim]")
+    console.print(ui.tool_line("Compacted", detail="the conversation was summarised to free context"))
+    console.print(ui.detail_block(summary, max_lines=20))
     return [
         SystemMessage(content=system_prompt),
         HM(content=f"[Compacted context from previous turns]\n\n{summary}"),
@@ -4405,8 +4308,8 @@ def _compact(
 
 def _print_help(extra_commands=None):
     table = Table.grid(padding=(0, 2))
-    table.add_column(style="cyan", no_wrap=True)
-    table.add_column(style="dim")
+    table.add_column(style="m.accent", no_wrap=True)
+    table.add_column(style="m.dim")
     commands = [
         ("/help",          "Show this help"),
         ("/init",          "Create MITRA.md + mitra.toml in this folder"),
@@ -4433,7 +4336,8 @@ def _print_help(extra_commands=None):
     ]
     for cmd, desc in commands:
         table.add_row(cmd, desc)
-    console.print(Panel(table, title="[bold cyan]Slash Commands[/bold cyan]", border_style="cyan"))
+    console.print()
+    console.print(table)
 
 
 if __name__ == "__main__":

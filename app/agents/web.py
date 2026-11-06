@@ -272,12 +272,8 @@ def run(llm, user_request: str, console: Console | None = None) -> WebResponse:
             messages.append(ToolMessage(content=str(output), tool_call_id=tc["id"]))
 
 
-def render(response: WebResponse) -> Panel:
-    return Panel(
-        Markdown(response.summary),
-        title="[bold cyan]Web Search[/bold cyan]",
-        border_style="cyan",
-    )
+def render(response: WebResponse):
+    return Markdown(response.summary or "")
 
 
 def make_routing_tool(llm, console: Console | None = None):

@@ -41,9 +41,5 @@ def run(llm, request: str, review_input: str, *, source: str = "current changes"
     )
 
 
-def render(response: ReviewResponse) -> Panel:
-    return Panel(
-        Markdown(response.summary),
-        title="[bold cyan]Review[/bold cyan]",
-        border_style="cyan",
-    )
+def render(response: ReviewResponse):
+    return Markdown(response.summary or "")

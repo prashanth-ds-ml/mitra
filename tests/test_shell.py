@@ -242,16 +242,13 @@ class TestRender:
     def test_render_ok_panel(self):
         from app.agents.shell import ShellResult
         r = ShellResult(command="python --version", cwd=".", exit_code=0, output_lines=["Python 3.13.0"])
-        panel = shell_agent.render(r)
-        assert panel is not None
-        assert "Run" in str(panel.title)
+        out = _text_of(shell_agent.render(r))
+        assert "● Bash python --version" in out and "done · 1 lines of output" in out
 
     def test_render_failed_panel(self):
         from app.agents.shell import ShellResult
         r = ShellResult(command="pytest", cwd=".", exit_code=1, output_lines=["FAILED"])
-        panel = shell_agent.render(r)
-        assert panel is not None
-        assert "Run" in str(panel.title)
+        assert "failed · exit 1" in _text_of(shell_agent.render(r))
 
     def test_render_timeout_panel(self):
         from app.agents.shell import ShellResult
@@ -297,3 +294,11 @@ class TestTypedByUser:
                                      timeout=1, typed_by_user=True)
 
         assert not result.ok
+
+
+def _text_of(renderable) -> str:
+    from rich.console import Console
+    from app import ui
+    c = ui.apply(Console(record=True, width=100, color_system=None))
+    c.print(renderable)
+    return c.export_text()

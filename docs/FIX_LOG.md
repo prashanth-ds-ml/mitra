@@ -47,6 +47,7 @@ files, memory, plan) is one row in the header. The Session Snapshot box, the GPU
 line, the detail with a coloured diff, the question, then an inline arrow-key menu (number keys work too; esc
 cancels). The input has a rule above and below it, then the status line. `/model use <name>` sets the next start's
 model.
+Second pass the same day: the remaining boxes went too (14 more command replies, the error box, the compact summary, `/help`, the commit-message helper, and the agents' own panels: reviewer, web, session, reader, file and shell results, the planner's step boxes). The plan keeps one accent box, as in the mock.
 **Test:** 8 tests in `tests/test_ui.py`; the real menu driven with simulated keys (down, down, up, enter -> 2nd
 option; "3" -> 3rd; enter -> default).
 

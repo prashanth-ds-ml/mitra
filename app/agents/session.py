@@ -106,9 +106,5 @@ def build_resume_reply(workspace: str) -> str:
     return "\n".join(lines)
 
 
-def render_resume(reply: str) -> Panel:
-    return Panel(
-        Markdown(reply),
-        title="[bold cyan]Session Resume[/bold cyan]",
-        border_style="cyan",
-    )
+def render_resume(reply: str):
+    return Markdown(reply or "")

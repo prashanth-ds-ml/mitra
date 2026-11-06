@@ -112,61 +112,15 @@ def _panel_title(response: AgentResponse) -> str:
 
 # ─── Renderer ─────────────────────────────────────────────────────────────────
 
-def render(response: AgentResponse) -> Panel:
-    """Build a Rich Panel from an AgentResponse."""
+def render(response: AgentResponse):
+    """Steps as one line each, then the summary (no panel, D-031)."""
+    from rich.markdown import Markdown
+    from app.ui import agent_steps
+
     parts: list = []
-
-    # ── Request ──
-    parts.append(Text.from_markup("[dim]Request[/dim]"))
-    parts.append(Text(response.request, style="italic"))
-    parts.append(Text(""))
-
-    # ── Steps ──
     if response.steps:
-        parts.append(Rule(title="activity", style="dim cyan", align="left"))
-        parts.append(Text(""))
-
-        grid = Table.grid(padding=(0, 1))
-        grid.add_column(width=3, no_wrap=True)   # icon
-        grid.add_column(width=12, style="bold")  # action
-        grid.add_column()                        # label / detail
-
-        for step in response.steps:
-            if step.ok:
-                icon = Text("●", style="bold cyan")
-                label = Text(step.label, style="white")
-            else:
-                icon = Text("●", style="bold red")
-                # On failure: first line of output only (no walls of text)
-                first_line = step.output.lstrip("✗").strip().splitlines()[0]
-                label = Text(first_line[:120], style="red")
-
-            grid.add_row(icon, step.action, label)
-
-        parts.append(grid)
-        parts.append(Text(""))
-
-    # ── Summary ──
+        parts.append(agent_steps(response.steps))
     if response.summary:
-        parts.append(Rule(title="summary", style="dim cyan", align="left"))
         parts.append(Text(""))
-        parts.append(Text(response.summary))
-        parts.append(Text(""))
-
-    # ── Footer ──
-    ok, err = response.ok_count, response.err_count
-    footer = Text()
-    footer.append(f"  {ok} done", style="bold green")
-    footer.append("  ·  ", style="dim")
-    footer.append(
-        f"{err} error{'s' if err != 1 else ''}",
-        style="bold red" if err else "dim",
-    )
-    parts.append(footer)
-
-    return Panel(
-        Group(*parts),
-        title=f"[bold cyan]{_panel_title(response)}[/bold cyan]",
-        border_style="cyan",
-        padding=(1, 2),
-    )
+        parts.append(Markdown(response.summary))
+    return Group(*parts)

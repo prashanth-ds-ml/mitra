@@ -60,21 +60,19 @@ class TestRender:
         memory.write_plan(str(tmp_path), goal="Done", steps=["Only step"])
         memory.mark_step_done(str(tmp_path), 0)
         plan = planner_agent._parse_plan(str(tmp_path))
-        panel = planner_agent.render(plan)
-        assert panel.border_style == "green"
+        assert "Plan complete" in _text_of(planner_agent.render(plan))
 
     def test_incomplete_plan_yellow_border(self, tmp_path):
         memory.write_plan(str(tmp_path), goal="In progress", steps=["A", "B"])
         plan = planner_agent._parse_plan(str(tmp_path))
-        panel = planner_agent.render(plan)
-        assert panel.border_style == "yellow"
+        out = _text_of(planner_agent.render(plan))
+        assert "Plan" in out and "1. A" in out and "0/2 steps done" in out
 
     def test_render_flow_panel(self, tmp_path):
         memory.write_plan(str(tmp_path), goal="Build something", steps=["Step 1", "Step 2"])
         plan = planner_agent._parse_plan(str(tmp_path))
-        panel = planner_agent.render_flow(plan, current_step=plan.steps[0])
-        assert panel is not None
-        assert "Task Flow" in str(panel.title)
+        out = _text_of(planner_agent.render_flow(plan, current_step=plan.steps[0]))
+        assert "● Step 1 of 2 Step 1" in out and "0 done" in out
 
 
 # ── Step model ────────────────────────────────────────────────────────────────
@@ -249,3 +247,11 @@ class TestAutoCompactConfig:
         from app.config import load
         cfg = load(cwd=str(tmp_path))
         assert cfg["ollama_api_key"] == "dotenv-secret"
+
+
+def _text_of(renderable) -> str:
+    from rich.console import Console
+    from app import ui
+    c = ui.apply(Console(record=True, width=100, color_system=None))
+    c.print(renderable)
+    return c.export_text()

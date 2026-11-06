@@ -71,9 +71,7 @@ class TestSessionAgent:
         assert "120,000 tokens before compact" in reply
 
     def test_render_resume_returns_panel(self):
-        panel = session_agent.render_resume("## Session resume")
-        assert panel is not None
-        assert "Session Resume" in str(panel.title)
+        assert "Session resume" in _text_of(session_agent.render_resume("## Session resume"))
 
 
 class TestSessionMetadataTrust:
@@ -82,3 +80,11 @@ class TestSessionMetadataTrust:
 
         assert memory.is_shell_command_trusted(str(tmp_path), str(tmp_path), "pytest") is True
         assert memory.is_shell_command_trusted(str(tmp_path), str(tmp_path), "python") is False
+
+
+def _text_of(renderable) -> str:
+    from rich.console import Console
+    from app import ui
+    c = ui.apply(Console(record=True, width=100, color_system=None))
+    c.print(renderable)
+    return c.export_text()

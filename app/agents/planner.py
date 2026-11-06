@@ -133,61 +133,42 @@ def create_plan(llm, goal: str, workspace: str, context: str = "", work_mode: st
 # ─── Render plan panel ────────────────────────────────────────────────────────
 
 def render(plan: Plan) -> Panel:
-    """Render the current plan as a Rich Panel."""
-    table = Table.grid(padding=(0, 1))
-    table.add_column(width=2)
-    table.add_column()
+    """The plan in one accent box, like the mock's plan mode."""
+    from rich.box import ROUNDED
+    from rich.console import Group
 
+    table = Table.grid(padding=(0, 1))
+    table.add_column(justify="right", style="m.accent")
+    table.add_column()
     for step in plan.steps:
         if step.done:
-            table.add_row("[green]✓[/green]", Text(step.text, style="dim strike"))
+            table.add_row("✓", Text(step.text, style="m.faint strike"))
         else:
-            table.add_row("[yellow]○[/yellow]", step.text)
-
-    pending = len(plan.pending)
-    done    = len(plan.completed)
-    footer  = f"[dim]{done}/{len(plan.steps)} steps done[/dim]"
-
-    from rich.console import Group
+            table.add_row(f"{step.index + 1}.", Text(step.text, style="m.text"))
+    done = len(plan.completed)
     content = Group(
-        Text.from_markup(f"[bold]Goal:[/bold] {plan.goal}\n"),
+        Text(plan.goal, style="m.tool"),
+        Text(""),
         table,
         Text(""),
-        Text.from_markup(footer),
+        Text(f"{done}/{len(plan.steps)} steps done", style="m.dim"),
     )
-
-    border = "green" if plan.is_done else "yellow"
-    title  = "[bold green]Plan complete ✓[/bold green]" if plan.is_done else "[bold yellow]Active Plan[/bold yellow]"
-    return Panel(content, title=title, border_style=border)
+    title = Text("Plan complete" if plan.is_done else "Plan", style="m.accent.b")
+    return Panel(content, title=title, title_align="left", box=ROUNDED, border_style="m.accent", padding=(0, 2))
 
 
-def render_flow(plan: Plan, current_step: Step | None = None, blocked: int = 0) -> Panel:
-    """Render a compact task-flow panel for live execution updates."""
-    next_step = current_step.text if current_step else (plan.pending[0].text if plan.pending else "None")
+def render_flow(plan: Plan, current_step: Step | None = None, blocked: int = 0) -> Text:
+    """One progress line: `● Step 2 of 5  text   1 done · 0 blocked`."""
+    from app.ui import tool_line
+
     total = len(plan.steps)
     done = len(plan.completed)
-    doing = 1 if current_step else 0
-    planned = max(total - done - doing, 0)
-
-    stats = Table.grid(expand=True)
-    stats.add_column(justify="center")
-    stats.add_column(justify="center")
-    stats.add_column(justify="center")
-    stats.add_column(justify="center")
-    stats.add_row(
-        f"[cyan]Plan[/cyan]\n[bold]{planned}[/bold]",
-        f"[yellow]Doing[/yellow]\n[bold]{doing}[/bold]",
-        f"[green]Done[/green]\n[bold]{done}[/bold]",
-        f"[red]Blocked[/red]\n[bold]{blocked}[/bold]",
-    )
-
-    from rich.console import Group
-    content = Group(
-        stats,
-        Text(""),
-        Text.from_markup(f"[dim]Current:[/dim] {next_step}"),
-    )
-    return Panel(content, title="[bold cyan]Task Flow[/bold cyan]", border_style="cyan")
+    if current_step is not None:
+        action, target = f"Step {current_step.index + 1} of {total}", current_step.text
+    else:
+        action, target = "Plan", (plan.pending[0].text if plan.pending else "all steps done")
+    extra = f"{done} done" + (f" · {blocked} blocked" if blocked else "")
+    return tool_line(action, target, detail=extra)
 
 
 def _reset_plan_execution_state(workspace: str, goal: str) -> None:
@@ -423,14 +404,8 @@ def run_plan(
             break
 
         if console:
+            console.print()
             console.print(render_flow(plan, current_step=step))
-            console.print(
-                Panel(
-                    f"[bold]{step.text}[/bold]",
-                    title=f"[bold yellow]Step {step.index + 1} of {len(plan.steps)}[/bold yellow]",
-                    border_style="yellow",
-                )
-            )
 
         try:
             workflow.start_step(step.text)

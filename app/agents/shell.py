@@ -701,41 +701,8 @@ def make_routing_tool(llm, console: Console | None = None):
 
 # ─── Rich renderer ───────────────────────────────────────────────────────────
 
-def render(result: ShellResult) -> Panel:
-    """Build a Rich Panel showing the shell result."""
-    parts: list = []
+def render(result: ShellResult):
+    """`● Bash <command>` and its `⎿` result line (the output itself streamed live)."""
+    from app.ui import shell_done, shell_start
 
-    # Command line
-    parts.append(Text.from_markup("[dim]Run[/dim]"))
-    parts.append(Text(result.command, style="bold"))
-    if result.cwd:
-        parts.append(Text.from_markup(f"[dim]CWD: {result.cwd}[/dim]"))
-    parts.append(Text(""))
-
-    # Output
-    if result.output_lines:
-        parts.append(Rule(title="tail", style="dim green", align="left"))
-        parts.append(Text(""))
-        # Show last 40 lines in the panel (full output was already streamed live)
-        for line in result.output_lines[-40:]:
-            parts.append(Text(line, style="dim"))
-        parts.append(Text(""))
-
-    # Footer
-    if result.denied:
-        status_text = Text("Skipped - user declined", style="bold yellow")
-    elif result.timed_out:
-        status_text = Text("Timed out", style="bold red")
-    elif result.ok:
-        status_text = Text(f"Completed - exit {result.exit_code}", style="bold green")
-    else:
-        status_text = Text(f"Failed - exit {result.exit_code}", style="bold red")
-
-    parts.append(status_text)
-
-    return Panel(
-        Group(*parts),
-        title="[bold green]Run[/bold green]",
-        border_style="green",
-        padding=(1, 2),
-    )
+    return Group(shell_start(result.command), shell_done(result))

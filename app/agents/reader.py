@@ -481,14 +481,10 @@ def run(llm, user_request: str, console: Console | None = None) -> ReaderRespons
 
 # ─── Render ───────────────────────────────────────────────────────────────────
 
-def render(response: ReaderResponse) -> Panel:
-    """Build a Rich Panel for the reader agent's findings."""
+def render(response: ReaderResponse):
+    """The reader agent's findings as plain markdown."""
     from rich.markdown import Markdown
-    return Panel(
-        Markdown(response.summary),
-        title="[bold magenta]Code Reader[/bold magenta]",
-        border_style="magenta",
-    )
+    return Markdown(response.summary or "")
 
 
 # ─── Routing tool (for main LLM) ─────────────────────────────────────────────

@@ -27,6 +27,12 @@ class TestReviewerAgent:
             source="last Mitra change set",
             summary="Potential regression in app.py.",
         )
-        panel = reviewer.render(response)
-        assert panel is not None
-        assert "Review" in str(panel.title)
+        assert "Potential regression in app.py." in _text_of(reviewer.render(response))
+
+
+def _text_of(renderable) -> str:
+    from rich.console import Console
+    from app import ui
+    c = ui.apply(Console(record=True, width=100, color_system=None))
+    c.print(renderable)
+    return c.export_text()

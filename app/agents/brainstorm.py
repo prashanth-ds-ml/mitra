@@ -92,15 +92,7 @@ def run(llm, goal: str, console: Console, *, project_context: str = "") -> str:
         thinking, questions_text, ready = _parse_response(text)
 
         if thinking:
-            console.print(
-                Panel(
-                    Text(thinking, style="dim italic"),
-                    border_style="dim",
-                    padding=(0, 2),
-                    title="[dim]thinking[/dim]",
-                    title_align="right",
-                )
-            )
+            console.print(Text(thinking, style="m.faint italic"))
             console.print()
 
         if ready or not questions_text.strip():
