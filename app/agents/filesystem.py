@@ -923,18 +923,45 @@ def make_routing_tool(llm):
     return setup_project
 
 
+def coerce_tool_args(tool_name: str, args: dict) -> dict:
+    """Fix argument shapes small models get wrong (E-018).
+
+    Writing a JSON file, models often pass `content` as an object instead of text; write it as formatted JSON.
+    """
+    args = dict(args or {})
+    content = args.get("content")
+    if content is not None and not isinstance(content, str):
+        if isinstance(content, (dict, list)):
+            args["content"] = json.dumps(content, indent=2, ensure_ascii=False) + "\n"
+        else:
+            args["content"] = str(content)
+    return args
+
+
+def safe_invoke(fn, tool_name: str, args: dict) -> str:
+    """Run a tool; bad arguments or a crash become a tool error the model can correct, never a crashed turn (E-018)."""
+    try:
+        return fn.invoke(args)
+    except Exception as exc:  # pydantic ValidationError, TypeError, OSError, ...
+        first = str(exc).strip().splitlines()
+        detail = " ".join(line.strip() for line in first[:3])[:400]
+        return (f"✗ Invalid call to {tool_name}: {detail}. "
+                f"Check the argument types in the tool description and call it again.")
+
+
 def _invoke_tool_call(tool_name: str, args: dict, tool_map: dict[str, object], console=None) -> str:
     fn = tool_map.get(tool_name)
     if fn is None:
         return f"✗ Unknown tool: {tool_name}"
+    args = coerce_tool_args(tool_name, args)
     if _guard.confirm_fn is not None and _should_confirm_write(tool_name, args):
         approved = _guard.confirm_fn(tool_name, args)
         if not approved:
             return f"✗ Skipped: user declined {tool_name}"
     if console is not None:
         with console.status(f"[m.dim]Running {tool_name}...[/m.dim]", spinner="dots", spinner_style="m.accent"):
-            return fn.invoke(args)
-    return fn.invoke(args)
+            return safe_invoke(fn, tool_name, args)
+    return safe_invoke(fn, tool_name, args)
 
 
 def run_direct(tool_name: str, args: dict, *, request: str | None = None, console=None) -> AgentResponse:

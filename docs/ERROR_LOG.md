@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-018 | 2026-11-06 | M2 | High | user (errors.log) | A plan step crashed the whole turn: qwen3.5:4b called `create_file` with `content` as a JSON object (a game config), pydantic rejected it, and the exception escaped the tool loop | closed | F-014 |
 | E-017 | 2026-11-06 | M2 | Medium | user (terminal test) | Old and new interface mixed: model picker, GPU emoji line, "Session Snapshot" box (stale "compact at 120,000"), API-key note, cyan boxes for command replies and a full-screen blue dialog for approvals, around the new header | closed | F-013 |
 | E-016 | 2026-11-06 | M2 | High | Claude (live UI check) | qwen3.5 replies looked frozen: langchain-ollama drops a thinking model's reasoning when `reasoning` is unset, so a plain question ran 116 s / 8.2K tokens with nothing on screen and no answer shown | closed | F-012 |
 | E-015 | 2026-11-05 | M2 | High | user (terminal test) | A bare `/run` went to the model, which used `qwen3:14b` (hard-coded role default the user does not have): 404. Startup also asked for an Ollama cloud key though Mitra is local-only | closed | F-011 |
@@ -43,6 +44,21 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-018: Bad tool arguments crashed the turn
+
+- **Date found:** 2026-11-06 · **Milestone:** M2 · **Severity:** High · **Found by:** user, `.mitra/errors.log` in mitra-playground
+- **Status:** closed
+
+**What happened:** during a plan run, `filesystem.run` -> `create_file` raised
+`ValidationError: content: Input should be a valid string [input_value={'game': {'screen_width': ..., 'color': [255, 0, 0]}}]`.
+The error went up to the chat loop, which printed "Error" and stopped the plan.
+**Root cause:** tool calls were run with `fn.invoke(args)` and no error handling, so any wrong argument type from the
+model ended the turn instead of going back to it as a tool result. Small models often send JSON file content as an
+object.
+**Fix:** F-014.
+**Regression test:** `TestBadToolArguments` in `tests/test_filesystem.py` (3 tests; all fail without the fix).
+**Lesson?** L-028.
 
 ### E-017: Old and new terminal interface mixed
 

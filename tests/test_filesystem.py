@@ -532,3 +532,34 @@ class TestMarkdownTools:
         assert "Created file" in create_result
         assert "Updated file" in update_result
         assert target.read_text(encoding="utf-8") == "# Updated\n"
+
+
+# ── Bad tool arguments never crash a turn (E-018) ─────────────────────────────
+
+class TestBadToolArguments:
+    def _tools(self):
+        return {t.name: t for t in filesystem._ALL_TOOLS}
+
+    def test_json_content_given_as_an_object_is_written_as_json(self, tmp_path):
+        """E-018: qwen3.5 passed create_file content as a dict while writing a config; the plan crashed."""
+        import json
+        args = {"path": str(tmp_path / "config.json"), "content": {"game": {"screen_width": 600, "color": [255, 0, 0]}}}
+        out = filesystem._invoke_tool_call("create_file", args, self._tools())
+        assert not out.startswith("✗"), out
+        written = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
+        assert written == {"game": {"screen_width": 600, "color": [255, 0, 0]}}
+
+    def test_wrong_argument_type_comes_back_as_a_tool_error(self, tmp_path):
+        out = filesystem._invoke_tool_call("list_directory", {"path": {"not": "a path"}}, self._tools())
+        assert out.startswith("✗ Invalid call to list_directory")
+        assert "call it again" in out
+
+    def test_a_crashing_tool_comes_back_as_a_tool_error(self):
+        class Boom:
+            name = "boom"
+
+            def invoke(self, args):
+                raise OSError("disk on fire")
+
+        out = filesystem.safe_invoke(Boom(), "boom", {})
+        assert out.startswith("✗ Invalid call to boom") and "disk on fire" in out

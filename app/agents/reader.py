@@ -101,10 +101,13 @@ def _invoke_with_status(llm_with_tools, messages: list, console: Console | None,
 
 
 def _run_tool_with_status(fn, args: dict, console: Console | None, label: str) -> str:
+    from app.agents.filesystem import safe_invoke  # bad arguments go back to the model (E-018)
+
+    name = getattr(fn, "name", "tool")
     if console is None:
-        return fn.invoke(args)
+        return safe_invoke(fn, name, args)
     with console.status(f"[m.dim]{label}[/m.dim]", spinner="dots", spinner_style="m.accent"):
-        return fn.invoke(args)
+        return safe_invoke(fn, name, args)
 
 
 def _safe_is_dir(path: pathlib.Path) -> bool:
