@@ -27,6 +27,7 @@ PATTERNS = {
     "tests_never_passed": "Tests were run but never passed by the end.",
     "text_tool_call": "The model wrote a tool call as text.",
     "empty_answer": "A turn ended without an answer.",
+    "interrupted": "The user stopped a turn before it finished (esc / ctrl+c): it was going the wrong way or too slow.",
     "model_error": "A model call failed.",
 }
 CODE_SUFFIXES = (".py", ".js", ".ts", ".html", ".css")
@@ -123,12 +124,17 @@ def analyze(files: list[Path], harness_version: int | None = None) -> Report:
             rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
         except (OSError, json.JSONDecodeError):
             continue
+        started, ended = [], set()
         units: dict[str, dict] = defaultdict(lambda: {"cmd_fail": Counter(), "code": False, "tests": 0,
                                                      "tests_ok": False, "steps": 0})
         for r in rows:
             kind = r.get("kind")
             u = units[_unit_key(r)]
             where = f"{_project(path)}/{path.name}"
+            if kind == "turn_start":
+                started.append(r.get("turn"))
+            elif kind == "turn_end":
+                ended.add(r.get("turn"))
             if kind in ("start", "turn_start"):
                 rep.harness_versions[str(r.get("harness_version", "?"))] += 1
             elif kind == "model":
@@ -172,13 +178,21 @@ def analyze(files: list[Path], harness_version: int | None = None) -> Report:
                     rep.pattern("step_limit").add(f"{where}: {reason[:120]}")
                 elif counted and ("Stopped:" in reason or "kept repeating" in reason or "in a row" in reason):
                     rep.pattern("guard_stop").add(f"{where}: {reason[:120]}")
-                if kind == "turn_end" and not str(r.get("text") or "").strip():
+                if kind == "turn_end" and r.get("interrupted"):
+                    rep.pattern("interrupted").add(f"{where}: turn {r.get('turn')} after {r.get('steps', 0)} steps")
+                elif kind == "turn_end" and not str(r.get("text") or "").strip():
                     rep.pattern("empty_answer").add(f"{where}: turn {r.get('turn')}")
                 if kind in ("end", "turn_end"):
                     rep.units += 1
                     rep.seconds += float(r.get("seconds") or 0)
                     if r.get("status") == "passed":
                         rep.passed_units += 1
+        # records from before interrupted turns were written: a turn that started and never ended was stopped
+        # (the last turn of a file may still be running, so it is left out)
+        for t in started[:-1]:
+            if t not in ended:
+                rep.pattern("interrupted").add(f"{_project(path)}/{path.name}: turn {t} (no end record)")
+                rep.units += 1
         for key, u in units.items():
             for cmd, n in u["cmd_fail"].items():
                 if n >= 3:

@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-042 | 2026-11-06 | M1 | Medium | live session (brick breaker, turns 6-7) | Turns the user stopped with esc left no `turn_end` record (KeyboardInterrupt went past the recorder), so the analyzer could not see them; being stopped by the user is a key self-improvement signal | closed | F-042 |
 | E-041 | 2026-11-06 | M1 | High | live session (brick breaker, mitra-try, turn 4) | The game ran fine but was reported `Exit code 1 [TIMEOUT] FAILED` when the command limit stopped its window; the model kept trying to fix a working game (`timeout 5 && python x.py &`, `python -c ...`) until the guard stopped the turn | closed | F-041 |
 | E-040 | 2026-11-06 | M1 | High | live session (brick breaker, mitra-try, turn 4) | `python -c "import pygame; print('ok')"` was split at the `;` inside the quotes and ran as `import pygame && print(...)`: a correct command failed 4 times and the guard stopped the turn (my E-033 chain split ignored quotes) | closed | F-040 |
 | E-039 | 2026-11-06 | M1 | Medium | deep dive | Some subprocess calls had no timeout (8 in `app/agents/filesystem.py`: git, venv, pip; 2 git helpers in `app/main.py`), against the CLAUDE.md non-negotiable; a hung git would freeze the chat | closed | F-039 |

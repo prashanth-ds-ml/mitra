@@ -233,7 +233,14 @@ class ChatSession:
         user = next((m.content for m in reversed(messages) if isinstance(m, HumanMessage)), "")
         self.rec.write("turn_start", turn=self.turn_no, mode=self.mode, user=str(user)[:2000],
                        harness_version=self.harness.version)
-        res = self._turn(messages, res, max_steps)
+        try:
+            res = self._turn(messages, res, max_steps)
+        except BaseException as exc:  # interrupted (esc / ctrl+c) or crashed: still recorded, the analyzer counts it
+            self.rec.write("turn_end", turn=self.turn_no, steps=res.steps, stopped=True, interrupted=True,
+                           reason=f"interrupted ({type(exc).__name__})", text="", tokens_in=res.tokens_in,
+                           tokens_out=res.tokens_out, seconds=round(time.monotonic() - t0, 1),
+                           changed=[e["path"] for e in res.journal])
+            raise
         self.rec.write("turn_end", turn=self.turn_no, steps=res.steps, stopped=res.stopped, reason=res.stop_reason,
                        text=res.text[:2000], tokens_in=res.tokens_in, tokens_out=res.tokens_out,
                        ctx_used=res.ctx_used, seconds=round(time.monotonic() - t0, 1),

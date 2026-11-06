@@ -132,3 +132,44 @@ def test_run_files_include_the_improve_benchmark_records(tmp_path, monkeypatch):
     _write(tmp_path / "proj" / ".mitra" / "runs" / "chat.jsonl", [{"kind": "turn_start", "turn": 1}])
     names = [p.name for p in D.run_files([tmp_path / "proj"])]
     assert sorted(names) == ["T01.jsonl", "chat.jsonl"]
+
+
+def test_interrupted_turns_are_counted_with_or_without_an_end_record(tmp_path):
+    """Live session 2026-11-06: turns 6 and 7 were stopped with esc and left no turn_end; nothing counted them."""
+    _write(tmp_path / ".mitra" / "runs" / "chat.jsonl", [
+        {"kind": "turn_start", "turn": 1}, {"kind": "model", "turn": 1},           # old record: no end
+        {"kind": "turn_start", "turn": 2},
+        {"kind": "turn_end", "turn": 2, "interrupted": True, "steps": 11, "text": ""},  # new record
+        {"kind": "turn_start", "turn": 3}, {"kind": "model", "turn": 3}])          # still running: not counted
+    rep = A.analyze(A.find_run_files([tmp_path]))
+    p = rep.patterns["interrupted"]
+    assert p.count == 2 and "empty_answer" not in rep.patterns
+    assert any("turn 1 (no end record)" in e for e in p.examples) and any("after 11 steps" in e for e in p.examples)
+
+
+def test_chat_records_a_turn_that_is_interrupted(tmp_path):
+    from types import SimpleNamespace
+
+    import pytest
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    from app.core import chat as C
+
+    class Model:
+        def bind_tools(self, specs):
+            return self
+
+        def stream(self, messages):
+            raise KeyboardInterrupt
+
+    hooks = C.Hooks(stream=lambda chunks, step=1: SimpleNamespace(message=next(iter(chunks)), text="", stopped=False,
+                                                                   printed=True),
+                    show=lambda *a: None, confirm=lambda *a: True, run_shell=lambda c: ("", True),
+                    web_search=lambda q: "", fetch_url=lambda u: "", mcp_find=lambda q: "", mcp_call=lambda *a: "")
+    session = C.ChatSession(workspace=tmp_path, llm=Model(), hooks=hooks)
+    with pytest.raises(KeyboardInterrupt):
+        session.turn([SystemMessage(content="s"), HumanMessage(content="go")])
+    rows = [json.loads(x) for f in (tmp_path / ".mitra" / "runs").glob("chat-*.jsonl")
+            for x in f.read_text(encoding="utf-8").splitlines()]
+    end = [r for r in rows if r["kind"] == "turn_end"]
+    assert len(end) == 1 and end[0]["interrupted"] and "KeyboardInterrupt" in end[0]["reason"]
