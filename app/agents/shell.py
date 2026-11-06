@@ -99,6 +99,9 @@ def configure(
 
 # ─── Result ───────────────────────────────────────────────────────────────────
 
+LIVE_OUTPUT_LINES = 10
+
+
 @dataclass
 class ShellResult:
     command: str
@@ -107,6 +110,7 @@ class ShellResult:
     output_lines: list[str]          # combined stdout+stderr, chronological
     timed_out: bool = False
     denied: bool = False             # user declined
+    hidden_lines: int = 0            # output lines not shown live (folded; ctrl+o shows them)
 
     @property
     def ok(self) -> bool:
@@ -578,6 +582,7 @@ def execute(
     lines: list[str] = []
     proc: subprocess.Popen | None = None
     timed_out = False
+    shown = {"live": 0, "hidden": 0}   # live output is capped at LIVE_OUTPUT_LINES (D-035)
 
     def _reader(stream, tag: str) -> None:
         """Read lines from a stream, print live, and append to lines list."""
@@ -586,7 +591,11 @@ def execute(
                 line = raw.rstrip("\n")
                 lines.append(line)
                 if _config.stream_to_console and console is not None:
-                    console.print(Text("     " + line, style="m.dim"), soft_wrap=True)
+                    if shown["live"] < LIVE_OUTPUT_LINES:
+                        console.print(Text("     " + line, style="m.dim"), soft_wrap=True)
+                        shown["live"] += 1
+                    else:
+                        shown["hidden"] += 1
                 if len(lines) > _config.max_output_lines * 2:
                     lines[:] = lines[-_config.max_output_lines:]
         except Exception:
@@ -629,6 +638,7 @@ def execute(
         exit_code=exit_code,
         output_lines=kept,
         timed_out=timed_out,
+        hidden_lines=shown["hidden"],
     )
 
 

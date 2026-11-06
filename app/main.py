@@ -21,7 +21,6 @@ from rich.table import Table
 from rich.text import Text
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
-from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.key_binding import KeyBindings
 
 from app.llm import get_cloud_llm, get_local_llm, probe_ollama
@@ -558,6 +557,43 @@ _SLASH_COMMANDS = [
     "exit", "quit",
 ]
 _SESSION_MODES = ("read-only", "plan", "approve", "auto")
+_KEY_HELP = [
+    ("shift+enter",  "New line (also alt+enter, ctrl+j)"),
+    ("↑ ↓",          "Move between lines; earlier prompts at the first/last line"),
+    ("ctrl+r",       "Search earlier prompts"),
+    ("ctrl+← →",     "Jump a word (ctrl+backspace deletes one)"),
+    ("/  @",         "Command menu · file search"),
+    ("esc",          "Stop the model while it writes; esc esc clears the input"),
+    ("shift+tab",    "Next mode: ask → auto-edit → plan"),
+    ("ctrl+o",       "Show the last folded output or thinking"),
+    ("ctrl+l",       "Clear the screen (the conversation is kept)"),
+    ("ctrl+c",       "Clear the input; twice on an empty line to quit"),
+]
+# Shown by /help and in the `/` menu as you type (D-035).
+_COMMAND_HELP = [
+        ("/help",          "Show this help"),
+        ("/init",          "Create MITRA.md + mitra.toml in this folder"),
+        ("/status",        "Workspace, model, mode and session status"),
+        ("/doctor",        "Machine and setup check: RAM, GPU, Ollama, permissions, MCP"),
+        ("/model",         "Show the active models (/model list: installed Ollama models)"),
+        ("/context",       "Context-window use and when the session compacts"),
+        ("/think on|off",  "Show or hide the model's reasoning"),
+        ("/mode [name]",   "Show or change the session mode"),
+        ("! <command>",    "Run a shell command in the workspace (e.g. ! pytest -q)"),
+        ("/test [cmd]",    "Run the tests (default: pytest)"),
+        ("/fix <cmd>",     "Run a command, and edit + retry until it passes (bounded)"),
+        ("/diff",          "Show the git diff or Mitra's last change set"),
+        ("/undo",          "Undo Mitra's last change set"),
+        ("/commit [msg]",  "Commit staged changes (--generate drafts the message); never pushes"),
+        ("/review [staged]", "Review the current or staged diff for real problems"),
+        ("/mcp",           "MCP servers: list, test, tools, on/off, trust, import, call"),
+        ("/skills",        "List skills (/skills show <name>)"),
+        ("/logs [name]",   "Inspect .mitra logs"),
+        ("/resume",        "Saved session summary and recent activity"),
+        ("/compact",       "Compress the conversation to free context"),
+        ("/clear",         "Clear the conversation (saved files are kept)"),
+        ("exit / quit",    "Exit Mitra"),
+]
 _WORK_MODES = ("builder", "collaborator", "mentor", "architect", "reviewer", "debugger", "product")
 _FIX_MAX_ATTEMPTS = 3
 _LAST_SHELL_COMMAND: str | None = None
@@ -811,25 +847,6 @@ _RUN_HINTS = (
 )
 
 
-def _make_completer(workspace: str, extra_commands: list[str] | None = None) -> WordCompleter:
-    """Build a completer from slash commands + filenames in workspace."""
-    try:
-        files = [
-            str(p.relative_to(workspace))
-            for p in pathlib.Path(workspace).rglob("*")
-            if p.is_file() and not any(part.startswith(".") or part == "__pycache__"
-                                       for part in p.parts)
-        ][:80]  # cap at 80 to keep startup fast
-    except Exception:
-        files = []
-    extra = [cmd for cmd in (extra_commands or []) if cmd]
-    return WordCompleter(
-        _SLASH_COMMANDS + extra + files,
-        sentence=True,
-        match_middle=False,
-    )
-
-
 def _build_prompt_label(model: str, session_mode: str = "approve", work_mode: str = "builder") -> str:
     """Return the interactive prompt label shown before each user input."""
     # Mode and model are shown in the status line under the input (D-031).
@@ -950,16 +967,6 @@ def _build_skills_reply(
         lines.append(f"  {skill.description}")
     lines.extend(["", "Use `/skills show <name>` to inspect a skill."])
     return "\n".join(lines)
-
-
-def _make_key_bindings() -> KeyBindings:
-    bindings = KeyBindings()
-
-    @bindings.add("c-g")
-    def _(event) -> None:
-        event.app.current_buffer.open_in_editor()
-
-    return bindings
 
 
 def _clear_terminal() -> None:
@@ -3250,36 +3257,51 @@ def _chat():
     ))
     console.print(ui.header.tips())
     prompt_str = _build_prompt_label(model, session_mode, work_mode)
-    completer = _make_completer(
-        cfg["workspace"],
-        extra_commands=[command.name for command in plugin_commands.commands],
-    )
     current_task = "Ready"
 
     def _set_current_task(label: str) -> None:
         nonlocal current_task
         current_task = label or "Ready"
 
-    session = PromptSession(
-        history=InMemoryHistory(),
-        completer=completer,
-        key_bindings=_make_key_bindings(),
-        style=ui.prompt_style(),
-        bottom_toolbar=lambda: ui.framed_status(
+    ui_state = ui.UiState(mode=session_mode)
+
+    def _print_folded() -> None:
+        console.print()
+        console.print(ui.tool_line(ui_state.folded.title or "Folded output"))
+        console.print(ui.detail_block(ui_state.folded.text, max_lines=400))
+
+    input_box = ui.InputBox(
+        workspace=cfg["workspace"],
+        commands=_COMMAND_HELP + [(c.name, "plugin command") for c in plugin_commands.commands],
+        state=ui_state,
+        message=ui.prompt_message,
+        toolbar=lambda: ui.framed_status(
             model=model,
-            mode=session_mode,
+            mode=ui.mode_label(ui_state.mode),
             total_tokens=sess_in + sess_out,
             context_limit=auto_compact_threshold,
             cwd=shell_agent.get_cwd(),
             background_tasks=shell_agent.count_background_tasks(only_running=True),
+            notice=ui_state.current_notice(),
         ),
+        print_folded=_print_folded,
     )
+    typed_ahead = ""
     messages = [SystemMessage(content=system_prompt)]
     sess_in = sess_out = 0  # cumulative session token counts
 
     while True:
         _set_current_task("Ready")
-        user_input = session.prompt(ui.prompt_message)
+        ui_state.mode = session_mode
+        ui.notify.ready(console)
+        try:
+            user_input = input_box.prompt(default=typed_ahead)
+        except (EOFError, KeyboardInterrupt):
+            user_input = "exit"
+        typed_ahead = ""
+        if ui_state.mode != session_mode:   # shift+tab while typing
+            session_mode = ui_state.mode
+            _apply_session_mode(cfg, session_mode)
 
         if user_input.strip() in ["/exit", "exit", "quit"]:
             event_bus.emit(event_bus.SessionEndEvent(
@@ -3298,7 +3320,7 @@ def _chat():
         if _is_bang_command(user_input):
             bang_command = _extract_bang_command(user_input)
             _set_current_task(f"Running {bang_command}")
-            _cmd_run(bang_command)
+            _cmd_run(bang_command, folded=ui_state.folded)
             continue
 
         navigation_target = (
@@ -3718,6 +3740,7 @@ def _chat():
 
         console.print()
         turn_started = time.monotonic()
+        ui.notify.working(console)
 
         try:
             # ── Invoke with streaming ─────────────────────────────────────────
@@ -3729,13 +3752,19 @@ def _chat():
             streamed_text = ""
             has_tool_calls = False
 
-            streamed = ui.stream_reply(console, main_llm.stream(messages), show_reasoning=show_reasoning)
+            with ui.KeyWatcher() as keys:
+                streamed = ui.stream_reply(console, main_llm.stream(messages), show_reasoning=show_reasoning,
+                                           stop=keys.stop, folded=ui_state.folded)
+            typed_ahead += keys.take_typed()
             streamed_chunks = streamed.chunks
             streamed_text = streamed.text
-            has_tool_calls = any(getattr(c, "tool_call_chunks", None) for c in streamed_chunks)
-            if streamed.message is None:
+            has_tool_calls = not streamed.stopped and any(getattr(c, "tool_call_chunks", None) for c in streamed_chunks)
+            if streamed.stopped:
+                response = AIMessage(content=streamed.text)   # keep the partial answer; run no tools
+            elif streamed.message is None:
                 raise RuntimeError("The model returned an empty reply.")
-            response = streamed.message
+            else:
+                response = streamed.message
 
             # Fall back to invoke if streaming didn't give tool calls properly
             if not response.tool_calls and has_tool_calls:
@@ -3778,6 +3807,7 @@ def _chat():
                             console=console,
                         )
                         console.print(ui.shell_done(shell_result))
+                        ui_state.folded.remember(f"Output of {_LAST_SHELL_COMMAND}", shell_result.output)
                         messages.append(ToolMessage(content=shell_result.to_llm_summary(), tool_call_id=tc["id"]))
                         ai_reply = shell_result.to_llm_summary()
                         tool_result = shell_result
@@ -3835,9 +3865,14 @@ def _chat():
 
                 if not skip_follow_up:
                     console.print()
-                    fu = ui.stream_reply(console, main_llm.stream(messages), show_reasoning=show_reasoning,
-                                         label="Writing")
-                    follow_up = fu.message if fu.message is not None else AIMessage(content="")
+                    with ui.KeyWatcher() as keys:
+                        fu = ui.stream_reply(console, main_llm.stream(messages), show_reasoning=show_reasoning,
+                                             label="Writing", stop=keys.stop, folded=ui_state.folded)
+                    typed_ahead += keys.take_typed()
+                    if fu.stopped or fu.message is None:
+                        follow_up = AIMessage(content=fu.text)
+                    else:
+                        follow_up = fu.message
                     f_in, f_out = _get_tokens(follow_up)
                     turn_in += f_in; turn_out += f_out
                     messages.append(follow_up)
@@ -3848,7 +3883,7 @@ def _chat():
                 ai_reply = clean_content.strip()
                 if not streamed.printed:
                     console.print(Markdown(ai_reply))
-            else:
+            elif not streamed.stopped:
                 # A failed or empty model reply is an error, never a silent pass.
                 console.print(ui.tool_line(
                     "Empty reply", ok=False,
@@ -3861,6 +3896,7 @@ def _chat():
             sess_in += turn_in; sess_out += turn_out
             if turn_in or turn_out:
                 console.print(ui.turn_footer(time.monotonic() - turn_started, turn_in, turn_out))
+            ui.notify.done(console, time.monotonic() - turn_started)
 
             # ── Auto-compact ──────────────────────────────────────────────────
             if sess_in + sess_out >= auto_compact_threshold:
@@ -3970,7 +4006,7 @@ def _confirm_shell(command: str, cwd: str) -> str | None:
     return command if approved else None
 
 
-def _cmd_run(command: str, workspace: str | None = None) -> None:
+def _cmd_run(command: str, workspace: str | None = None, *, folded=None) -> None:
     """`! <command>`: run a command the user typed, in their shell, inside the workspace."""
     if not command:
         console.print("[dim]Usage: [cyan]! <command>[/cyan]  e.g. ! pytest -q[/dim]")
@@ -3980,6 +4016,8 @@ def _cmd_run(command: str, workspace: str | None = None) -> None:
     console.print(ui.shell_start(command))
     result = shell_agent.execute(command=command, cwd=workspace, console=console, typed_by_user=True)
     console.print(ui.shell_done(result))
+    if folded is not None:
+        folded.remember(f"Output of {command}", result.output)
 
 
 def _extract_fix_command(raw: str, *, last_command: str | None = None) -> str | None:
@@ -4310,34 +4348,19 @@ def _print_help(extra_commands=None):
     table = Table.grid(padding=(0, 2))
     table.add_column(style="m.accent", no_wrap=True)
     table.add_column(style="m.dim")
-    commands = [
-        ("/help",          "Show this help"),
-        ("/init",          "Create MITRA.md + mitra.toml in this folder"),
-        ("/status",        "Workspace, model, mode and session status"),
-        ("/doctor",        "Machine and setup check: RAM, GPU, Ollama, permissions, MCP"),
-        ("/model",         "Show the active models (/model list: installed Ollama models)"),
-        ("/context",       "Context-window use and when the session compacts"),
-        ("/think on|off",  "Show or hide the model's reasoning"),
-        ("/mode [name]",   "Show or change the session mode"),
-        ("! <command>",    "Run a shell command in the workspace (e.g. ! pytest -q)"),
-        ("/test [cmd]",    "Run the tests (default: pytest)"),
-        ("/fix <cmd>",     "Run a command, and edit + retry until it passes (bounded)"),
-        ("/diff",          "Show the git diff or Mitra's last change set"),
-        ("/undo",          "Undo Mitra's last change set"),
-        ("/commit [msg]",  "Commit staged changes (--generate drafts the message); never pushes"),
-        ("/review [staged]", "Review the current or staged diff for real problems"),
-        ("/mcp",           "MCP servers: list, test, tools, on/off, trust, import, call"),
-        ("/skills",        "List skills (/skills show <name>)"),
-        ("/logs [name]",   "Inspect .mitra logs"),
-        ("/resume",        "Saved session summary and recent activity"),
-        ("/compact",       "Compress the conversation to free context"),
-        ("/clear",         "Clear the conversation (saved files are kept)"),
-        ("exit / quit",    "Exit Mitra"),
-    ]
+    commands = list(_COMMAND_HELP)
     for cmd, desc in commands:
         table.add_row(cmd, desc)
     console.print()
     console.print(table)
+    keys = Table.grid(padding=(0, 2))
+    keys.add_column(style="m.accent", no_wrap=True)
+    keys.add_column(style="m.dim")
+    for key, desc in _KEY_HELP:
+        keys.add_row(key, desc)
+    console.print()
+    console.print(Text("  Keys", style="m.tool"))
+    console.print(keys)
 
 
 if __name__ == "__main__":

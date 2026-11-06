@@ -84,6 +84,7 @@ class StreamResult:
     thinking_tokens: int = 0
     seconds: float = 0.0
     printed: bool = False           # answer text was shown on screen
+    stopped: bool = False           # the user pressed esc
     chunks: list = field(default_factory=list)
 
 
@@ -98,7 +99,7 @@ class _Thinking:
         t = Text(f"{self.label}… {self.clock() - self.started:.0f}s", style="m.accent")
         if self.tokens:
             t.append(f" · {format_tokens(self.tokens)} tokens", style="m.dim")
-        t.append("  ctrl+c to stop", style="m.faint")
+        t.append("  esc to stop", style="m.faint")
         self.spinner.text = t
         return self.spinner
 
@@ -110,6 +111,8 @@ def stream_reply(
     show_reasoning: bool = False,
     clock: Callable[[], float] = time.monotonic,
     label: str = "Thinking",
+    stop=None,
+    folded=None,
 ) -> StreamResult:
     """Consume model chunks, drawing the thinking timer and the answer live. Returns the merged message."""
     res = StreamResult()
@@ -132,6 +135,8 @@ def stream_reply(
             return
         think_shown = True
         live.console.print(thinking_done(clock() - start, res.thinking_tokens, hint=not show_reasoning))
+        if folded is not None and not show_reasoning:
+            folded.remember("Thinking", res.thinking)
         if show_reasoning and res.thinking.strip():
             live.console.print(Text(res.thinking.strip()[:4000], style="m.faint italic"))
         live.console.print()
@@ -161,6 +166,9 @@ def stream_reply(
     live.start()
     try:
         for chunk in chunks:
+            if stop is not None and stop.is_set():
+                res.stopped = True
+                break
             res.chunks.append(chunk)
             try:
                 res.message = chunk if res.message is None else res.message + chunk
@@ -174,6 +182,13 @@ def stream_reply(
                 handle(splitter.feed(content), live)
             if getattr(chunk, "tool_call_chunks", None) and not say:
                 thinking.label = "Choosing a tool"
+        if res.stopped:
+            close = getattr(chunks, "close", None)
+            if callable(close):
+                try:
+                    close()   # closes the HTTP stream, so Ollama stops generating
+                except Exception:
+                    pass
         handle(splitter.flush(), live)
         show_thinking_line(live)
         done, current = split_blocks(say)
@@ -186,6 +201,9 @@ def stream_reply(
         state["view"] = Text("")
     finally:
         live.stop()
+    if res.stopped:
+        from app.ui.render import tool_line
+        console.print(tool_line("Stopped", detail="you pressed esc; the partial answer is kept", ok=False))
     res.text = say.strip()
     res.printed = bool(res.text)
     res.seconds = clock() - start

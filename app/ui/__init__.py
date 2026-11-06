@@ -11,7 +11,9 @@ from app.ui.render import (
     tool_line,
     turn_footer,
 )
-from app.ui import header, menu
+from app.ui import header, menu, notify
+from app.ui.input import InputBox, UiState, mode_label, next_mode
+from app.ui.keys import KeyWatcher
 from app.ui.status import framed_status, git_branch, prompt_message, status_line
 from app.ui.stream import StreamResult, ThinkSplitter, split_blocks, stream_reply
 from app.ui.theme import PHOSPHOR, THEME, apply, prompt_style
@@ -20,6 +22,7 @@ __all__ = [
     "PHOSPHOR", "THEME", "apply", "prompt_style",
     "action_for", "agent_steps", "detail_block", "menu", "format_tokens", "shell_done", "shell_start", "step_line",
     "thinking_done", "tool_line", "turn_footer",
+    "InputBox", "UiState", "mode_label", "next_mode", "KeyWatcher", "notify",
     "header", "framed_status", "git_branch", "prompt_message", "status_line",
     "StreamResult", "ThinkSplitter", "split_blocks", "stream_reply",
 ]

@@ -81,7 +81,6 @@ from app.main import (
     _is_simple_greeting,
     _is_understand_alias_request,
     _looks_like_explicit_command,
-    _make_completer,
     _normalize_session_mode,
     _normalize_work_mode,
     _pick_model,
@@ -170,38 +169,48 @@ class TestSlashCommands:
             assert removed not in _SLASH_COMMANDS
 
 
-# ── _make_completer ───────────────────────────────────────────────────────────
+# ── `/` and `@` completion (D-035) ──────────────────────────────────────────
 
-class TestMakeCompleter:
-    def test_completer_includes_slash_commands(self, tmp_path):
-        completer = _make_completer(str(tmp_path))
-        words = set(completer.words)
-        assert "/help" in words
-        assert "/mcp" in words
+def _completions(completer, text):
+    from prompt_toolkit.document import Document
+    return list(completer.get_completions(Document(text), None))
 
-    def test_completer_includes_workspace_files(self, tmp_path):
-        (tmp_path / "main.py").write_text("pass")
+
+class TestCompleter:
+    def _make(self, root, extra=()):
+        from app.main import _COMMAND_HELP
+        from app.ui.input import FileIndex, MitraCompleter
+        return MitraCompleter(list(_COMMAND_HELP) + list(extra), FileIndex(str(root)))
+
+    def test_slash_menu_lists_commands_with_descriptions(self, tmp_path):
+        items = _completions(self._make(tmp_path), "/m")
+        names = [c.text for c in items]
+        assert "/mcp" in names and "/model" in names and "/help" not in names
+        assert all(c.display_meta_text for c in items)
+
+    def test_at_finds_workspace_files_by_name(self, tmp_path):
+        (tmp_path / "snake").mkdir()
+        (tmp_path / "snake" / "game.py").write_text("pass")
         (tmp_path / "utils.py").write_text("pass")
-        completer = _make_completer(str(tmp_path))
-        words = set(completer.words)
-        assert "main.py" in words
-        assert "utils.py" in words
+        items = _completions(self._make(tmp_path), "explain @game")
+        assert [c.text for c in items] == ["@snake/game.py"]
 
-    def test_completer_includes_extra_commands(self, tmp_path):
-        completer = _make_completer(str(tmp_path), extra_commands=["/hello-plugin"])
-        words = set(completer.words)
-        assert "/hello-plugin" in words
+    def test_plugin_commands_are_offered(self, tmp_path):
+        items = _completions(self._make(tmp_path, [("/hello-plugin", "plugin command")]), "/hel")
+        assert "/hello-plugin" in [c.text for c in items]
 
-    def test_completer_excludes_hidden_files(self, tmp_path):
+    def test_secrets_and_tool_folders_are_never_offered(self, tmp_path):
         (tmp_path / ".env").write_text("SECRET=1")
-        completer = _make_completer(str(tmp_path))
-        words = set(completer.words)
-        assert ".env" not in words
+        (tmp_path / "key.pem").write_text("x")
+        (tmp_path / ".venv").mkdir()
+        (tmp_path / ".venv" / "site.py").write_text("x")
+        (tmp_path / "app.py").write_text("x")
+        texts = [c.text for c in _completions(self._make(tmp_path), "@")]
+        assert texts == ["@app.py"]
 
     def test_bad_workspace_does_not_raise(self):
-        # Should not raise even if workspace doesn't exist
-        completer = _make_completer("/nonexistent/path/xyz")
-        assert completer is not None
+        from app.ui.input import FileIndex
+        assert FileIndex("/nonexistent/path/xyz").files() == []
 
 
 class TestCloudRoutingConfig:

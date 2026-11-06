@@ -117,6 +117,9 @@ def shell_done(result) -> Text:
         t.append("done" + (f" · {n} lines of output" if n else ""), style="m.ok")
     else:
         t.append(f"failed · exit {result.exit_code}", style="m.err")
+    hidden = getattr(result, "hidden_lines", 0) or 0
+    if hidden:
+        t.append(f"  … +{hidden} lines (ctrl+o)", style="m.faint")
     return t
 
 
@@ -125,7 +128,7 @@ def thinking_done(seconds: float, tokens: int, *, hint: bool = True) -> Text:
     if tokens:
         t.append(f" · {format_tokens(tokens)} tokens", style="m.dim")
     if hint:
-        t.append("  (/think on to show)", style="m.faint")
+        t.append("  (ctrl+o to show)", style="m.faint")
     return t
 
 

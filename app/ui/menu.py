@@ -91,8 +91,11 @@ def choose(
     keys = [k for k, _ in options]
     labels = [label for _, label in options]
     start = keys.index(default) if default in keys else 0
+    from app.ui import notify
+
     console.print()
     console.print(Text("  " + question, style="m.tool"))
+    notify.waiting(console)
     try:
         picked = (runner or _run_inline)(labels, start)
     except Exception:
@@ -109,4 +112,5 @@ def choose(
         console.print(Text("    cancelled", style="m.faint"))
         return None
     console.print(Text(f"    ❯ {labels[picked]}", style="m.accent"))
+    notify.working(console)
     return keys[picked]

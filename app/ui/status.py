@@ -39,6 +39,7 @@ def status_line(
     cwd: str,
     background_tasks: int = 0,
     branch: str | None = None,
+    notice: str = "",
 ) -> list[tuple[str, str]]:
     """prompt_toolkit formatted text for the bottom toolbar."""
     pct = min(100, int(total_tokens / max(context_limit, 1) * 100))
@@ -58,6 +59,10 @@ def status_line(
         parts.append(("class:status", f" · {background_tasks} running"))
     if pct >= 80:
         parts.append(("class:status.warn", "  /compact soon"))
+    if notice:
+        parts.append(("class:status.accent", f"   {notice}"))
+    else:
+        parts.append(("class:status.rule", "   shift+tab mode · /help"))
     return parts
 
 

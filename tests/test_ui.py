@@ -101,7 +101,7 @@ def test_stream_prints_answer_as_markdown_and_one_thinking_line():
     res = ui.stream_reply(c, chunks("<think>look at", " the code</think>", "Done. ", "Score added.\n\n- one\n- two"),
                           clock=FakeClock())
     out = printed(c)
-    assert "✻ Thought for" in out and "(/think on to show)" in out
+    assert "✻ Thought for" in out and "(ctrl+o to show)" in out
     assert "look at the code" not in out           # reasoning hidden by default
     assert "Done. Score added." in out and "• one" in out
     assert res.text.startswith("Done. Score added.") and res.thinking == "look at the code"
@@ -134,7 +134,8 @@ def test_status_line_shows_model_mode_context_tokens_folder_branch():
     parts = ui.status_line(model="qwen3.5:9b", mode="approve", total_tokens=4100, context_limit=41000,
                            cwd=r"C:\dev\snake_game", branch="main", background_tasks=1)
     text = "".join(t for _, t in parts)
-    assert text == "  qwen3.5:9b · approve · ctx 10% · 4.1K tokens · snake_game (main) · 1 running"
+    assert text.startswith("  qwen3.5:9b · approve · ctx 10% · 4.1K tokens · snake_game (main) · 1 running")
+    assert "shift+tab mode" in text
     assert ("class:status.accent", "approve") in parts
 
 

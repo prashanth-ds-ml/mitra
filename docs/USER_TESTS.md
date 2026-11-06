@@ -11,3 +11,19 @@ machine or your judgment. Updated every release.
 | U-004 | M4 | Record the 2-minute demo video | Your voice and screen | open |
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
+
+## 2026-11-06 · Terminal keys (D-035)
+
+Real Windows Terminal, `python -m app.main`. Automated tests drive the same key bindings through a simulated input;
+these need a real console and a person.
+
+- [ ] Shift+enter makes a new line; enter sends; alt+enter and ctrl+j also make a new line
+- [ ] ↑↓ move between lines in a multi-line prompt; at the top line ↑ shows the previous prompt (also after a restart)
+- [ ] Ctrl+←/→ jump words; ctrl+backspace deletes a word; ctrl+r finds an earlier prompt
+- [ ] Typing `/` opens the command menu with descriptions; `@ga` offers `snake/game.py`
+- [ ] Pasting 40+ lines shows `[pasted text #1: N lines]`; the model receives the full text
+- [ ] Esc while the model writes stops it and keeps the partial answer; text typed meanwhile is in the next prompt
+- [ ] Shift+tab changes the mode in the status line (ask → auto-edit → plan)
+- [ ] A command with long output shows 10 lines and `+N lines (ctrl+o)`; ctrl+o prints the rest
+- [ ] An approval rings the bell / flashes the taskbar and the tab title says "waiting for you"
+- [ ] Ctrl+l clears the screen; ctrl+c clears the input; ctrl+c twice on an empty line quits

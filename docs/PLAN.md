@@ -81,7 +81,7 @@ Design, ability list and what happens to local-codex's code: [M2_PLAN.md](M2_PLA
 - [x] Terminal interface part 1 (D-031, 2026-11-06): `app/ui/` with the Phosphor theme, live streamed answers (markdown per finished block), a thinking line with timer and token count, one line per tool step (no panels), status line (model, mode, ctx %, tokens, folder, branch; warns at 80%), turn footer
 - [x] Startup screen (D-031, 2026-11-06): one-line title instead of the big banner, compact model picker, header box (model, context, GPU, folder, MCP servers) + tips
 - [x] Inline arrow-key approval menu with coloured diff; command replies without boxes; startup straight to the header (D-034) (2026-11-06)
-- [ ] Terminal interface part 2: `/` menu with descriptions, `@` files, saved history, shift+tab modes, esc to stop
+- [x] Terminal interface part 2 (D-035, 2026-11-06): multi-line input with shift+enter, editing keys, saved history + ctrl+r, `/` menu with descriptions, `@` file search, paste folding, esc to stop with type-ahead, shift+tab modes, title + bell notifications, folded command output + ctrl+o, ctrl+l
 - [ ] `/model`, `/context`, `/think`; prompt tokens and context use in the status line, warning before the limit
 - [ ] Project notes (AGENTS.md / CLAUDE.md) within the byte budget; skills loaded on demand (FastAPI, LangGraph, Next.js, uv on Windows)
 - [x] Model picker and `/model list` show only compatible models: chat + native tool calling, >= 1.5B parameters, >= 32K context; `mitra models --all` shows the rest and why (2026-11-05)
