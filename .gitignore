@@ -23,3 +23,6 @@ results/ollama-bench.log
 
 # agent worktrees and local Claude Code state
 .claude/
+.mitra/health/
+.mitra/runs/
+.mitra/output/
