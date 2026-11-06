@@ -1573,3 +1573,10 @@ def test_words_containing_test_are_not_test_requests():
     from app.routing import IntentRouter
     assert IntentRouter()._is_test_request("pull the latest changes") is False
     assert IntentRouter()._is_test_request("add tests for the parser") is True
+
+
+def test_mode_names_match_shift_tab():
+    from app.main import _build_mode_reply, _is_known_mode, _normalize_session_mode
+    assert _normalize_session_mode("ask") == "approve" and _normalize_session_mode("auto-edit") == "auto"
+    assert _is_known_mode("plan") and _is_known_mode("approve") and not _is_known_mode("yolo")
+    assert "`ask`" in _build_mode_reply("approve") and "`auto-edit`" in _build_mode_reply("auto")

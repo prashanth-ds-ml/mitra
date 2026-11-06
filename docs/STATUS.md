@@ -1,10 +1,29 @@
 # Status
 
-**Now:** M0 in progress, baselines next · **Last updated:** 2026-11-05 · **Repo:** https://github.com/prashanth-ds-ml/mitra
+**Now:** M2 terminal cleanup done; next is M1 (core loop) on the user's go · **Last updated:** 2026-11-06 · **Repo:** https://github.com/prashanth-ds-ml/mitra
 **Plan:** [PLAN.md](PLAN.md) · **Scope:** [SCOPE.md](SCOPE.md) · **Decisions:** [DECISIONS.md](DECISIONS.md) ·
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next
+2026-11-06, terminal assistant session (all pushed; 645 tests; Windows **and Linux** CI green, Linux blocking again):
+- **Interface (D-031..D-035):** `app/ui/` with the Phosphor theme, live streaming, thinking line, one line per tool
+  step, inline arrow-key approvals with coloured diffs, startup straight to the header (remembered model), framed
+  input + status line, multi-line input (shift+enter), saved history, `/` and `@` menus, paste folding, esc to stop
+  with type-ahead, shift+tab modes (ask / auto-edit / plan), title + bell notifications, folded output + ctrl+o.
+  Mock: https://claude.ai/artifact/DgT44qmxc48rG9n3LB6hiR. Person-only key checks: USER_TESTS.md (2026-11-06).
+- **Models (D-032, D-033):** only official qwen3.5 tags with 4B+ are listed; context measured on this machine:
+  4B at 64K (100% GPU, 82 tok/s), 9B at 128K (47% GPU, 10 tok/s). EVALS 2026-11-06.
+- **Bugs fixed:** E-016 (thinking dropped), E-017 (old/new interface mixed), E-018 (bad tool args crashed a turn),
+  E-019 (questions started builds; nested project copies), E-020 (silent turns; removed commands in replies),
+  E-021 (Windows quotes), E-022 (keyword routing), and the old review findings E-001, E-002, E-003, E-005.
+- **Playground:** leftovers from Mitra's runs moved out (backup in the session scratchpad); `.mitra/` ignored.
+
+**Next decision (user):** go for M1, the core loop that can run plan -> implement -> test -> fix on a playground
+level; it replaces the keyword router and the planner/file/shell agent hand-offs that caused E-019, E-020, E-022.
+Level 01 needs its `plan.md` and tests written first (no level content exists yet). Still waiting on the user's OK:
+starting the real MCP servers (downloads + GitHub token). M0 baselines still need ~10 GB free RAM.
+
+Earlier:
 2026-11-05: code renamed to Mitra (920ee63); MCP client on the official SDK with day-one servers (8a91474, D-030):
 git, GitHub (remote HTTP, token from `gh auth token -u prashanth-ds-ml` via `~/.mitra/mcp.json`), Context7,
 filesystem, Semgrep on; fetch, AWS docs, Serena off. 640 tests pass (Windows CI green; Linux has the same 8 E-005

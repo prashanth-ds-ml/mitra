@@ -1023,9 +1023,18 @@ def _build_intent_progress_message(intent: str, user_input: str) -> tuple[str, s
     return None
 
 
+_MODE_ALIASES = {"ask": "approve", "auto-edit": "auto", "autoedit": "auto", "auto_edit": "auto"}
+
+
 def _normalize_session_mode(raw: str | None) -> str:
     mode = (raw or "approve").strip().lower()
+    mode = _MODE_ALIASES.get(mode, mode)
     return mode if mode in _SESSION_MODES else "approve"
+
+
+def _is_known_mode(raw: str) -> bool:
+    mode = (raw or "").strip().lower()
+    return mode in _SESSION_MODES or mode in _MODE_ALIASES
 
 
 def _intent_to_model_role(intent: str) -> str:
@@ -1903,9 +1912,10 @@ def _build_model_reply(model: str, codegen_model: str, *, cloud_codegen_enabled:
 def _build_mode_reply(session_mode: str) -> str:
     return (
         "## Session mode\n\n"
-        f"- **Current mode:** `{session_mode}`\n"
+        f"- **Current mode:** `{ui.mode_label(session_mode)}`\n"
         f"- **Behavior:** {_mode_summary(session_mode)}\n\n"
-        "Available modes: `read-only`, `plan`, `approve`, `auto`."
+        "Modes: `ask` (approve each change), `auto-edit` (change files without asking), "
+        "`plan` (read and plan only). Shift+tab cycles them."
     )
 
 
@@ -3653,8 +3663,8 @@ def _chat():
                 ai_reply = _build_mode_reply(session_mode)
             else:
                 normalized = _normalize_session_mode(requested)
-                if normalized != requested.strip().lower():
-                    ai_reply = f"Unknown mode: `{requested}`. Available modes: `read-only`, `plan`, `approve`, `auto`."
+                if not _is_known_mode(requested):
+                    ai_reply = f"Unknown mode: `{requested}`. Modes: `ask`, `auto-edit`, `plan` (shift+tab cycles them)."
                 else:
                     session_mode = normalized
                     _apply_session_mode(cfg, session_mode)
