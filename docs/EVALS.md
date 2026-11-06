@@ -102,6 +102,25 @@ Scripts: `ctx_probe.py`, `speed_probe.py` (session scratchpad, to be moved to `b
 GPU, so its largest context that fits in RAM (128K) costs little extra speed (13.4 to 9.6 tok/s). Chosen: 4B at 64K,
 9B at 128K (user, 2026-11-06). Prompt-processing speed at full context is not measured yet.
 
+### 2026-11-06 · M1 · First playground run: level 01 (snake), Mitra core loop
+
+`python scripts/run_level.py levels/01-snake --builder mitra --model qwen3.5:4b --max-steps 30` (mitra-playground),
+commit a5cf5c7 + 97041d3, qwen3.5:4b at 128K, thinking auto, plan run task by task (`mitra solve --plan`).
+
+| Task | Model calls | Tool calls | Result |
+|---|---|---|---|
+| T1 state | 5 | 6 | passed (4 tests) |
+| T2 moves | 6 | 7 | passed (4) |
+| T3 food | 4 | 5 | passed (2) |
+| T4 game over | 4 | 5 | passed (2) |
+| T5 API | 3 | 5 | passed (3) |
+| T6 web page | 6 | 9 | passed (2) |
+
+Total 428 s. Visible tests 17/17; visible + hidden 71/72: **not passed**. The miss:
+`test_food_never_lands_on_the_snake[0]`: in `step()` the model calls `place_food()` before inserting the new head,
+so the new food can be placed on the cell the head is moving into (1 of 40 seeds). No fresh rounds, rollbacks,
+text tool calls or model errors were needed. Result file: mitra-playground `results/01-snake/20261106-1950-*.json`.
+
 ## Result template
 
 ```markdown
