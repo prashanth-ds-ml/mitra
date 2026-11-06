@@ -117,7 +117,7 @@ show_reasoning = false       # show <think> output panels when available
 memory_enabled = false
 require_diff_approval = true
 auto_compact_threshold = 120000  # auto-compact when session tokens exceed this
-num_ctx = 0                      # 0 = per model: qwen3.5 4B 64K, 9B 128K (measured, D-033)
+num_ctx = 0                      # 0 = per model: qwen3.5 4B and 9B at 128K (measured, D-033, D-036)
 ollama_api_key = ""          # optional; leave empty to be prompted at startup
 ollama_local_base_url = "http://localhost:11434"
 ollama_cloud_base_url = "https://ollama.com"
@@ -3017,7 +3017,7 @@ def _pick_model(cfg: dict) -> str:
         incompatible = len(config.get_local_model_inventory(include_incompatible=True)) - len(inventory)
         if incompatible > 0:
             console.print(Text(
-                f"  {incompatible} other installed models hidden: Mitra runs on qwen3.5 4B (64K) and 9B (128K). "
+                f"  {incompatible} other installed models hidden: Mitra runs on qwen3.5 4B and 9B, 128K context. "
                 "`mitra models --all` lists them",
                 style="m.faint",
             ))
@@ -3351,8 +3351,8 @@ def _chat():
         toolbar=lambda: ui.framed_status(
             model=model,
             mode=ui.mode_label(ui_state.mode),
-            total_tokens=sess_in + sess_out,
-            context_limit=auto_compact_threshold,
+            total_tokens=ctx_used,          # E-025: what is in the context now, not the sum of all calls
+            context_limit=num_ctx,
             cwd=shell_agent.get_cwd(),
             background_tasks=shell_agent.count_background_tasks(only_running=True),
             notice=ui_state.current_notice(),
@@ -3361,7 +3361,8 @@ def _chat():
     )
     typed_ahead = ""
     messages = [SystemMessage(content=system_prompt)]
-    sess_in = sess_out = 0  # cumulative session token counts
+    sess_in = sess_out = 0  # cumulative session token counts (work done)
+    ctx_used = 0            # prompt tokens of the latest model call = how full the context is (E-025)
 
     while True:
         _set_current_task("Ready")
@@ -3630,7 +3631,7 @@ def _chat():
             continue
 
         if cmd == "/context":
-            ai_reply = _build_context_reply(sess_in + sess_out, auto_compact_threshold, num_ctx)
+            ai_reply = _build_context_reply(ctx_used, auto_compact_threshold, num_ctx)
             _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
@@ -3645,7 +3646,7 @@ def _chat():
                 session_mode=session_mode,
                 work_mode=work_mode,
                 show_reasoning=show_reasoning,
-                total_tokens=sess_in + sess_out,
+                total_tokens=ctx_used,
                 auto_compact_threshold=auto_compact_threshold,
                 num_ctx=num_ctx,
                 agent_models=agent_models,
@@ -3781,9 +3782,10 @@ def _chat():
                 system_prompt,
                 workspace=cfg["workspace"],
                 reason="manual",
-                total_tokens=sess_in + sess_out,
+                total_tokens=ctx_used,
             )
             sess_in = sess_out = 0
+            ctx_used = 0
             continue
 
         if intent == "run" and _looks_like_explicit_command(user_input):
@@ -3845,6 +3847,7 @@ def _chat():
                     response = main_llm.invoke(messages)
 
             t_in, t_out = _get_tokens(response)
+            ctx_used = t_in or ctx_used
             turn_in += t_in; turn_out += t_out
             messages.append(response)
 
@@ -3949,6 +3952,7 @@ def _chat():
                     else:
                         follow_up = fu.message
                     f_in, f_out = _get_tokens(follow_up)
+                    ctx_used = f_in or ctx_used
                     turn_in += f_in; turn_out += f_out
                     messages.append(follow_up)
                     if fu.text:
@@ -3980,11 +3984,11 @@ def _chat():
             ui.notify.done(console, time.monotonic() - turn_started)
 
             # ── Auto-compact ──────────────────────────────────────────────────
-            if sess_in + sess_out >= auto_compact_threshold:
+            if ctx_used >= auto_compact_threshold:  # E-025: compare the real context size
                 console.print(
                     "\n[yellow]⚡ Context window is full. Auto-compacting history...[/yellow]"
                 )
-                tokens_before = sess_in + sess_out
+                tokens_before = ctx_used
                 msg_count_before = len(messages)
                 messages = _compact(
                     local_llm,
@@ -3992,7 +3996,7 @@ def _chat():
                     system_prompt,
                     workspace=cfg["workspace"],
                     reason="auto",
-                    total_tokens=sess_in + sess_out,
+                    total_tokens=ctx_used,
                 )
                 tokens_after = 0
                 msg_count_after = len(messages)
@@ -4005,6 +4009,7 @@ def _chat():
                     context=hook_ctx,
                 ))
                 sess_in = sess_out = 0
+                ctx_used = 0
 
             # ── Persist to memory ─────────────────────────────────────────
             if ai_reply:

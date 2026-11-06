@@ -1580,3 +1580,11 @@ def test_mode_names_match_shift_tab():
     assert _normalize_session_mode("ask") == "approve" and _normalize_session_mode("auto-edit") == "auto"
     assert _is_known_mode("plan") and _is_known_mode("approve") and not _is_known_mode("yolo")
     assert "`ask`" in _build_mode_reply("approve") and "`auto-edit`" in _build_mode_reply("auto")
+
+
+def test_context_use_is_the_latest_prompt_not_the_sum_of_calls():
+    """E-025: compaction fired at 193,304 'tokens' on a 64K model; every call resends the whole history."""
+    src = (pathlib.Path(__file__).resolve().parents[1] / "app" / "main.py").read_text(encoding="utf-8")
+    assert "if ctx_used >= auto_compact_threshold" in src
+    assert "if sess_in + sess_out >= auto_compact_threshold" not in src
+    assert "total_tokens=ctx_used,          # E-025" in src and "context_limit=num_ctx," in src

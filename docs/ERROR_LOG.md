@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-025 | 2026-11-06 | M2 | High | user ("why is it stopped after the compaction") | The chat compacted at "193,304 tokens" on a 64K model: context use was the sum of every call's tokens, not the size of the latest prompt; the same turn ended after the old file agent hit its 20-call limit and wrote 4 files into `levels/01-snake/` | closed | F-025 |
 | E-024 | 2026-11-06 | M2 | High | user ("its mitra job") | Mitra could not research anything: its only search was DuckDuckGo's HTML page, which times out from this machine; a stopped search gave no answer; one failed call replaced the whole answer with an error line | closed | F-024 |
 | E-023 | 2026-11-06 | M2 | High | user (terminal test) | "search about 3.5+ series models": the web agent ran 100+ `search_web` calls, most with the identical query, while every search timed out | closed | F-023 |
 | E-022 | 2026-11-06 | M2 | Medium | user (terminal test) | "can you make a clean plan for Level 01 ... 3. test ..." was routed as a test request; "fix the failing test" too; "latest" counted as "test" | closed | F-021 |
@@ -50,6 +51,22 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-025: Context use counted every call; compaction fired far too early
+
+- **Date found:** 2026-11-06 · **Milestone:** M2 · **Severity:** High · **Found by:** user, chat in mitra-playground
+- **Status:** closed
+
+**What happened:** after "so step 1 is done...??" the old file agent stopped at its 20-call limit (E-002 fix) while
+writing the game; the turn ended with "Let me split this into smaller steps:" and Mitra auto-compacted with
+`usage_tokens_before: 193304` although the 4B context was 64K. The agent had written `config.py`,
+`food_generator.py`, `input_handler.py`, `main.py` into the level definition folder `levels/01-snake/`.
+**Root cause:** `sess_in + sess_out` adds up the input of every model call, and every call resends the whole history,
+so the number grows much faster than the context really fills. The status line's "ctx %" and the auto-compact check
+both used it. (The 20-call stop and the writes are the old chat path, replaced by the core loop in M1 stage 2.)
+**Fix:** F-025. The 4 stray files were moved out of the level folder (backup in the session scratchpad).
+**Regression test:** `test_context_use_is_the_latest_prompt_not_the_sum_of_calls`.
+**Lesson?** L-033.
 
 ### E-024: Mitra's web search did not work
 

@@ -534,10 +534,10 @@ REQUIRED_CAPABILITIES = ("completion", "tools")
 SUPPORTED_FAMILIES = ("qwen35",)
 SUPPORTED_BASE_NAMES = ("qwen3.5",)
 
-# Context per model size, measured 2026-11-06 on the 8 GB GPU + 24 GB RAM machine (D-033):
-#   qwen3.5:4b  64K = 100% GPU, 82 tok/s (128K spills to CPU: 24 tok/s)
-#   qwen3.5 9B 128K = 47% GPU, 10 tok/s (never fits the GPU; 256K does not fit in RAM)
-SMALL_MODEL_CONTEXT = 65_536
+# Context per model size, measured 2026-11-06 on the 8 GB GPU + 24 GB RAM machine (EVALS):
+#   qwen3.5:4b 128K = 65% GPU, 24 tok/s (64K would be 100% GPU, 82 tok/s)  -- D-036: room over speed
+#   qwen3.5 9B 128K = 47% GPU, 10 tok/s (never fits the GPU; 256K does not fit in RAM)  -- D-033
+SMALL_MODEL_CONTEXT = 131_072
 LARGE_MODEL_CONTEXT = 131_072
 LARGE_MODEL_PARAMETERS = 6_000_000_000
 
@@ -680,8 +680,8 @@ def get_local_model_inventory(*, include_incompatible: bool = False) -> list[Loc
             if compatible and facts:
                 large = (facts.get("parameters") or 0) >= LARGE_MODEL_PARAMETERS
                 context = LARGE_MODEL_CONTEXT if large else SMALL_MODEL_CONTEXT
-                if large and placement == "gpu":
-                    placement = "split"  # measured: the 9B at 128K is 47% on an 8 GB GPU (D-033)
+                if context > 65_536 and placement == "gpu":
+                    placement = "split"  # measured: above 64K the 4B and the 9B spill to CPU (D-033, D-036)
             models.append(
                 LocalModelInfo(
                     name=name,
