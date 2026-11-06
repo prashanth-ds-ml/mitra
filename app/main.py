@@ -356,6 +356,29 @@ def cmd_harness(
 
 
 cli.command("harness")(cmd_harness)
+
+
+def cmd_report(
+    html_page: bool = typer.Option(False, "--html", help="Also write the dashboard page and print its path."),
+    as_json: bool = typer.Option(False, "--json", help="Print the report as JSON."),
+) -> None:
+    """What goes wrong in recorded runs (patterns with counts), and a local dashboard page with --html."""
+    from app.core import analyze as A
+    from app.core import dashboard as D
+
+    if html_page:
+        out, rep = D.build()
+    else:
+        rep = A.analyze(A.find_run_files(D.default_roots()))
+    if as_json:
+        print(json.dumps(rep.to_json(), indent=2))
+    else:
+        console.print(Text(A.format_report(rep), style="m.text"))
+    if html_page:
+        console.print(Text(f"dashboard: {out}", style="m.tool"))
+
+
+cli.command("report")(cmd_report)
 cli.command("/models", hidden=True)(cmd_models)
 cli.command("test")(cmd_test)
 cli.command("/test", hidden=True)(cmd_test)

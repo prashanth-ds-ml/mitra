@@ -1,10 +1,19 @@
 # Status
 
-**Now:** M1 stage 1-2 done (core loop, chat on it, old engine removed); next: Level 01 run on the user's ok · **Last updated:** 2026-11-06 · **Repo:** https://github.com/prashanth-ds-ml/mitra
+**Now:** M1 done + Level 01 run (71/72); self-improvement steps 0-2 done, next `mitra improve` · **Last updated:** 2026-11-06 · **Repo:** https://github.com/prashanth-ds-ml/mitra
 **Plan:** [PLAN.md](PLAN.md) · **Scope:** [SCOPE.md](SCOPE.md) · **Decisions:** [DECISIONS.md](DECISIONS.md) ·
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next
+2026-11-06 night, self-improvement (D-038):
+- Step 0 (E-033): shell chains / cd / Git Bash paths; guard counts real failures; failed commands show why.
+- Step 1: harness settings (`app/core/harness.py`, `mitra harness`), used by solve, plans and chat.
+- Step 2: `mitra report` (failure patterns from `.mitra/runs/**/*.jsonl`, `app/core/analyze.py`) and
+  `mitra report --html` (dashboard at `~/.mitra/dashboard.html`, `app/core/dashboard.py`). Level runs now keep their
+  records in `mitra-playground/.mitra/runs/level-*`. First report: Level 01 run, 28 calls, 4 tool errors (reading
+  paths that do not exist yet).
+- Next: step 3 `mitra improve` (9B proposes, benchmark A/B decides), then step 4 overnight runs (needs the user's ok).
+
 2026-11-06 evening (all pushed; 431 tests; Windows + Linux CI green):
 - **M1 core loop** (`app/core/`): one loop, 7 tools, tests decide done; `mitra solve "task"` and `mitra solve --plan plan.md`
   (task by task until each task's "Done when" test passes). Live: fizzbuzz solved in 4 steps / 12 s.
