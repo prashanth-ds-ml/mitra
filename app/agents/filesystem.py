@@ -261,7 +261,14 @@ def _safe_is_file(path: pathlib.Path) -> bool:
 def _resolve_path(path: str | None) -> pathlib.Path:
     target = pathlib.Path(path or ".")
     if not target.is_absolute() and _guard.workspace is not None:
-        target = _guard.workspace / target
+        workspace = pathlib.Path(_guard.workspace)
+        parts = target.parts
+        # E-019: models often start a relative path with the workspace's own folder name
+        # ("mitra-playground/levels/..." inside mitra-playground), which nested a copy of the project.
+        # Drop that first part unless a real subfolder of that name exists.
+        if len(parts) > 1 and parts[0].lower() == workspace.name.lower() and not (workspace / parts[0]).exists():
+            target = pathlib.Path(*parts[1:])
+        target = workspace / target
     return target.resolve()
 
 

@@ -1471,3 +1471,62 @@ class TestDiffPreview:
         )
 
         assert "more lines omitted" in preview
+
+
+# ── Questions never start a plan or a build (E-019) ──────────────────────────
+
+class TestQuestionsAreAnswered:
+    """The user's own messages from mitra-playground/.mitra/execution_trace.jsonl, 2026-11-06."""
+
+    @pytest.mark.parametrize("text", [
+        "whats the plan now",
+        "what is the status of snake game",
+        "why did it create files?",
+        "is the snake game done?",
+    ])
+    def test_questions_are_explained(self, text):
+        from app.main import _classify_intent
+        assert _classify_intent(text) == "explain"
+
+    @pytest.mark.parametrize("text", [
+        "ok lets start with snake game can you setup all the requirements for the snake and plan for the game first ,no coding",
+        "yes so can tell me what is the plan is and how we are going to build , no code implementation yet just brainstroming",
+    ])
+    def test_no_coding_requests_only_talk(self, text):
+        from app.main import _classify_intent
+        assert _classify_intent(text) == "brainstorm"
+
+    def test_polite_requests_are_still_requests(self):
+        from app.main import _is_question
+        assert not _is_question("can you add a score counter?")
+        assert _is_question("what's next?")
+
+    def test_explain_is_not_a_plan_request(self):
+        from app.routing import IntentRouter
+        assert IntentRouter()._is_plan_request("explain the game loop") is False
+        assert IntentRouter()._is_plan_request("make a plan for the game") is True
+
+
+class TestWorkspaceNameIsNotNested:
+    def test_path_starting_with_the_workspace_name_is_not_nested(self, tmp_path):
+        from app.agents import filesystem
+        ws = tmp_path / "mitra-playground"
+        ws.mkdir()
+        filesystem.configure(workspace=str(ws), confirm_fn=None)
+        try:
+            resolved = filesystem._resolve_path("mitra-playground/levels/01-snake/plan.md")
+            assert resolved == (ws / "levels" / "01-snake" / "plan.md").resolve()
+            (ws / "docs").mkdir()
+            assert filesystem._resolve_path("docs/a.md") == (ws / "docs" / "a.md").resolve()
+        finally:
+            filesystem.configure(workspace=None, confirm_fn=None)
+
+    def test_a_real_subfolder_with_the_same_name_is_kept(self, tmp_path):
+        from app.agents import filesystem
+        ws = tmp_path / "app"
+        (ws / "app").mkdir(parents=True)
+        filesystem.configure(workspace=str(ws), confirm_fn=None)
+        try:
+            assert filesystem._resolve_path("app/main.py") == (ws / "app" / "main.py").resolve()
+        finally:
+            filesystem.configure(workspace=None, confirm_fn=None)

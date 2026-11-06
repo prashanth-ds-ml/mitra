@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-019 | 2026-11-06 | M2 | High | user (errors.log review) | Questions and "no coding" requests started builds: "whats the plan now" became a plan goal and ran twice; "plan ... no coding" wrote code; files went to a nested `mitra-playground/mitra-playground/` | closed | F-015 |
 | E-018 | 2026-11-06 | M2 | High | user (errors.log) | A plan step crashed the whole turn: qwen3.5:4b called `create_file` with `content` as a JSON object (a game config), pydantic rejected it, and the exception escaped the tool loop | closed | F-014 |
 | E-017 | 2026-11-06 | M2 | Medium | user (terminal test) | Old and new interface mixed: model picker, GPU emoji line, "Session Snapshot" box (stale "compact at 120,000"), API-key note, cyan boxes for command replies and a full-screen blue dialog for approvals, around the new header | closed | F-013 |
 | E-016 | 2026-11-06 | M2 | High | Claude (live UI check) | qwen3.5 replies looked frozen: langchain-ollama drops a thinking model's reasoning when `reasoning` is unset, so a plain question ran 116 s / 8.2K tokens with nothing on screen and no answer shown | closed | F-012 |
@@ -44,6 +45,24 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-019: Questions started builds; files written to a nested copy of the project
+
+- **Date found:** 2026-11-06 · **Milestone:** M2 · **Severity:** High · **Found by:** user, reviewing errors.log with Claude
+- **Status:** closed
+
+**What happened (mitra-playground, from `.mitra/execution_trace.jsonl`):**
+1. "ok lets start with snake game ... plan for the game first, no coding" created a level with `assert True` tests and
+   a `start/main.py` that does not parse, under `mitra-playground/mitra-playground/levels/01-snake/`.
+2. "whats the plan now" was saved as the plan goal and started a PlanWorkflow (13:24, again 14:12), which wrote
+   `snake_game_project/`, `ARCHITECTURE.md`, `DESIGN.md`, `PLAN.md` in the repo root.
+**Root cause:** the regex intent router matched the substring "plan" anywhere (also inside "explain") and had no idea of
+a question or of "no coding"; the file tools joined a relative path that began with the workspace's own folder name onto
+the workspace.
+**Fix:** F-015. The leftovers were moved out of the playground (backup in the session scratchpad); `.mitra/` is now
+ignored by the playground repo.
+**Regression test:** `TestQuestionsAreAnswered`, `TestWorkspaceNameIsNotNested` in `tests/test_main_ux.py`.
+**Lesson?** L-029. The regex router itself is removed in the M1 loop rewrite; this is the stopgap.
 
 ### E-018: Bad tool arguments crashed the turn
 

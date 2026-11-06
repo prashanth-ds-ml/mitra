@@ -1453,6 +1453,35 @@ def _should_use_router_build_intent(user_input: str) -> bool:
     return len(normalized.split()) <= 7
 
 
+_QUESTION_WORDS = ("what", "whats", "what's", "why", "how", "when", "where", "which", "who", "whose",
+                   "is", "are", "was", "were", "does", "did", "do", "should", "status")
+_POLITE_REQUESTS = ("can you", "could you", "would you", "will you", "please", "pls", "kindly")
+_NO_CHANGE_PHRASES = ("no code", "no coding", "without code", "without coding", "don't code", "dont code",
+                      "do not code", "no implementation", "don't implement", "dont implement", "do not implement",
+                      "not implement", "just brainstorm", "only brainstorm", "just plan", "only plan",
+                      "don't change", "dont change", "do not change", "no changes")
+
+
+def _is_question(user_input: str) -> bool:
+    """A question gets an answer, never a build or a plan run (E-019).
+
+    "what's the plan now", "what is the status of snake game?" are questions; "can you add a score?" is a request.
+    """
+    text = re.sub(r"\s+", " ", (user_input or "").strip().lower())
+    if not text or text.startswith(_POLITE_REQUESTS):
+        return False
+    if text.endswith("?"):
+        return True
+    first = re.split(r"[\s,]", text, maxsplit=1)[0]
+    return first in _QUESTION_WORDS
+
+
+def _forbids_changes(user_input: str) -> bool:
+    """The user said not to write code or change files ("no coding", "just brainstorm")."""
+    text = re.sub(r"\s+", " ", (user_input or "").strip().lower())
+    return any(phrase in text for phrase in _NO_CHANGE_PHRASES)
+
+
 def _classify_intent(user_input: str) -> str:
     normalized = re.sub(r"\s+", " ", user_input.strip().lower())
     if not normalized:
@@ -1463,10 +1492,14 @@ def _classify_intent(user_input: str) -> str:
         return "chat"
     if _is_small_talk(normalized):
         return "chat"
+    if _forbids_changes(user_input):
+        return "brainstorm"     # talk it through; nothing is written (E-019)
     if _is_brainstorm_request(normalized):
         return "brainstorm"
     if _is_command_help_request(normalized):
         return "run-help"
+    if _is_question(user_input):
+        return "explain"        # questions never start a plan or a build (E-019)
     if _is_cleanup_request(normalized):
         return "change"
     if _is_simple_change_request(normalized):

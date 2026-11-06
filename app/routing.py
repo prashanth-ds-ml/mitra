@@ -219,8 +219,9 @@ class IntentRouter:
         )
 
     def _is_plan_request(self, normalized: str) -> bool:
+        # Whole words only: "explain" and "explanation" contain "plan" (E-019).
         return any(
-            phrase in normalized
+            re.search(rf"\b{re.escape(phrase)}\b", normalized)
             for phrase in (
                 "plan",
                 "roadmap",

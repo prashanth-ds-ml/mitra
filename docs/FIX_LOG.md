@@ -8,6 +8,7 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-015 | 2026-11-06 | E-019 | Questions route to explain; "no coding" / "just brainstorm" route to brainstorm (nothing written); router matches "plan" as a whole word; a relative path starting with the workspace's folder name is not nested | `app/main.py`, `app/routing.py`, `app/agents/filesystem.py` | `TestQuestionsAreAnswered`, `TestWorkspaceNameIsNotNested` | works |
 | F-014 | 2026-11-06 | E-018 | `coerce_tool_args` writes object/list `content` as formatted JSON; `safe_invoke` turns any tool exception into a `✗ Invalid call to <tool>: ...` result the model can correct; used by the file, reader and web agents | `app/agents/filesystem.py`, `app/agents/reader.py`, `app/agents/web.py` | `TestBadToolArguments` | works |
 | F-013 | 2026-11-06 | E-017 | Startup = header box only (remembered model, loaded items in the header); command replies as plain markdown; approvals as an inline arrow-key menu with a coloured diff; framed input | `app/main.py`, `app/ui/menu.py`, `app/ui/header.py`, `app/ui/status.py`, `app/config.py` | `tests/test_ui.py` (8 new) | works |
 | F-012 | 2026-11-06 | E-016 | `get_local_llm(reasoning="auto")` turns thinking on for models with the `thinking` capability; an empty reply prints an error line | `app/llm.py`, `app/main.py` | `test_thinking_models_get_reasoning_on_so_thinking_is_not_dropped` | works |
@@ -39,6 +40,14 @@ again.
 ```
 
 ## Entries
+
+### F-015: Questions get answers; no nested project copies (E-019)
+**Change:** `_classify_intent` checks, before any build or plan route: `_forbids_changes` ("no coding", "no
+implementation", "just brainstorm", ...) -> brainstorm; `_is_question` (ends with "?" or starts with what/why/how/is/
+status/..., but not "can you"/"please") -> explain. `IntentRouter._is_plan_request` uses whole words. `_resolve_path`
+drops a first path part equal to the workspace folder name when no such subfolder exists.
+**Test:** the user's real messages from the trace are test cases (2 questions, 2 "no coding" requests); path tests for
+the nested case and for a real same-named subfolder.
 
 ### F-014: Tool errors go back to the model (E-018)
 **Change:** `coerce_tool_args` fixes the common shape mistake (JSON content sent as an object is written as indented
