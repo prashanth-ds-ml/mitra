@@ -38,6 +38,19 @@ Method and every result, whatever it shows. Raw results live in `results/` and a
 
 ## Results
 
+### 2026-11-06 · M1 · First `mitra improve` runs (self-improvement step 3, smoke test)
+- **Model:** builder qwen3.5:4b at 128K; proposer qwen3.5:4b (the 9B needs ~11 GB free RAM, 7.8 GB was free).
+- **Setup:** `mitra improve --proposer qwen3.5:4b --tasks T01 --max-steps 20`, scratch `MITRA_HOME` (the real
+  harness untouched). Run records: the Level 01 run (6 tasks, 28 calls); top pattern `tool_error` 4x (reads of paths
+  that did not exist yet).
+- **Proposal:** rule "Always verify file existence with list_files before attempting to read or edit it."
+- **Run 1 (invalid):** current 0/1, proposal 0/1: grading ran in the tool's own Python without fastapi (E-035).
+- **Run 2:** current T01 fail (6 steps, 27,357 prompt tokens), proposal T01 fail (8 steps, 28,077) -> **dropped**.
+  Both runs passed the visible tests; the hidden test `test_more_than_two_decimals_rejected` failed: the fix removed
+  the `try/except` that turns a bad amount into an error response.
+- **Reading:** the loop works end to end; one task is far too few to decide anything. The real A/B needs the whole tune
+  half (5 tasks) and more run records from real sessions.
+
 ### 2026-10-26 · M0 · Prompt overhead of each stock agent
 - **Commit:** see PROGRESS_LOG · **Model:** qwen3.5:4b (token counts are Ollama's own, Qwen3.5 tokenizer and template)
 - **Setup:** `python bench/run.py --agent bench/configs/<agent>.toml --model qwen3.5:4b --overhead`: each agent gets task

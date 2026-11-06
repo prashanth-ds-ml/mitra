@@ -8,6 +8,8 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-035 | 2026-11-06 | E-035 | `bench.grade(..., python=)` grades with the Python the workspace's tests use (`project_python`); an infra error in grading stops the A/B as `bench_error` and changes nothing | `bench/bench.py`, `app/core/improve.py` | `test_a_broken_grader_stops_the_ab_and_changes_nothing` | works |
+| F-034 | 2026-11-06 | E-034 | A module loaded with `importlib.util` is registered in `sys.modules` before it runs (dataclasses look their module up there); unit tests had replaced the bench with a stub, so only the live run caught it | `app/core/improve.py` | `test_the_real_bench_loads_and_has_a_tune_half` | works |
 | F-033 | 2026-11-06 | E-033 | `cd X && cmd` / `;` chains run part by part (cd only inside the workspace), `/c/...` paths converted, pipes/redirects refused with a reason; repeat guard: shell commands are repeats unless a file changed, failures counted by the real result; failed commands show their last output line | `app/agents/shell.py`, `app/agents/limits.py`, `app/ui/render.py`, core loop + chat | `tests/test_shell_chains.py` | works |
 | F-032 | 2026-11-06 | E-032 | `_model_command_args`: a model command's `python` is `project_python()` | `app/agents/shell.py` | `test_model_python_command_uses_the_projects_python` | works |
 | F-031 | 2026-11-06 | E-031 | Inline code is never covered by trust (always asks); new `make_dir` tool | `app/main.py`, `app/core/tools.py` | `test_inline_code_asks_even_when_the_program_is_trusted` | works |

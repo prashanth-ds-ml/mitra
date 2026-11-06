@@ -137,9 +137,10 @@ def _tampered(task: Task, workspace: Path) -> list[str]:
     return changed
 
 
-def run_pytest(workspace: Path, *args: str, timeout: int = GRADE_TIMEOUT_S) -> subprocess.CompletedProcess:
+def run_pytest(workspace: Path, *args: str, timeout: int = GRADE_TIMEOUT_S,
+               python: str | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *args],
+        [python or sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *args],
         cwd=workspace,
         capture_output=True,
         text=True,
@@ -149,7 +150,7 @@ def run_pytest(workspace: Path, *args: str, timeout: int = GRADE_TIMEOUT_S) -> s
     )
 
 
-def grade(task: Task, workspace: Path) -> Grade:
+def grade(task: Task, workspace: Path, python: str | None = None) -> Grade:
     """Pass = protected tests unchanged and visible + hidden tests all pass, in a separate copy."""
     tampered = _tampered(task, workspace)
     with tempfile.TemporaryDirectory(prefix=f"mitra-grade-{task.id}-") as tmp:
@@ -158,7 +159,7 @@ def grade(task: Task, workspace: Path) -> Grade:
         for test in task.hidden:
             shutil.copy2(test, copy / "tests" / test.name)
         try:
-            proc = run_pytest(copy)
+            proc = run_pytest(copy, python=python)
         except subprocess.TimeoutExpired:
             return Grade(task.id, False, tampered, None, f"grading timed out after {GRADE_TIMEOUT_S}s")
     out = (proc.stdout + proc.stderr).strip()

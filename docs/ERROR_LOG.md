@@ -8,6 +8,8 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-035 | 2026-11-06 | M1 | High | own live test (`mitra improve --tasks T01`) | Every benchmark task graded as failed although the visible tests passed: `bench.grade` ran pytest with `sys.executable` (the `mitra` tool's Python, no fastapi), and `evaluate` ignored the grader's infra error, so the A/B compared 0/1 vs 0/1 | closed | F-035 |
+| E-034 | 2026-11-06 | M1 | Medium | own live test (`mitra improve --dry-run`) | `mitra improve` crashed at start: `AttributeError: 'NoneType' object has no attribute '__dict__'` in dataclasses, loading `bench/bench.py` by path | closed | F-034 |
 | E-033 | 2026-11-06 | M1 | High | user session (brick breaker, pasted) | The same `cd .../brick-breaker && python -m pytest ...` ran 30+ times (455K tokens, 12 min) until the step limit: chains and `cd` cannot run without a shell, Git Bash paths are not Windows paths, the repeat guard exempted shell commands and missed their failures, and the screen showed only `failed · exit 1` | closed | F-033 |
 | E-032 | 2026-11-06 | M1 | High | user session (brick breaker) | A model's `run_command python ...` found Mitra's own Python inside the installed command (Windows searches the parent's folder first): `No module named pytest` | closed | F-032 |
 | E-031 | 2026-11-06 | M1 | High | user session (brick breaker) | `python -c "import os; os.makedirs(...)"` ran without asking because `python` had been trusted in that folder: trust by program name let inline code through in ask mode | closed | F-031 |

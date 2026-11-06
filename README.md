@@ -20,6 +20,22 @@ mitra --version
 The project folder is the nearest parent with a git repo or project file (`pyproject.toml`, `package.json`, ...),
 otherwise the folder you are in. To remove it: `uv tool uninstall mitra`.
 
+## Self-improvement (local models only)
+
+Mitra learns settings, not code: rules added to its prompt, tool descriptions and limits, kept in
+`~/.mitra/harness.toml` with every version saved.
+
+```
+mitra report            # what goes wrong in recorded runs: problem patterns with counts and examples
+mitra report --html     # the same + playground results and history as a local page (~/.mitra/dashboard.html)
+mitra improve           # a local model proposes one change for the top problem; the benchmark's tune half decides
+mitra improve --dry-run # only show the proposal
+mitra harness           # what Mitra has learned so far; `mitra harness revert N` goes back to version N
+```
+
+A change is kept only if more benchmark tasks pass (hidden tests) and prompt tokens grow at most 20%; every attempt
+is logged in `~/.mitra/harness/attempts.jsonl`.
+
 ## Why
 Coding agents like Claude Code, Codex and OpenCode can connect to local models through Ollama, but they are built for
 frontier models: many tools, strict tool-call formats and a large fixed prompt (measured here: 2.7K-12.2K tokens

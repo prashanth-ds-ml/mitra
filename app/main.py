@@ -379,6 +379,45 @@ def cmd_report(
 
 
 cli.command("report")(cmd_report)
+
+
+def cmd_improve(
+    model: str = typer.Option("", "--model", help="Builder model for the benchmark (default: the last one used)."),
+    proposer: str = typer.Option("", "--proposer", help="Model that proposes the change (default: the 9B if installed)."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Only show the proposal; no benchmark, nothing saved."),
+    tasks: str = typer.Option("", "--tasks", help="Comma-separated tune task ids (default: the whole tune half)."),
+    max_steps: int = typer.Option(30, "--max-steps", help="Model calls per benchmark task."),
+) -> None:
+    """Self-improve: a local model proposes one settings change for the top problem; the benchmark decides."""
+    from app import config as cfg_mod
+    from app.core import analyze as A
+    from app.core import dashboard as D
+    from app.core import improve as I
+    from app.llm import get_local_llm, thinking_setting
+
+    cfg = cfg_mod.load()
+    builder_name = model or cfg.get("local_model") or cfg_mod.load_last_model() or "qwen3.5:4b"
+    installed = {m.name for m in cfg_mod.get_local_model_inventory()}
+    proposer_name = proposer or next((m for m in ("qwen3.5:9b", "qwen3.5:latest") if m in installed), builder_name)
+    rep = A.analyze(A.find_run_files(D.default_roots()))
+    num_ctx = int(cfg.get("num_ctx") or 0) or cfg_mod.context_for_model(builder_name)
+    proposer_llm = get_local_llm(proposer_name, num_ctx=32768, reasoning=False)
+    builder_llm = get_local_llm(builder_name, num_ctx=num_ctx, reasoning=thinking_setting(cfg.get("thinking")))
+    bench = I.load_bench()
+    chosen = None
+    if tasks:
+        wanted = {t.strip().upper() for t in tasks.split(",") if t.strip()}
+        chosen = [t for t in bench.load_tasks() if t.split == "tune" and t.id.upper() in wanted]
+        if not chosen:
+            console.print("[m.err]None of those are tune tasks (`python bench/bench.py list`).[/m.err]")
+            raise typer.Exit(1)
+    entry = I.improve(rep, proposer=proposer_llm, builder=builder_llm, builder_name=builder_name,
+                      proposer_name=proposer_name, dry_run=dry_run, tasks=chosen, bench=bench, num_ctx=num_ctx,
+                      max_steps=max_steps, say=lambda t: console.print(Text(t, style="m.text")))
+    raise typer.Exit(0 if entry.get("result") in ("kept", "dropped", "dry_run", "skipped") else 1)
+
+
+cli.command("improve")(cmd_improve)
 cli.command("/models", hidden=True)(cmd_models)
 cli.command("test")(cmd_test)
 cli.command("/test", hidden=True)(cmd_test)

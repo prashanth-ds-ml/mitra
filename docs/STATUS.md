@@ -1,6 +1,6 @@
 # Status
 
-**Now:** M1 done + Level 01 run (71/72); self-improvement steps 0-2 done, next `mitra improve` · **Last updated:** 2026-11-06 · **Repo:** https://github.com/prashanth-ds-ml/mitra
+**Now:** M1 done + Level 01 run (71/72); self-improvement steps 0-3 done, next overnight runs (on the user's ok) · **Last updated:** 2026-11-06 · **Repo:** https://github.com/prashanth-ds-ml/mitra
 **Plan:** [PLAN.md](PLAN.md) · **Scope:** [SCOPE.md](SCOPE.md) · **Decisions:** [DECISIONS.md](DECISIONS.md) ·
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
@@ -12,7 +12,12 @@
   `mitra report --html` (dashboard at `~/.mitra/dashboard.html`, `app/core/dashboard.py`). Level runs now keep their
   records in `mitra-playground/.mitra/runs/level-*`. First report: Level 01 run, 28 calls, 4 tool errors (reading
   paths that do not exist yet).
-- Next: step 3 `mitra improve` (9B proposes, benchmark A/B decides), then step 4 overnight runs (needs the user's ok).
+- Step 3: `mitra improve` (`app/core/improve.py`): local proposer (9B by default, needs ~11 GB free RAM; `--proposer
+  qwen3.5:4b` otherwise) suggests one rule / tool text / limit for the top pattern; the builder solves the bench tune
+  half with the current and the proposed harness; kept only if more pass (hidden tests) at <=120% prompt tokens.
+  Attempts in `~/.mitra/harness/attempts.jsonl` and on the dashboard. Live dry run (4B proposer): "verify file
+  existence with list_files before reading or editing" for the tool_error pattern, 10 s.
+- Next: step 4 overnight runs (needs the user's ok to create a scheduled task); more run records from real sessions.
 
 2026-11-06 evening (all pushed; 431 tests; Windows + Linux CI green):
 - **M1 core loop** (`app/core/`): one loop, 7 tools, tests decide done; `mitra solve "task"` and `mitra solve --plan plan.md`

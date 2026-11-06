@@ -67,7 +67,8 @@ ul{margin:4px 0 0;padding-left:18px}.ex{color:var(--dim);font-size:12px}
 """
 
 
-def render(results: list[dict], rep: A.Report, history: list[tuple[str, str]], current: H.Harness) -> str:
+def render(results: list[dict], rep: A.Report, history: list[tuple[str, str]], current: H.Harness,
+           tries: list[dict] | None = None) -> str:
     e = html.escape
     rows = []
     for d in results:
@@ -85,6 +86,14 @@ def render(results: list[dict], rep: A.Report, history: list[tuple[str, str]], c
         pats.append(f"<tr><td>{p.count}</td><td>{e(p.name)}<div class='dim'>{e(A.PATTERNS.get(p.name, ''))}</div>"
                     f"<ul>{ex}</ul></td></tr>")
     hist = "".join(f"<tr><td>{e(s)}</td><td>{e(n)}</td></tr>" for s, n in reversed(history[-20:]))
+    tried = []
+    for t in reversed((tries or [])[-20:]):
+        b, c = t.get("base") or {}, t.get("candidate") or {}
+        ab = f"{b.get('passed')}/{b.get('total')} → {c.get('passed')}/{c.get('total')}" if b else ""
+        cls = "ok" if t.get("result") == "kept" else "dim"
+        tried.append(f"<tr><td>{e(t.get('date', ''))}</td><td>{e(t.get('change', '') or t.get('top_pattern', ''))}"
+                     f"<div class='ex'>{e(t.get('reason', ''))}</div></td><td>{e(ab)}</td>"
+                     f"<td class='{cls}'>{e(t.get('result', ''))}</td></tr>")
     rules = "".join(f"<li>{e(r)}</li>" for r in current.rules) or "<li class='dim'>none yet</li>"
     last = results[-1] if results else None
     lp, lt = _rate(last["visible_plus_hidden"]) if last else (0, 0)
@@ -102,6 +111,9 @@ def render(results: list[dict], rep: A.Report, history: list[tuple[str, str]], c
 <h2>Problems in run records ({rep.files} files)</h2><div class="wrap"><table><tr><th>count</th><th>pattern</th></tr>
 {''.join(pats) or "<tr><td colspan=2 class='dim'>none found</td></tr>"}</table></div>
 <h2>What Mitra has learned (harness v{current.version})</h2><ul>{rules}</ul>
+<h2>Improve attempts (mitra improve)</h2><div class="wrap"><table><tr><th>date</th><th>proposal</th>
+<th>tune tasks passed</th><th>result</th></tr>{''.join(tried) or "<tr><td colspan=4 class='dim'>none yet</td></tr>"}
+</table></div>
 <h2>Harness history</h2><div class="wrap"><table><tr><th>version</th><th>why</th></tr>
 {hist or "<tr><td colspan=2 class='dim'>no changes yet</td></tr>"}</table></div></main></body></html>"""
 
@@ -111,5 +123,7 @@ def build(roots: list[Path] | None = None, out: Path | None = None) -> tuple[Pat
     rep = A.analyze(A.find_run_files(roots))
     out = out or (H.home() / "dashboard.html")
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(render(load_results(roots), rep, harness_history(), H.load()), encoding="utf-8")
+    from app.core.improve import attempts
+
+    out.write_text(render(load_results(roots), rep, harness_history(), H.load(), attempts()), encoding="utf-8")
     return out, rep
