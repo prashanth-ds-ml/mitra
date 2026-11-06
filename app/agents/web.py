@@ -24,7 +24,7 @@ _DEFAULT_TIMEOUT = 15
 def _invoke_with_status(llm_with_tools, messages: list, console: Console | None, label: str) -> AIMessage:
     if console is None:
         return llm_with_tools.invoke(messages)
-    with console.status(f"[bold cyan]{label}[/bold cyan]", spinner="dots"):
+    with console.status(f"[m.dim]{label}[/m.dim]", spinner="dots", spinner_style="m.accent"):
         return llm_with_tools.invoke(messages)
 
 

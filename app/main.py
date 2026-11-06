@@ -43,18 +43,6 @@ cli = typer.Typer(invoke_without_command=True, add_completion=False)
 console = ui.apply(Console())
 intent_router = routing_module.IntentRouter()
 
-try:
-    # prefer direct import
-    from misc.ascii import generate_mitra_banner_art
-except Exception:
-    # ensure project root is on sys.path when running as script
-    import sys
-    import pathlib
-
-    root = pathlib.Path(__file__).resolve().parents[1]
-    if str(root) not in sys.path:
-        sys.path.append(str(root))
-    from misc.ascii import generate_mitra_banner_art
 
 
 
@@ -145,20 +133,20 @@ def _run_init() -> None:
 
     rules_path = cwd / "MITRA.md"
     if rules_path.exists():
-        console.print("[yellow]MITRA.md already exists — skipped.[/yellow]")
+        console.print("[m.dim]MITRA.md already exists — skipped.[/m.dim]")
     else:
         rules_path.write_text(_MITRA_MD_TEMPLATE, encoding="utf-8")
         created.append("MITRA.md")
 
     toml_path = cwd / "mitra.toml"
     if toml_path.exists():
-        console.print("[yellow]mitra.toml already exists — skipped.[/yellow]")
+        console.print("[m.dim]mitra.toml already exists — skipped.[/m.dim]")
     else:
         toml_path.write_text(_MITRA_TOML_TEMPLATE, encoding="utf-8")
         created.append("mitra.toml")
 
     if created:
-        console.print(f"[green]✓ Created:[/green] {', '.join(created)}")
+        console.print(f"[m.ok]✓ Created:[/m.ok] {', '.join(created)}")
         console.print("[dim]Edit MITRA.md to add your project rules.[/dim]")
     else:
         console.print("[dim]Nothing to create — already initialised.[/dim]")
@@ -166,7 +154,7 @@ def _run_init() -> None:
     # Always scaffold the Obsidian memory vault (skips existing files)
     vault_files = memory.init_memory(str(cwd))
     if vault_files:
-        console.print(f"\n[green]✓ Memory vault:[/green] .mitra/")
+        console.print(f"\n[m.ok]✓ Memory vault:[/m.ok] .mitra/")
         for f in vault_files:
             console.print(f"  [dim cyan]  {f}[/dim cyan]")
         console.print(
@@ -206,7 +194,7 @@ def _print_phase0_status(cwd: str | None = None) -> None:
     table.add_row("Config file", "present" if paths["project"].exists() else "missing")
     table.add_row("Rules file", "present" if paths["rules"].exists() else "missing")
     table.add_row("Active model", active_model)
-    table.add_row("Ollama", ollama_message if ollama_ok else f"[red]{ollama_message}[/red]")
+    table.add_row("Ollama", ollama_message if ollama_ok else f"[m.err]{ollama_message}[/m.err]")
     table.add_row("Local endpoint", cfg.get("ollama_local_base_url", "http://localhost:11434"))
     console.print(table)
 
@@ -258,7 +246,7 @@ def _print_phase0_models(cwd: str | None = None, show_all: bool = False) -> None
     logger.info("models command workspace=%s model_count=%s", workspace, len(inventory))
 
     if not inventory:
-        console.print(Panel(ollama_message if not ollama_ok else "No local models found.", title="Local Models", border_style="cyan"))
+        console.print(ui.tool_line("Local models", ok=False, detail=ollama_message if not ollama_ok else "none installed (ollama pull qwen3.5:4b)"))
         return
 
     table = Table(title="Local Models" + ("" if show_all else " (compatible with Mitra)"))
@@ -1831,56 +1819,6 @@ def _build_startup_project_brief(workspace: str) -> str | None:
     return "## Auto-detected project brief\n\n" + "\n".join(details)
 
 
-def _build_startup_status(
-    workspace: str,
-    *,
-    has_memory: bool = False,
-    has_plan: bool = False,
-    session_mode: str = "approve",
-    work_mode: str = "builder",
-    show_reasoning: bool = False,
-    num_ctx: int = 131072,
-    auto_compact_threshold: int = 120000,
-) -> Panel:
-    from rich.console import Group
-    from rich.text import Text
-
-    state = _detect_project_state(workspace, has_memory=has_memory, has_plan=has_plan)
-    rows = Table.grid(padding=(0, 2))
-    rows.add_column(style="cyan", no_wrap=True)
-    rows.add_column(style="dim")
-    rows.add_row("Workspace", state["workspace_name"])
-    rows.add_row("Entrypoint", state["entrypoint"] or "Not detected yet")
-    rows.add_row("Environment", ".venv ready" if state["venv_exists"] else "No .venv yet")
-    rows.add_row("Mode", session_mode)
-    rows.add_row("Work mode", work_mode)
-    rows.add_row("Context", f"{num_ctx:,} max · compact at {auto_compact_threshold:,}")
-
-    suggested: list[str] = []
-    if not state["venv_exists"]:
-        suggested.append("Create `.venv`")
-    if state["dependency_source"] == "requirements.txt":
-        suggested.append("Install requirements")
-    elif state["dependency_source"] == "pyproject.toml":
-        suggested.append("Install editable package")
-    if state["entrypoint"]:
-        suggested.append("Ask “how do I run this?”")
-    else:
-        suggested.append("Ask “what do you understand about this project?”")
-
-    content = Group(
-        rows,
-        Text(""),
-        Text.from_markup(
-            f"[bold]Session:[/bold] {session_agent.ensure_session(workspace).get('name', state['workspace_name'])}  ·  "
-            f"[bold]Plan:[/bold] {'Loaded' if state['has_plan'] else 'None'}  ·  "
-            f"[bold]Memory:[/bold] {'Loaded' if state['has_memory'] else 'None'}"
-        ),
-        Text.from_markup("[bold]Next:[/bold] " + "  ·  ".join(suggested)),
-    )
-    return Panel(content, title="[bold cyan]Session Snapshot[/bold cyan]", border_style="cyan")
-
-
 def _summarize_plan_progress(workspace: str) -> str:
     plan_text = memory.load_plan(workspace)
     if not plan_text:
@@ -2381,7 +2319,7 @@ def _generate_commit_message(workspace: str, llm, *, staged: bool = True) -> str
     )
 
     from langchain_core.messages import HumanMessage
-    with console.status("[bold cyan]Generating commit message...[/bold cyan]"):
+    with console.status("[m.dim]Generating commit message...[/m.dim]", spinner_style="m.accent"):
         response = llm.invoke([HumanMessage(content=prompt)])
     msg = (response.content or "").strip()
     return msg if msg else None
@@ -2950,7 +2888,7 @@ def _auto_plan_request(
     if playbook_context:
         context = f"{context}\n\n{playbook_context}".strip()
     _print_progress_message("Writing the plan", "Saving the next steps to `.mitra/plan.md`.", color="yellow")
-    with console.status("[bold green]Generating plan...[/bold green]"):
+    with console.status("[m.dim]Generating plan...[/m.dim]", spinner_style="m.accent"):
         plan = planner_agent.create_plan(llm, goal, workspace, context=context, work_mode=work_mode)
     console.print(f"[m.faint]  · Plan written to .mitra/plan.md[/m.faint]")
     console.print(planner_agent.render(plan))
@@ -2977,7 +2915,7 @@ def _auto_plan_request(
 
 
 def _placement_badge(placement: str) -> str:
-    return {"gpu": "[green]GPU[/green]", "split": "[yellow]GPU+CPU[/yellow]", "cpu": "[red]CPU[/red]"}.get(placement, "")
+    return {"gpu": "[m.ok]GPU[/m.ok]", "split": "[m.dim]GPU+CPU[/m.dim]", "cpu": "[m.err]CPU[/m.err]"}.get(placement, "")
 
 
 def _startup_model(cfg: dict) -> str:
@@ -3010,8 +2948,8 @@ def _pick_model(cfg: dict) -> str:
         inventory = config.get_local_model_inventory()
         if not inventory:
             console.print(
-                "[red]No compatible local Ollama models found. Mitra needs a chat model with tool calling, "
-                "e.g. 'ollama pull qwen3.5:4b'.[/red]"
+                "[m.err]No compatible local Ollama models found. Mitra needs a chat model with tool calling, "
+                "e.g. 'ollama pull qwen3.5:4b'.[/m.err]"
             )
             raise SystemExit(1)
         incompatible = len(config.get_local_model_inventory(include_incompatible=True)) - len(inventory)
@@ -3053,7 +2991,7 @@ def _pick_model(cfg: dict) -> str:
 
         choice = console.input("\n[m.accent]›[/m.accent] ").strip()
         if not choice:
-            console.print("[yellow]Pick a model name or number.[/yellow]")
+            console.print("[m.dim]Pick a model name or number.[/m.dim]")
             continue
 
         normalized = choice.lower()
@@ -3068,10 +3006,10 @@ def _pick_model(cfg: dict) -> str:
                 if 0 <= idx < len(visible_models):
                     target = visible_models[idx].name
                 else:
-                    console.print("[yellow]Invalid model number to remove.[/yellow]")
+                    console.print("[m.dim]Invalid model number to remove.[/m.dim]")
                     continue
             elif target not in {model.name for model in inventory}:
-                console.print("[yellow]Unknown model name to remove.[/yellow]")
+                console.print("[m.dim]Unknown model name to remove.[/m.dim]")
                 continue
 
             success, detail = config.remove_local_model(target)
@@ -3095,7 +3033,7 @@ def _pick_model(cfg: dict) -> str:
                 problem = config.compatibility_problem(config.get_model_facts(choice), choice) or "untested with Mitra"
                 console.print(f"[m.err]  {choice} is not a Mitra model ({problem}); it may fail at tool calls.[/m.err]")
                 return choice
-        console.print("[yellow]Invalid choice, try again.[/yellow]")
+        console.print("[m.dim]Invalid choice, try again.[/m.dim]")
 
 
 def _resolve_codegen_model(cfg: dict) -> str:
@@ -3385,7 +3323,7 @@ def _chat():
                 message_count=len(messages),
                 context=hook_ctx,
             ))
-            console.print("[yellow]Goodbye.[/yellow]")
+            console.print(Text("  Bye.", style="m.dim"))
             break
 
         if not user_input.strip():
@@ -3843,7 +3781,7 @@ def _chat():
 
             # Fall back to invoke if streaming didn't give tool calls properly
             if not response.tool_calls and has_tool_calls:
-                with console.status("[bold green]Thinking...[/bold green]"):
+                with console.status("[m.dim]Thinking...[/m.dim]", spinner_style="m.accent"):
                     response = main_llm.invoke(messages)
 
             t_in, t_out = _get_tokens(response)
@@ -3985,9 +3923,7 @@ def _chat():
 
             # ── Auto-compact ──────────────────────────────────────────────────
             if ctx_used >= auto_compact_threshold:  # E-025: compare the real context size
-                console.print(
-                    "\n[yellow]⚡ Context window is full. Auto-compacting history...[/yellow]"
-                )
+                console.print(ui.tool_line("Compacting", detail="the context is 80% full; summarising older turns"))
                 tokens_before = ctx_used
                 msg_count_before = len(messages)
                 messages = _compact(
@@ -4039,7 +3975,7 @@ def _amend_command(original: str) -> str | None:
     from prompt_toolkit.history import InMemoryHistory
 
     console.print(
-        "\n  [bold yellow]Amend command[/bold yellow] — edit below, then press Enter to run. Ctrl+C to cancel.\n"
+        "\n  [m.tool]Amend command[/m.tool] — edit below, then press Enter to run. Ctrl+C to cancel.\n"
     )
     history = InMemoryHistory()
     history.append_string(original)
@@ -4095,7 +4031,7 @@ def _confirm_shell(command: str, cwd: str) -> str | None:
 def _cmd_run(command: str, workspace: str | None = None, *, folded=None) -> None:
     """`! <command>`: run a command the user typed, in their shell, inside the workspace."""
     if not command:
-        console.print("[dim]Usage: [cyan]! <command>[/cyan]  e.g. ! pytest -q[/dim]")
+        console.print("[dim]Usage: [m.info]! <command>[/m.info]  e.g. ! pytest -q[/dim]")
         return
     global _LAST_SHELL_COMMAND
     _LAST_SHELL_COMMAND = command
@@ -4396,7 +4332,7 @@ def _compact(
         + failure_summary
     )
 
-    with console.status("[bold green]Compacting history...[/bold green]"):
+    with console.status("[m.dim]Compacting history...[/m.dim]", spinner_style="m.accent"):
         summary_msg = llm.invoke([HM(content=summarise_prompt)])
 
     summary = (summary_msg.content or "").strip()

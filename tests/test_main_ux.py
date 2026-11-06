@@ -51,7 +51,6 @@ from app.main import (
     _build_root_rename_reply,
     _build_run_command_reply,
     _build_status_reply,
-    _build_startup_status,
     _classify_intent,
     _confirm_plan_start,
     _detect_project_state,
@@ -778,18 +777,6 @@ class TestProjectDetection:
         state = _detect_project_state(str(tmp_path))
 
         assert state["entrypoint"] == ".\\snake-game\\cli.py"
-
-    def test_build_startup_status_panel(self, tmp_path):
-        (tmp_path / "main.py").write_text("print('hi')", encoding="utf-8")
-        panel = _build_startup_status(str(tmp_path), has_memory=False, has_plan=True)
-        assert panel is not None
-        assert "Session Snapshot" in str(panel.title)
-        rendered = _render_rich(panel)
-        assert "Context" in rendered
-        assert "131,072 max" in rendered
-        assert "compact at 120,000" in rendered
-        assert "Session:" in rendered
-        assert "Next:" in rendered
 
     def test_build_startup_project_brief_summarizes_workspace(self, tmp_path):
         (tmp_path / "README.md").write_text("# Demo\nA sample coding assistant.\n", encoding="utf-8")
