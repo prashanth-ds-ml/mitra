@@ -612,7 +612,7 @@ class TestProjectSummary:
         memory.write_plan(str(tmp_path), goal="Ship snake game", steps=["Create snake movement", "Run pytest"])
         reply = _build_next_steps_reply(str(tmp_path))
 
-        assert "Approve the active plan" in reply
+        assert "is not approved yet" in reply and "/plan" not in reply
         assert "Create snake movement" in reply
 
     def test_build_current_folder_reply_uses_active_path(self, tmp_path):
@@ -1530,3 +1530,24 @@ class TestWorkspaceNameIsNotNested:
             assert filesystem._resolve_path("app/main.py") == (ws / "app" / "main.py").resolve()
         finally:
             filesystem.configure(workspace=None, confirm_fn=None)
+
+
+# ── Replies never point to commands that no longer exist (E-020) ─────────────
+
+def test_no_text_mentions_removed_commands():
+    import re as _re
+    removed = ["/plan", "/next", "/start", "/build", "/brainstorm", "/understand", "/prd", "/playbook",
+               "/hibernate", "/tasks", "/search", "/permissions", "/thinking", "/reset"]
+    root = pathlib.Path(__file__).resolve().parents[1] / "app"
+    hits = []
+    for path in root.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        for cmd in removed:
+            for m in _re.finditer(rf"`{_re.escape(cmd)}(?:\s[^`]*)?`", text):
+                hits.append(f"{path.name}: {m.group(0)}")
+    assert hits == []
+
+
+def test_unapproved_plan_reply_names_no_command():
+    from app.main import _build_plan_unapproved_reply
+    assert "/" not in _build_plan_unapproved_reply()

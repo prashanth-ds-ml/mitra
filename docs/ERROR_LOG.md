@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-020 | 2026-11-06 | M2 | High | user (terminal test) | "make a clean plan for Level 01 ... plan, implement, test, fix, repeat" showed two thinking lines and nothing else: the model called `execute_plan`, got "not approved, use `/plan approve`" (a removed command), then wrote an empty follow-up, which Mitra did not report | closed | F-016 |
 | E-019 | 2026-11-06 | M2 | High | user (errors.log review) | Questions and "no coding" requests started builds: "whats the plan now" became a plan goal and ran twice; "plan ... no coding" wrote code; files went to a nested `mitra-playground/mitra-playground/` | closed | F-015 |
 | E-018 | 2026-11-06 | M2 | High | user (errors.log) | A plan step crashed the whole turn: qwen3.5:4b called `create_file` with `content` as a JSON object (a game config), pydantic rejected it, and the exception escaped the tool loop | closed | F-014 |
 | E-017 | 2026-11-06 | M2 | Medium | user (terminal test) | Old and new interface mixed: model picker, GPU emoji line, "Session Snapshot" box (stale "compact at 120,000"), API-key note, cyan boxes for command replies and a full-screen blue dialog for approvals, around the new header | closed | F-013 |
@@ -45,6 +46,22 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-020: A turn ended with nothing on screen
+
+- **Date found:** 2026-11-06 · **Milestone:** M2 · **Severity:** High · **Found by:** user, terminal test (sent twice)
+- **Status:** closed
+
+**What happened:** the request was routed as `test` (it contains "test"), shown as "Preparing a verification step";
+the chat model called the `execute_plan` tool with no approved plan; the tool answered "Use `/plan approve` first,
+then `/plan next`" (commands removed on 2026-11-05); the follow-up model call returned no text, and Mitra printed only
+the token footer. The reply reached `.mitra/activity.md` but never the screen.
+**Root cause:** the `execute_plan` branch printed no tool line, an empty follow-up was not treated as an error (only an
+empty first reply was), and 11 messages still named removed commands.
+**Fix:** F-016.
+**Regression test:** `test_no_text_mentions_removed_commands` (scans `app/` for removed commands in backticks),
+`test_unapproved_plan_reply_names_no_command`.
+**Lesson?** L-030.
 
 ### E-019: Questions started builds; files written to a nested copy of the project
 

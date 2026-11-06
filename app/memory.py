@@ -220,7 +220,7 @@ _PLAN_TEMPLATE = textwrap.dedent("""\
 
     # Active Plan
 
-    > Managed by Mitra's planner. Use `/plan <goal>` to set or update.
+    > Managed by Mitra's planner. Ask Mitra to make or change the plan.
 
     ## Goal
     {goal}
@@ -684,7 +684,7 @@ def init_memory(workspace: str) -> list[str]:
     if not plan_path.exists():
         content = _PLAN_TEMPLATE.format(
             updated=now,
-            goal="_No active goal. Use `/plan <goal>` to set one._",
+            goal="_No active goal. Ask Mitra to make a plan._",
             steps="- [ ] Define project goal",
         )
         plan_path.write_text(content, encoding="utf-8")
@@ -701,7 +701,7 @@ def init_memory(workspace: str) -> list[str]:
 
                 # Understand Notes
 
-                > Use `/understand <idea>` to capture the questions and answers that feed the PRD.
+                > Mitra keeps the questions and answers about the idea here.
             """),
             encoding="utf-8",
         )
@@ -718,7 +718,7 @@ def init_memory(workspace: str) -> list[str]:
 
                 # Product Requirements Document
 
-                > Use `/prd <idea>` to draft or update the project PRD.
+                > Mitra keeps the project PRD here.
             """),
             encoding="utf-8",
         )
@@ -735,7 +735,7 @@ def init_memory(workspace: str) -> list[str]:
 
                 # Brainstorm Notes
 
-                > Use `/brainstorm <topic>` to save idea exploration here.
+                > Mitra keeps idea exploration here.
             """),
             encoding="utf-8",
         )

@@ -520,7 +520,7 @@ _ERROR_HINTS: list[tuple[str, str]] = [
     ("validation error",          "The model returned malformed tool arguments. Try rephrasing your request."),
     ("list_type",                 "Package list was not recognised. Try: install pygame numpy"),
     ("context length",            "The conversation is too long. Use /reset to start a fresh session."),
-    ("requires more system memory", "The selected model is too large for available RAM. Use `/hibernate` to save state, unload the local model, and continue with a fresh session, or restart Mitra with a smaller model."),
+    ("requires more system memory", "The selected model is too large for the free RAM. Close other programs, or switch to the 4B model with `/model use qwen3.5:4b` and restart Mitra."),
     ("rate_limit",                "Request rate-limited. Wait a moment and try again."),
 ]
 
@@ -908,9 +908,10 @@ def _build_plan_execution_blocked_reply(session_mode: str, *, active_plan: bool 
 
 
 def _build_plan_unapproved_reply() -> str:
+    # The /plan commands were removed (2026-11-05); planning returns with the M3 runner (E-020).
     return (
-        "The active plan has not been approved yet. "
-        "Use `/plan approve` first, then `/plan next` for one step or `/plan run` for the remaining steps."
+        "There is no approved plan to run. Ask Mitra to make a plan for the goal; "
+        "it shows the plan and asks before running the first step."
     )
 
 
@@ -1738,14 +1739,14 @@ def _build_next_steps_reply(workspace: str) -> str:
         if plan.pending:
             next_step = plan.pending[0].text
             if planner_agent.is_plan_approved(workspace):
-                steps.append(f"Run `/next` to execute the next approved plan step: **{next_step}**.")
+                steps.append(f"Ask Mitra to continue the plan; the next step is: **{next_step}**.")
             else:
                 steps.append(
-                    f"Approve the active plan (`{plan.goal}`) with `/plan approve`, then run `/next` "
-                    f"to execute: **{next_step}**."
+                    f"The plan (`{plan.goal}`) is not approved yet; ask Mitra to run it and approve when asked. "
+                    f"Next step: **{next_step}**."
                 )
         else:
-            steps.append("Your active plan is complete. Define a fresh goal with `/plan <goal>` if you want a new execution loop.")
+            steps.append("Your active plan is complete. Ask Mitra for a new plan to keep going.")
 
     if not state["venv_exists"]:
         steps.append("Create and activate the project environment (`python -m venv .venv`, then `.\\.venv\\Scripts\\Activate.ps1`).")
@@ -1757,7 +1758,7 @@ def _build_next_steps_reply(workspace: str) -> str:
         steps.append(f"Run `{targets[0]}` and verify the app starts cleanly.")
 
     if not steps:
-        steps.append("Inspect the current workspace with `/status` and define the next concrete goal with `/plan <goal>`.")
+        steps.append("Inspect the current workspace with `/status` and ask Mitra to plan the next goal.")
 
     intro = f"Here are the most grounded next steps for **{root.name}** based on the current workspace state:"
     body = "\n".join(f"{i}. {step}" for i, step in enumerate(steps, start=1))
@@ -2632,7 +2633,7 @@ def _cmd_resume(workspace: str) -> str:
 def _cmd_search(raw: str, llm) -> str:
     query = raw.strip()[7:].strip()
     if not query:
-        return "Usage: `/search <query>`"
+        return "Give a search query."
 
     response = web_agent.run(llm, f"Search the web for: {query}", console=console)
     console.print(web_agent.render(response))
@@ -2932,7 +2933,7 @@ def _auto_plan_request(
             direct_llm=direct_llm,
         )
 
-    console.print("[dim]Use [cyan]/plan approve[/cyan] when you're ready, then [cyan]/plan next[/cyan].[/dim]")
+    console.print("[m.faint]  Ask Mitra to run the plan when you're ready; it asks before each step.[/m.faint]")
     return f"Created a plan for: {goal}"
 
 
@@ -3866,6 +3867,7 @@ def _chat():
                         tool_result = web_resp
                     elif tc["name"] == "execute_plan":
                         # ── Planner Agent ─────────────────────────────────────
+                        console.print(ui.tool_line("Plan", "run the next step"))
                         plan_summary = _execute_approved_plan(
                             workspace=cfg["workspace"],
                             llm=local_llm,
@@ -3876,6 +3878,7 @@ def _chat():
                             shell_llm=local_llm,
                             direct_llm=local_llm,
                         )
+                        console.print(Text("  ⎿  " + _shorten_display(plan_summary, 160), style="m.dim"))
                         messages.append(ToolMessage(content=plan_summary, tool_call_id=tc["id"]))
                         ai_reply = plan_summary
                         tool_result = plan_summary
@@ -3911,6 +3914,12 @@ def _chat():
                     messages.append(follow_up)
                     if fu.text:
                         ai_reply = fu.text
+                    elif not fu.stopped:
+                        # E-020: the model wrote nothing after the tool; never end a turn silently.
+                        console.print(ui.tool_line("Empty reply", ok=False,
+                                                   detail="the model wrote no answer after the tool; its result is below"))
+                        if ai_reply:
+                            _say(ai_reply)
 
             elif clean_content.strip():
                 ai_reply = clean_content.strip()

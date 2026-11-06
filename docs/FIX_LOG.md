@@ -8,6 +8,7 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-016 | 2026-11-06 | E-020 | `execute_plan` prints `● Plan` and its result; an empty follow-up prints "Empty reply" plus the tool's result; every mention of a removed command reworded | `app/main.py`, `app/memory.py`, `app/agents/planner.py`, `app/agents/session.py` | `test_no_text_mentions_removed_commands` | works |
 | F-015 | 2026-11-06 | E-019 | Questions route to explain; "no coding" / "just brainstorm" route to brainstorm (nothing written); router matches "plan" as a whole word; a relative path starting with the workspace's folder name is not nested | `app/main.py`, `app/routing.py`, `app/agents/filesystem.py` | `TestQuestionsAreAnswered`, `TestWorkspaceNameIsNotNested` | works |
 | F-014 | 2026-11-06 | E-018 | `coerce_tool_args` writes object/list `content` as formatted JSON; `safe_invoke` turns any tool exception into a `✗ Invalid call to <tool>: ...` result the model can correct; used by the file, reader and web agents | `app/agents/filesystem.py`, `app/agents/reader.py`, `app/agents/web.py` | `TestBadToolArguments` | works |
 | F-013 | 2026-11-06 | E-017 | Startup = header box only (remembered model, loaded items in the header); command replies as plain markdown; approvals as an inline arrow-key menu with a coloured diff; framed input | `app/main.py`, `app/ui/menu.py`, `app/ui/header.py`, `app/ui/status.py`, `app/config.py` | `tests/test_ui.py` (8 new) | works |
@@ -40,6 +41,12 @@ again.
 ```
 
 ## Entries
+
+### F-016: No silent turns; no removed commands in replies (E-020)
+**Change:** the plan tool shows a tool line and the first part of its result; when the model writes nothing after a
+tool, Mitra prints "Empty reply" and the tool's own result. Replies that named `/plan`, `/next`, `/hibernate`,
+`/search`, `/understand`, `/prd`, `/brainstorm` now say what to ask Mitra instead.
+**Test:** a scan of `app/` for removed commands in backticks (found 11 before the fix), and the unapproved-plan reply.
 
 ### F-015: Questions get answers; no nested project copies (E-019)
 **Change:** `_classify_intent` checks, before any build or plan route: `_forbids_changes` ("no coding", "no

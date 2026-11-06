@@ -46,7 +46,7 @@ class TestSessionAgent:
         assert "`approved` · `paused`" in reply
         assert "Plan checkpoint" in reply
         assert "Step 2 `paused` - Run pytest" in reply
-        assert "Use `/plan next` to continue." in reply
+        assert "Ask Mitra to continue the plan." in reply
 
     def test_build_resume_reply_includes_last_compaction(self, tmp_path):
         metadata = memory.ensure_session_metadata(str(tmp_path))

@@ -191,7 +191,7 @@ def approve_plan(workspace: str) -> str:
     """Mark the current saved plan as approved for execution."""
     plan = _parse_plan(workspace)
     if plan is None:
-        return "No active plan. Use `/plan <goal>` to create one."
+        return "No active plan. Ask Mitra to make a plan for your goal."
     metadata = memory.ensure_session_metadata(workspace)
     memory.save_session_metadata(
         workspace,
@@ -213,7 +213,7 @@ def pause_plan(workspace: str) -> str:
     """Mark active plan execution as paused without changing plan checkboxes."""
     plan = _parse_plan(workspace)
     if plan is None:
-        return "No active plan. Use `/plan <goal>` to create one."
+        return "No active plan. Ask Mitra to make a plan for your goal."
     metadata = memory.ensure_session_metadata(workspace)
     active = dict(metadata.get("active_plan_step") or {})
     if active:
@@ -236,7 +236,7 @@ def pause_plan(workspace: str) -> str:
             **({"active_plan_step": active} if active else {}),
         },
     )
-    return "Paused the active plan. Use `/plan next` to continue one step at a time."
+    return "Paused the active plan. Ask Mitra to continue the plan when you're ready."
 
 
 def is_plan_approved(workspace: str) -> bool:
