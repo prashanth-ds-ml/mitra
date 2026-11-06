@@ -21,6 +21,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from app.agents.limits import RepeatGuard
 from app.core import tools as T
 from app.core.parse import text_tool_calls
+from app.core.scrub import scrub_obj
 
 SYSTEM_PROMPT = """You are Mitra, a coding agent. You work inside one project folder using tools.
 
@@ -76,7 +77,8 @@ class Recorder:
     def write(self, kind: str, **data) -> None:
         if not self.path:
             return
-        row = {"t": time.time(), "kind": kind, "author": data.pop("author", "mitra"), **data}
+        # secrets never reach a run record: records may become training data (D-022)
+        row = scrub_obj({"t": time.time(), "kind": kind, "author": data.pop("author", "mitra"), **data})
         with self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
 

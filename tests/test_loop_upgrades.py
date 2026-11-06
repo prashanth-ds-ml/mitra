@@ -222,3 +222,15 @@ def test_repeat_guard_allows_rerunning_tests_and_rereading_after_an_edit():
     assert g.before("read_file", {"path": "a.py"}) is not None          # a real repeat
     g.after("edit_file", "Edited a.py.")
     assert g.before("read_file", {"path": "a.py"}) is None              # the file changed
+
+
+def test_run_records_are_scrubbed(ws, tmp_path):
+    """D-022: a secret the model reads or writes never lands in .mitra/runs."""
+    token = "ghp_" + "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8"
+    (ws.root / "config.txt").write_text(f"GITHUB_TOKEN={token}\n", encoding="utf-8")
+    model = Scripted(tc("read_file", 1, path="config.txt"), tc("write_file", 2, path="calc.py", content=GOOD),
+                     tc("run_tests", 3))
+    rec = tmp_path / "run.jsonl"
+    L.solve("x", ws, model, record_path=rec)
+    text = rec.read_text(encoding="utf-8")
+    assert token not in text and "***" in text

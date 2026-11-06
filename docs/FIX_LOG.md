@@ -8,6 +8,7 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-027 | 2026-11-06 | E-027 | `/commit` refuses when nothing is staged and runs plain `git commit -m` (no `git add -A`, no push) with timeouts; the drafted message comes from `git diff --cached`; a cancelled menu or empty typed message does not commit | `app/main.py` (`_cmd_commit`, `_generate_commit_message`) | `tests/test_commit_command.py` | works |
 | F-026 | 2026-11-06 | E-026 | `RepeatGuard`: `run_tests` and `run_command` are never repeats; any successful write clears the repeat memory | `app/agents/limits.py` | `test_repeat_guard_allows_rerunning_tests_and_rereading_after_an_edit` | works |
 | F-025 | 2026-11-06 | E-025 | `ctx_used` = prompt tokens of the latest model call; status line shows it against num_ctx; auto-compact, `/status`, `/context` and `/compact` use it | `app/main.py` | `test_context_use_is_the_latest_prompt_not_the_sum_of_calls` | works |
 | F-024 | 2026-11-06 | E-024 | `search_sources.py`: Wikipedia, Hugging Face, GitHub, arXiv and the Ollama library in parallel (no key), DuckDuckGo first and skipped after one failure, short-name fallback; `fetch_url` reads the README of Hugging Face and GitHub pages; a stopped search makes one final no-tools call for the answer; failed calls add a note instead of replacing the answer | `app/agents/search_sources.py`, `app/agents/web.py` | `tests/test_web_search.py` | works |
@@ -51,6 +52,22 @@ again.
 ```
 
 ## Entries
+
+### F-027: `/commit` commits staged changes only (E-027)
+
+- **Date:** 2026-11-06 · **Fixes:** E-026 · **Milestone:** M2
+- **Result:** works
+
+**Change:** `_cmd_commit` checks `git diff --cached --quiet` first and refuses with a hint when nothing is staged, then
+runs `git commit -m <message>` itself (120 s timeout) instead of the `git_commit` tool, which stages everything.
+`_generate_commit_message` reads `git diff --cached` directly (30 s timeout), so an empty diff means no draft. Only
+"Yes" uses the draft; "type my own" with an empty message, or a cancelled menu, commits nothing. The `git_commit` tool
+itself is unchanged (the agents rely on it).
+**Files:** `app/main.py` (`_cmd_commit`, `_generate_commit_message`)
+**Regression test:** `tests/test_commit_command.py` (9 tests, real git in a temp repo, every subprocess command
+recorded); 7 failed before the fix, all pass after.
+**Tried and rejected:** none.
+**Lesson:** L-034.
 
 ### F-016: No silent turns; no removed commands in replies (E-020)
 **Change:** the plan tool shows a tool line and the first part of its result; when the model writes nothing after a

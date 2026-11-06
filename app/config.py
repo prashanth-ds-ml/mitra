@@ -47,7 +47,10 @@ _DEFAULT_PLUGIN_DIRS = [
     "plugins",
     ".mitra/plugins",
 ]
-_MAX_INSTRUCTION_CHARS = 12000
+# Total size of all project notes put in the prompt. Small models have small
+# contexts, so notes share one budget; the most specific files win it.
+PROJECT_NOTES_BUDGET_BYTES = 12_000
+_NOTES_CUT_LINE = "[... cut: Mitra's project-notes budget is 12,000 bytes]"
 _BYTES_PER_GIB = 1024 ** 3
 
 _DEFAULTS: dict = {
@@ -171,11 +174,69 @@ def _load_project_instructions(root: pathlib.Path, entries) -> list[dict[str, st
         loaded.append(
             {
                 "path": str(resolved.relative_to(root.resolve())),
-                "content": text[:_MAX_INSTRUCTION_CHARS],
+                "content": text,
             }
         )
         seen.add(resolved)
-    return loaded
+    return _apply_notes_budget(loaded)
+
+
+def _notes_rank(path: str) -> int:
+    """Lower = more specific, kept first when the budget is tight.
+
+    .mitra/ files are written for Mitra itself; files at the workspace root
+    (AGENTS.md, CLAUDE.md) are for any agent on this project; files in other
+    folders (.github/copilot-instructions.md) target other tools and go first.
+    """
+    parts = pathlib.PurePath(path).parts
+    if parts and parts[0] == ".mitra":
+        return 0
+    if len(parts) == 1:
+        return 1
+    return 2
+
+
+def _cut_to_bytes(text: str, room: int) -> str | None:
+    """Cut `text` so it plus the cut line fits in `room` bytes; None if nothing useful fits."""
+    room -= len(_NOTES_CUT_LINE.encode("utf-8")) + 1  # +1 for the newline before it
+    if room <= 0:
+        return None
+    head = text.encode("utf-8")[:room].decode("utf-8", errors="ignore")
+    # End on a whole line when there is one, so a rule is never half-cut.
+    if "\n" in head:
+        head = head[: head.rindex("\n")]
+    head = head.rstrip()
+    if not head:
+        return None
+    return f"{head}\n{_NOTES_CUT_LINE}"
+
+
+def _apply_notes_budget(
+    loaded: list[dict[str, str]], budget: int = PROJECT_NOTES_BUDGET_BYTES
+) -> list[dict[str, str]]:
+    """Keep notes within `budget` bytes in total; broader files are cut or dropped first.
+
+    The returned list keeps the configured order; only who gets the budget
+    follows specificity.
+    """
+    order = sorted(range(len(loaded)), key=lambda i: (_notes_rank(loaded[i]["path"]), i))
+    left = budget
+    kept: dict[int, dict[str, str]] = {}
+    for i in order:
+        item = loaded[i]
+        size = len(item["content"].encode("utf-8"))
+        if size <= left:
+            kept[i] = item
+            left -= size
+            continue
+        cut = _cut_to_bytes(item["content"], left)
+        if cut is not None:
+            kept[i] = {**item, "content": cut}
+            left -= len(cut.encode("utf-8"))
+        # A file that is cut or dropped uses the rest of the budget: broader
+        # files after it would only fit in pieces, which reads worse than none.
+        left = 0
+    return [kept[i] for i in sorted(kept)]
 
 
 def _parse_size_to_gib(value: str, unit: str) -> float | None:
