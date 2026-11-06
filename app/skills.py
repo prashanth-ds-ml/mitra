@@ -113,7 +113,7 @@ def discover(workspace: str, entries=None) -> list[Skill]:
                 Skill(
                     name=name,
                     description=description,
-                    path=str(skill_path.relative_to(root)),
+                    path=skill_path.relative_to(root).as_posix(),  # same on every OS (E-005)
                     args=args,
                     model_override=frontmatter.get("model_override"),
                     pre_approved_tools=pre_approved,
@@ -125,6 +125,11 @@ def discover(workspace: str, entries=None) -> list[Skill]:
     return skills
 
 
+def _skill_path(skill: Skill) -> pathlib.PurePosixPath:
+    """Skill paths may have been written on Windows (`skills\\a\\SKILL.md`); read them on any OS (E-005)."""
+    return pathlib.PurePosixPath(str(skill.path).replace("\\", "/"))
+
+
 def find(skills: list[Skill], query: str) -> Skill | None:
     """Find a skill by exact name, folder name, or unambiguous partial text."""
     target = (query or "").strip().lower()
@@ -132,13 +137,13 @@ def find(skills: list[Skill], query: str) -> Skill | None:
         return None
 
     for skill in skills:
-        folder = pathlib.Path(skill.path).parent.name.lower()
+        folder = _skill_path(skill).parent.name.lower()
         if target in {skill.name.lower(), folder}:
             return skill
 
     matches = [
         skill for skill in skills
-        if target in skill.name.lower() or target in pathlib.Path(skill.path).parent.name.lower()
+        if target in skill.name.lower() or target in _skill_path(skill).parent.name.lower()
     ]
     return matches[0] if len(matches) == 1 else None
 
@@ -146,7 +151,7 @@ def find(skills: list[Skill], query: str) -> Skill | None:
 def read_body(workspace: str, skill: Skill) -> str | None:
     """Read a discovered skill body from inside the workspace."""
     root = pathlib.Path(workspace).resolve()
-    target = root / skill.path
+    target = root.joinpath(*_skill_path(skill).parts)
     try:
         resolved = target.resolve()
         resolved.relative_to(root)

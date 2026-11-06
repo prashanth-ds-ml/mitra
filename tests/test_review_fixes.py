@@ -119,3 +119,28 @@ def test_split_command_strips_outer_quotes_on_windows(monkeypatch):
     assert shell._split_command('python -c "print(42)"') == ["python", "-c", "print(42)"]
     assert shell._split_command('"C:/x y/python.exe" -m pytest') == ["C:/x y/python.exe", "-m", "pytest"]
     assert shell._split_command(r"pytest tests\test_a.py") == ["pytest", r"tests\test_a.py"]
+
+
+# ── E-005: paths work on Windows and Linux ──────────────────────────────────
+
+def test_ps_path_is_consistent_on_every_os():
+    from app.main import _ps_path
+    assert _ps_path("src/snake_agent/cli.py") == r".\src\snake_agent\cli.py"
+    assert _ps_path(pathlib.PurePosixPath("a/b.py")) == r".\a\b.py"
+    assert _ps_path(r".\already.py") == r".\already.py"
+
+
+def test_skill_paths_written_on_windows_are_read_anywhere(tmp_path):
+    from app import skills
+    (tmp_path / "skills" / "rag").mkdir(parents=True)
+    (tmp_path / "skills" / "rag" / "SKILL.md").write_text("body", encoding="utf-8")
+    skill = skills.Skill("rag", "RAG.", r"skills\rag\SKILL.md")
+    assert skills.read_body(str(tmp_path), skill) == "body"
+    assert skills.find([skill], "rag") is skill
+
+
+def test_status_line_folder_from_windows_or_posix_path():
+    from app.ui.status import status_line
+    for cwd in (r"C:\dev\snake_game", "/home/me/snake_game", "/home/me/snake_game/"):
+        text = "".join(t for _, t in status_line(model="m", mode="ask", total_tokens=0, context_limit=1, cwd=cwd, branch=""))
+        assert "· snake_game" in text, cwd

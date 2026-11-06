@@ -1483,6 +1483,16 @@ def _forbids_changes(user_input: str) -> bool:
     return any(phrase in text for phrase in _NO_CHANGE_PHRASES)
 
 
+def _ps_path(relative) -> str:
+    """A workspace-relative path as Mitra prints it in PowerShell hints: `.\\src\\app.py` on every OS (E-005).
+
+    Mitra's run hints are PowerShell commands; before this, Linux gave mixed `.\\src/app.py`."""
+    rel = str(relative).replace("/", "\\").lstrip("\\")
+    if rel.startswith(".\\"):
+        return rel
+    return ".\\" + rel
+
+
 def _classify_intent(user_input: str) -> str:
     normalized = re.sub(r"\s+", " ", user_input.strip().lower())
     if not normalized:
@@ -1620,7 +1630,7 @@ def _find_run_targets(workspace: str) -> list[str]:
     targets: list[str] = []
     for candidate in candidates:
         if candidate.exists() and candidate.is_file():
-            targets.append(f".\\{candidate.relative_to(root)}")
+            targets.append(_ps_path(candidate.relative_to(root)))
     return targets
 
 
@@ -2389,8 +2399,8 @@ def _render_change_entry_diff(entry: dict, workspace: str) -> str:
         src = pathlib.Path(entry["src"])
         dest = pathlib.Path(entry["dest"])
         try:
-            src_display = f".\\{src.relative_to(workspace)}"
-            dest_display = f".\\{dest.relative_to(workspace)}"
+            src_display = _ps_path(src.relative_to(workspace))
+            dest_display = _ps_path(dest.relative_to(workspace))
         except ValueError:
             src_display = str(src)
             dest_display = str(dest)
@@ -2398,7 +2408,7 @@ def _render_change_entry_diff(entry: dict, workspace: str) -> str:
 
     path = pathlib.Path(entry["path"])
     try:
-        display = f".\\{path.relative_to(workspace)}"
+        display = _ps_path(path.relative_to(workspace))
     except ValueError:
         display = str(path)
 
@@ -2467,8 +2477,8 @@ def _build_change_set_review_input(workspace: str) -> str | None:
             src = pathlib.Path(entry["src"])
             dest = pathlib.Path(entry["dest"])
             try:
-                src_display = f".\\{src.relative_to(workspace)}"
-                dest_display = f".\\{dest.relative_to(workspace)}"
+                src_display = _ps_path(src.relative_to(workspace))
+                dest_display = _ps_path(dest.relative_to(workspace))
             except ValueError:
                 src_display = str(src)
                 dest_display = str(dest)
@@ -2477,7 +2487,7 @@ def _build_change_set_review_input(workspace: str) -> str | None:
 
         path = pathlib.Path(entry["path"])
         try:
-            display = f".\\{path.relative_to(workspace)}"
+            display = _ps_path(path.relative_to(workspace))
         except ValueError:
             display = str(path)
         lines.append(f"File: {display}")

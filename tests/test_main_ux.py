@@ -716,11 +716,12 @@ class TestIntentRouting:
 
     def test_extracts_direct_folder_create_action(self):
         prompt = "create a folder named goal_tracker in projects"
-        assert _extract_simple_change_action(prompt) == ("create_folder", {"path": "projects\\goal_tracker"})
+        # A native path: it goes to the file tools, which run on Windows and Linux (E-005).
+        assert _extract_simple_change_action(prompt) == ("create_folder", {"path": str(pathlib.Path("projects/goal_tracker"))})
 
     def test_extracts_direct_file_create_action(self):
         prompt = "create a file named notes.txt in docs"
-        assert _extract_simple_change_action(prompt) == ("create_file", {"path": "docs\\notes.txt", "content": ""})
+        assert _extract_simple_change_action(prompt) == ("create_file", {"path": str(pathlib.Path("docs/notes.txt")), "content": ""})
 
     def test_extracts_direct_install_requirements_action(self):
         prompt = "install dependencies in this folder"

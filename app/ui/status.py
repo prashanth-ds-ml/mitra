@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pathlib
+import re
 import shutil
 import subprocess
 import time
@@ -43,7 +44,7 @@ def status_line(
 ) -> list[tuple[str, str]]:
     """prompt_toolkit formatted text for the bottom toolbar."""
     pct = min(100, int(total_tokens / max(context_limit, 1) * 100))
-    folder = pathlib.Path(cwd).name or cwd
+    folder = re.split(r"[\\\\/]", str(cwd).rstrip("\\\\/"))[-1] or str(cwd)  # Windows or POSIX path
     branch = git_branch(cwd) if branch is None else branch
     ctx_style = "class:status.warn" if pct >= 80 else "class:status"
     parts: list[tuple[str, str]] = [
