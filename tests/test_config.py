@@ -223,3 +223,25 @@ def test_inventory_hides_incompatible_models_unless_asked(monkeypatch):
     assert [m.name for m in config.get_local_model_inventory()] == ["qwen3.5:4b"]
     everything = config.get_local_model_inventory(include_incompatible=True)
     assert [(m.name, m.compatible) for m in everything] == [("qwen3.5:4b", True), ("nomic-embed-text:latest", False)]
+
+
+# ── Official qwen3.5 tags only, context per model (D-033) ───────────────────
+
+QWEN = {"family": "qwen35", "capabilities": ("completion", "tools", "thinking"), "context": 262_144}
+
+
+@pytest.mark.parametrize("name,ok", [
+    ("qwen3.5:4b", True), ("qwen3.5:latest", True), ("qwen3.5:9b", True),
+    ("qwen3.5-32k:latest", False), ("qwen3.5-32k-cpu2:latest", False),
+])
+def test_only_official_qwen35_tags_are_listed(name, ok):
+    problem = config.compatibility_problem({**QWEN, "parameters": 4_700_000_000}, name)
+    assert (problem is None) is ok
+    if not ok:
+        assert "custom qwen3.5 variant" in problem
+
+
+@pytest.mark.parametrize("params,ctx", [(4_660_000_000, 65_536), (9_650_000_000, 131_072)])
+def test_context_for_model_uses_the_measured_sizes(monkeypatch, params, ctx):
+    monkeypatch.setattr(config, "get_model_facts", lambda name: {**QWEN, "parameters": params})
+    assert config.context_for_model("qwen3.5:any") == ctx

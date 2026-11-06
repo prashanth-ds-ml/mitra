@@ -71,7 +71,7 @@ _DEFAULTS: dict = {
     "memory_enabled": False,
     "require_diff_approval": True,
     "auto_compact_threshold": 120000,  # combined tokens before auto-compact
-    "num_ctx": 131072,                # Ollama context window to request when supported
+    "num_ctx": 0,                     # 0 = per model, measured on this machine (D-033); set a number to override
     "gpu_layers": "auto",             # "auto" | 0 (CPU only) | -1 (full GPU) | N (N layers)
     "ollama_api_key": "",
     "ollama_local_base_url": "http://localhost:11434",
@@ -96,6 +96,7 @@ class LocalModelInfo:
     placement: str = "gpu"   # "gpu" | "split" | "cpu"
     capabilities: tuple[str, ...] = ()
     compatible: bool = True  # a chat model with native tool calling (or unknown)
+    context: int = 0         # num_ctx Mitra uses for it (D-033)
 
 
 @dataclass(frozen=True)
@@ -528,8 +529,24 @@ def get_recommended_model_budget_gib() -> float | None:
 
 
 REQUIRED_CAPABILITIES = ("completion", "tools")
-# Mitra is built and tested on qwen3.5 4B and 9B (D-015, D-029); the picker lists only those (user, 2026-11-06).
+# Mitra is built and tested on qwen3.5 4B and 9B (D-015, D-029); the picker lists only the official qwen3.5 tags,
+# not custom variants such as qwen3.5-32k (D-032, D-033).
 SUPPORTED_FAMILIES = ("qwen35",)
+SUPPORTED_BASE_NAMES = ("qwen3.5",)
+
+# Context per model size, measured 2026-11-06 on the 8 GB GPU + 24 GB RAM machine (D-033):
+#   qwen3.5:4b  64K = 100% GPU, 82 tok/s (128K spills to CPU: 24 tok/s)
+#   qwen3.5 9B 128K = 47% GPU, 10 tok/s (never fits the GPU; 256K does not fit in RAM)
+SMALL_MODEL_CONTEXT = 65_536
+LARGE_MODEL_CONTEXT = 131_072
+LARGE_MODEL_PARAMETERS = 6_000_000_000
+
+
+def context_for_model(name: str) -> int:
+    """num_ctx Mitra uses for a model when mitra.toml does not set one."""
+    facts = get_model_facts(name) or {}
+    params = facts.get("parameters") or 0
+    return LARGE_MODEL_CONTEXT if params >= LARGE_MODEL_PARAMETERS else SMALL_MODEL_CONTEXT
 MIN_PARAMETERS = 4_000_000_000   # qwen3.5:2b and smaller cannot drive a coding agent
 MIN_CONTEXT = 32_768             # Mitra's prompt + code + tool results need room
 _facts_cache: dict[str, dict | None] = {}
@@ -578,7 +595,7 @@ def get_model_capabilities(name: str) -> tuple[str, ...] | None:
     return facts["capabilities"] if facts else None
 
 
-def compatibility_problem(facts: dict | None) -> str | None:
+def compatibility_problem(facts: dict | None, name: str | None = None) -> str | None:
     """Why a model cannot run Mitra, or None if it can (unknown facts get the benefit of the doubt)."""
     if not facts:
         return None
@@ -589,6 +606,8 @@ def compatibility_problem(facts: dict | None) -> str | None:
         return "no tool calling"
     if facts.get("family") and facts["family"] not in SUPPORTED_FAMILIES:
         return f"not qwen3.5 (family {facts['family']})"
+    if name and name.split(":", 1)[0] not in SUPPORTED_BASE_NAMES:
+        return "custom qwen3.5 variant (Mitra sets the context itself)"
     if facts.get("parameters") and facts["parameters"] < MIN_PARAMETERS:
         return f"too small ({facts['parameters'] / 1e9:.1f}B parameters)"
     if facts.get("context") and facts["context"] < MIN_CONTEXT:
@@ -596,8 +615,8 @@ def compatibility_problem(facts: dict | None) -> str | None:
     return None
 
 
-def is_compatible_model(facts: dict | None) -> bool:
-    return compatibility_problem(facts) is None
+def is_compatible_model(facts: dict | None, name: str | None = None) -> bool:
+    return compatibility_problem(facts, name) is None
 
 
 def get_local_model_inventory(*, include_incompatible: bool = False) -> list[LocalModelInfo]:
@@ -631,9 +650,15 @@ def get_local_model_inventory(*, include_incompatible: bool = False) -> list[Loc
             recommended = placement in ("gpu", "split")
             facts = get_model_facts(name)
             caps = facts["capabilities"] if facts else None
-            compatible = is_compatible_model(facts)
+            compatible = is_compatible_model(facts, name)
             if not compatible and not include_incompatible:
                 continue
+            context = 0
+            if compatible and facts:
+                large = (facts.get("parameters") or 0) >= LARGE_MODEL_PARAMETERS
+                context = LARGE_MODEL_CONTEXT if large else SMALL_MODEL_CONTEXT
+                if large and placement == "gpu":
+                    placement = "split"  # measured: the 9B at 128K is 47% on an 8 GB GPU (D-033)
             models.append(
                 LocalModelInfo(
                     name=name,
@@ -643,6 +668,7 @@ def get_local_model_inventory(*, include_incompatible: bool = False) -> list[Loc
                     placement=placement,
                     capabilities=caps or (),
                     compatible=compatible,
+                    context=context,
                 )
             )
         return models

@@ -31,10 +31,13 @@ def model_table(models) -> Table:
     table.add_column(justify="right", style="m.accent")
     table.add_column(style="m.text")
     table.add_column(justify="right", style="m.dim")
+    table.add_column(justify="right", style="m.text")
     table.add_column()
     for i, m in enumerate(models, 1):
         label, style = _PLACEMENT.get(getattr(m, "placement", ""), ("", "m.dim"))
-        table.add_row(f"  {i}", m.name, getattr(m, "size_text", "") or "", Text(label, style=style))
+        ctx = getattr(m, "context", 0) or 0
+        table.add_row(f"  {i}", m.name, getattr(m, "size_text", "") or "",
+                      f"{ctx // 1024}K context" if ctx else "", Text(label, style=style))
     return table
 
 

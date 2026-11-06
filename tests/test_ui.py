@@ -170,11 +170,11 @@ def test_header_shows_model_context_placement_folder_and_mcp():
 def test_model_table_numbers_models_with_size_and_placement():
     from types import SimpleNamespace as NS
     c = make_console()
-    c.print(ui.header.model_table([NS(name="qwen3.5:4b", size_text="3.4 GB", placement="gpu"),
-                                   NS(name="gemma4:e4b", size_text="9.6 GB", placement="split")]))
+    c.print(ui.header.model_table([NS(name="qwen3.5:4b", size_text="3.4 GB", placement="gpu", context=65536),
+                                   NS(name="qwen3.5:latest", size_text="6.6 GB", placement="split", context=131072)]))
     lines = [ln.rstrip() for ln in printed(c).splitlines() if ln.strip()]
-    assert lines[0].split() == ["1", "qwen3.5:4b", "3.4", "GB", "GPU"]
-    assert lines[1].split() == ["2", "gemma4:e4b", "9.6", "GB", "GPU+CPU"]
+    assert lines[0].split() == ["1", "qwen3.5:4b", "3.4", "GB", "64K", "context", "GPU"]
+    assert lines[1].split() == ["2", "qwen3.5:latest", "6.6", "GB", "128K", "context", "GPU+CPU"]
 
 
 def test_startup_title_replaces_the_big_banner(monkeypatch):

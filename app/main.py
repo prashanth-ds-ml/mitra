@@ -113,7 +113,7 @@ show_reasoning = false       # show <think> output panels when available
 memory_enabled = false
 require_diff_approval = true
 auto_compact_threshold = 120000  # auto-compact when session tokens exceed this
-num_ctx = 131072                 # requested Ollama context window when supported
+num_ctx = 0                      # 0 = per model: qwen3.5 4B 64K, 9B 128K (measured, D-033)
 ollama_api_key = ""          # optional; leave empty to be prompted at startup
 ollama_local_base_url = "http://localhost:11434"
 ollama_cloud_base_url = "https://ollama.com"
@@ -267,7 +267,7 @@ def _print_phase0_models(cwd: str | None = None, show_all: bool = False) -> None
     for item in inventory:
         row = [item.name, item.size_text or "-", item.placement, "yes" if item.recommended else "no"]
         if show_all:
-            problem = config.compatibility_problem(config.get_model_facts(item.name))
+            problem = config.compatibility_problem(config.get_model_facts(item.name), item.name)
             row.append("ok" if problem is None else f"hidden: {problem}")
         table.add_row(*row)
     console.print(table)
@@ -414,7 +414,8 @@ def _build_role_llm(
 
 def _build_idea_llm(cfg: dict):
     temperature = cfg.get("temperature", 0.2)
-    num_ctx = int(cfg.get("num_ctx", 131072))
+    _model = cfg.get("local_model") or cfg.get("model") or ""
+    num_ctx = int(cfg.get("num_ctx") or 0) or (config.context_for_model(_model) if _model else config.SMALL_MODEL_CONTEXT)
     return _build_role_llm(
         cfg,
         "prd",
@@ -2930,7 +2931,7 @@ def _pick_model(cfg: dict) -> str:
         incompatible = len(config.get_local_model_inventory(include_incompatible=True)) - len(inventory)
         if incompatible > 0:
             console.print(Text(
-                f"  {incompatible} other installed models hidden: Mitra runs on qwen3.5 (4B or larger). "
+                f"  {incompatible} other installed models hidden: Mitra runs on qwen3.5 4B (64K) and 9B (128K). "
                 "`mitra models --all` lists them",
                 style="m.faint",
             ))
@@ -3005,7 +3006,7 @@ def _pick_model(cfg: dict) -> str:
             # Typing the exact name of a hidden model still works, with a warning.
             others = {m.name: m for m in config.get_local_model_inventory(include_incompatible=True)}
             if choice in others:
-                problem = config.compatibility_problem(config.get_model_facts(choice)) or "untested with Mitra"
+                problem = config.compatibility_problem(config.get_model_facts(choice), choice) or "untested with Mitra"
                 console.print(f"[m.err]  {choice} is not a Mitra model ({problem}); it may fail at tool calls.[/m.err]")
                 return choice
         console.print("[yellow]Invalid choice, try again.[/yellow]")
@@ -3095,7 +3096,7 @@ def _chat():
     session_mode = _normalize_session_mode(cfg.get("session_mode"))
     work_mode = _normalize_work_mode(cfg.get("work_mode"))
     show_reasoning = bool(cfg.get("show_reasoning", False))
-    num_ctx = int(cfg.get("num_ctx", 131072))
+    num_ctx = int(cfg.get("num_ctx") or 0) or config.context_for_model(model)
     gpu_layers_cfg = cfg.get("gpu_layers", "auto")
 
     # Determine GPU placement for the chosen model
@@ -3225,7 +3226,8 @@ def _chat():
         cloud_codegen_enabled=bool(cloud_api_key),
     )
 
-    auto_compact_threshold = int(cfg.get("auto_compact_threshold", _AUTO_COMPACT_THRESHOLD))
+    # Compact before the model's context is full: at most 80% of num_ctx (D-033).
+    auto_compact_threshold = min(int(cfg.get("auto_compact_threshold", _AUTO_COMPACT_THRESHOLD)), int(num_ctx * 0.8))
     setup_tool   = filesystem.make_routing_tool(codegen_llm)
     shell_tool   = shell_agent.make_routing_tool(local_llm, console=console)
     reader_tool  = reader_agent.make_routing_tool(local_llm, console=console)

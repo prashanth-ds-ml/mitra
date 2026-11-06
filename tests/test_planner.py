@@ -231,7 +231,7 @@ class TestAutoCompactConfig:
         from app.config import _DEFAULTS
         assert "auto_compact_threshold" in _DEFAULTS
         assert _DEFAULTS["auto_compact_threshold"] == 120000
-        assert _DEFAULTS["num_ctx"] == 131072
+        assert _DEFAULTS["num_ctx"] == 0  # per model (D-033)
 
     def test_loaded_from_toml(self, tmp_path):
         (tmp_path / "mitra.toml").write_text(

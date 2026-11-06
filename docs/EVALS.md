@@ -77,6 +77,31 @@ Method and every result, whatever it shows. Raw results live in `results/` and a
   the baselines; speed per solved task decides which is the practical default. A first run of this check was wrong:
   C09's prompt was cut by Ollama at 16K context (E-008).
 
+### 2026-11-06 · M2 · Context size vs GPU fit and speed (D-033)
+
+Machine: 8 GB GPU (about 5.4 GB usable by Ollama), 24 GB RAM, about 8 GB RAM free. Ollama native API, `think` off,
+model loaded with `num_ctx` set, size read from `/api/ps`; speed = 200 generated tokens, temperature 0.
+Scripts: `ctx_probe.py`, `speed_probe.py` (session scratchpad, to be moved to `bench/` with M0).
+
+| Model | num_ctx | Loaded size | On GPU | Generation |
+|---|---|---|---|---|
+| qwen3.5:4b | 32K | 3.93 GB | 100% | |
+| qwen3.5:4b | 64K | 4.99 GB | 100% | 82.5 tok/s |
+| qwen3.5:4b | 80K | 6.25 GB | 87% | |
+| qwen3.5:4b | 96K | 6.87 GB | 79% | |
+| qwen3.5:4b | 112K | 7.68 GB | 71% | |
+| qwen3.5:4b | 128K | 8.30 GB | 65% | 24.2 tok/s |
+| qwen3.5:4b | 256K | 13.30 GB | 38% | (needs more RAM than is free) |
+| qwen3.5 9B (`latest`) | 16K | 6.14 GB | 84% | |
+| qwen3.5 9B | 32K | 6.74 GB | 78% | 20.6 tok/s |
+| qwen3.5 9B | 48K | 7.43 GB | 70% | |
+| qwen3.5 9B | 64K | 8.05 GB | 65% | 13.4 tok/s |
+| qwen3.5 9B | 128K | 10.55 GB | 47% | 9.6 tok/s |
+
+**Reading:** the 4B stays fully on the GPU up to 64K; past that it spills and slows about 3.4x. The 9B never fits the
+GPU, so its largest context that fits in RAM (128K) costs little extra speed (13.4 to 9.6 tok/s). Chosen: 4B at 64K,
+9B at 128K (user, 2026-11-06). Prompt-processing speed at full context is not measured yet.
+
 ## Result template
 
 ```markdown
