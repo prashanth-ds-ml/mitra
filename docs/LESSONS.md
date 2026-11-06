@@ -28,6 +28,7 @@ local-codex review and this project's planning. Add a lesson whenever an error c
 | L-020 | Benchmarks | The agent's environment must match the grader's: same `python` on PATH, same packages; check it with a test before any real run | E-006 |
 | L-021 | Git | `git diff` ignores untracked files; `git add -A` then `git diff --cached <start>` to capture everything an agent changed | E-007 |
 | L-022 | Tests | Any test that depends on prompt length asserts the prompt tokens Ollama reports; measure the size, never estimate it in a comment. A cut prompt is a void case, not a model failure | E-008 |
+| L-034 | Git | Before reusing a helper for a user command, read what it runs: an agent's `git_commit` stages everything (`git add -A`). Test user-facing git commands against a real temp repo and assert the exact commands run | E-026 |
 | L-033 | Context | How full the context is = the prompt tokens of the latest call. Summing tokens across calls measures work done, not context, and grows much faster | E-025 |
 | L-032 | Tools | Test every tool against the real service from this machine before relying on it, and prefer open APIs over scraped pages. When a loop is cut short, still ask the model for an answer from what it has: the user asked a question, not for a stop message | E-024 |
 | L-031 | Loops | A step limit is not enough: small models repeat a failing call until the limit. Refuse identical repeats, stop after a few failures of the same tool, and tell the user the real cause (offline, blocked) | E-023 |

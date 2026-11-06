@@ -1231,8 +1231,16 @@ def _generate_commit_message(workspace: str, llm, *, staged: bool = True) -> str
     """Generate a suggested commit message from the diff using the LLM."""
     if not _is_git_repo(workspace):
         return None
-    diff_output = filesystem.git_diff.invoke({"cwd": workspace, "staged": staged})
-    if not diff_output or "no changes" in diff_output.lower():
+    # Plain git with a timeout (E-026): the git_diff tool's reply is "✓ git diff\n(no diff)"
+    # when nothing changed, which the old check missed, so the model drafted from nothing.
+    args = ["git", "diff", "--cached"] if staged else ["git", "diff"]
+    try:
+        result = subprocess.run(args, cwd=workspace, capture_output=True, text=True,
+                                encoding="utf-8", errors="replace", timeout=30)
+    except subprocess.TimeoutExpired:
+        return None
+    diff_output = (result.stdout or "").strip() if result.returncode == 0 else ""
+    if not diff_output:
         return None
 
     prompt = (
@@ -1256,30 +1264,52 @@ def _generate_commit_message(workspace: str, llm, *, staged: bool = True) -> str
 
 
 def _cmd_commit(workspace: str, llm, message: str | None = None, *, staged: bool = True, generate: bool = False) -> str:
-    """Handle `/commit` — create a commit with optional auto-generated message."""
+    """Handle `/commit`: commit the staged changes only, with an optional drafted message.
+
+    Never stages and never pushes. E-026: it used the git_commit tool, which runs
+    `git add -A` first, so unstaged and untracked files were committed too.
+    """
     if not _is_git_repo(workspace):
         return "Not a git repository."
 
+    # `--quiet` exits 1 when something is staged, 0 when nothing is.
+    try:
+        staged = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=workspace,
+                                capture_output=True, timeout=30).returncode == 1
+    except subprocess.TimeoutExpired:
+        return "✗ git diff timed out after 30 s."
+    if not staged:
+        return ("Nothing is staged. `/commit` commits staged changes only: "
+                "stage files with `! git add <files>` first.")
+
     if generate:
-        suggested = _generate_commit_message(workspace, llm, staged=staged)
-        if suggested:
-            console.print()
-            console.print(ui.tool_line("Commit message"))
-            console.print(ui.detail_block(suggested))
-            choice = ui.menu.choose(console, "Use this message?",
-                                    [("yes", "Yes"), ("edit", "No, I'll type my own")], default="yes")
-            if choice == "yes":
-                message = suggested
-            else:
-                message = console.input("[dim]Enter custom message: [/dim]").strip()
+        suggested = _generate_commit_message(workspace, llm, staged=True)
+        if not suggested:
+            return "Could not draft a message. Use `/commit <message>`."
+        console.print()
+        console.print(ui.tool_line("Commit message"))
+        console.print(ui.detail_block(suggested))
+        choice = ui.menu.choose(console, "Use this message?",
+                                [("yes", "Yes"), ("edit", "No, I'll type my own")], default="yes")
+        if choice == "yes":
+            message = suggested
+        elif choice == "edit":
+            message = console.input("[dim]Enter custom message: [/dim]").strip()
+            if not message:
+                return "Commit cancelled: empty message."
         else:
-            return "No changes to commit."
+            return "Commit cancelled."
 
     if not message:
         return "Usage: `/commit <message>` or `/commit --generate` to auto-suggest."
 
-    result = filesystem.git_commit.invoke({"cwd": workspace, "message": message})
-    return result
+    try:
+        result = subprocess.run(["git", "commit", "-m", message], cwd=workspace, capture_output=True,
+                                text=True, encoding="utf-8", errors="replace", timeout=120)
+    except subprocess.TimeoutExpired:
+        return "✗ git commit timed out after 120 s (a commit hook may be stuck)."
+    output = (result.stdout or "").strip() or (result.stderr or "").strip()
+    return f"✓ Committed: {message}\n{output}" if result.returncode == 0 else f"✗ {output}"
 
 
 def _truncate_diff(text: str, max_lines: int = 160) -> str:

@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-026 | 2026-11-06 | M2 | High | Claude (review of `/commit`) | `/commit` committed unstaged and untracked files: it used the `git_commit` tool, which runs `git add -A` first; with nothing staged, `--generate` drafted a message from "(no diff)" and committed everything | closed | F-026 |
 | E-025 | 2026-11-06 | M2 | High | user ("why is it stopped after the compaction") | The chat compacted at "193,304 tokens" on a 64K model: context use was the sum of every call's tokens, not the size of the latest prompt; the same turn ended after the old file agent hit its 20-call limit and wrote 4 files into `levels/01-snake/` | closed | F-025 |
 | E-024 | 2026-11-06 | M2 | High | user ("its mitra job") | Mitra could not research anything: its only search was DuckDuckGo's HTML page, which times out from this machine; a stopped search gave no answer; one failed call replaced the whole answer with an error line | closed | F-024 |
 | E-023 | 2026-11-06 | M2 | High | user (terminal test) | "search about 3.5+ series models": the web agent ran 100+ `search_web` calls, most with the identical query, while every search timed out | closed | F-023 |
@@ -51,6 +52,22 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-026: `/commit` committed files the user had not staged
+
+- **Date found:** 2026-11-06 · **Milestone:** M2 · **Severity:** High · **Found by:** Claude, review of `/commit`
+- **Status:** closed
+
+**What happened:** `/commit` is documented as "Commit staged changes ... never pushes", but `_cmd_commit` called
+`filesystem.git_commit`, which runs `git add -A` before `git commit`, so unstaged edits and untracked files (scratch
+files, `.env` if not ignored) went into the commit. With nothing staged, `/commit --generate` still asked the model:
+the `git_diff` tool replies "✓ git diff\n(no diff)", and the check looked for "no changes". A cancelled menu fell
+through to "type your own message". The git calls had no timeout. It never pushed.
+**Root cause:** a tool written for the agents (stage everything, then commit) reused for a user command with a
+different promise; no test ran `/commit` against a real repo.
+**Fix:** F-026.
+**Regression test:** `tests/test_commit_command.py`.
+**Lesson?** L-034.
 
 ### E-025: Context use counted every call; compaction fired far too early
 
