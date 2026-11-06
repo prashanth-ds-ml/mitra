@@ -1,0 +1,23 @@
+"""Mitra's terminal interface (D-031): Phosphor theme, live reply streaming, one-line tool steps, status line."""
+from app.ui.render import (
+    action_for,
+    agent_steps,
+    format_tokens,
+    shell_done,
+    shell_start,
+    step_line,
+    thinking_done,
+    tool_line,
+    turn_footer,
+)
+from app.ui.status import git_branch, status_line
+from app.ui.stream import StreamResult, ThinkSplitter, split_blocks, stream_reply
+from app.ui.theme import PHOSPHOR, THEME, apply, prompt_style
+
+__all__ = [
+    "PHOSPHOR", "THEME", "apply", "prompt_style",
+    "action_for", "agent_steps", "format_tokens", "shell_done", "shell_start", "step_line",
+    "thinking_done", "tool_line", "turn_footer",
+    "git_branch", "status_line",
+    "StreamResult", "ThinkSplitter", "split_blocks", "stream_reply",
+]

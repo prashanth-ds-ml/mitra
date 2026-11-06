@@ -5,11 +5,12 @@ import pathlib
 import re
 import subprocess
 import sys
+import time
 import traceback
 from datetime import datetime
 
 import typer
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from rich.console import Console
 from rich.markdown import Markdown
@@ -34,12 +35,13 @@ from app.agents import reader as reader_agent
 from app.agents import planner as planner_agent
 from app.agents import web as web_agent
 from app.agents.response import render
+from app import ui
 from app import config, logs as app_logs, memory, skills as skills_registry, mcp as mcp_registry, advisor as model_advisor, plugins as plugin_registry, policy as policy_module, events as event_bus, workflows, langgraph_workflows, routing as routing_module
 
 cli = typer.Typer(invoke_without_command=True, add_completion=False)
 
 
-console = Console()
+console = ui.apply(Console())
 intent_router = routing_module.IntentRouter()
 
 try:
@@ -855,8 +857,8 @@ def _make_completer(workspace: str, extra_commands: list[str] | None = None) -> 
 
 def _build_prompt_label(model: str, session_mode: str = "approve", work_mode: str = "builder") -> str:
     """Return the interactive prompt label shown before each user input."""
-    model_short = model.split(":")[0]
-    return f"\n[Mitra · {session_mode} · {work_mode}] ({model_short})> "
+    # Mode and model are shown in the status line under the input (D-031).
+    return "\n› "
 
 
 def _shorten_display(text: str, max_len: int = 28) -> str:
@@ -975,23 +977,6 @@ def _build_skills_reply(
     return "\n".join(lines)
 
 
-def _build_bottom_toolbar(
-    *,
-    session_mode: str,
-    model: str,
-    cwd: str,
-    total_tokens: int,
-    auto_compact_threshold: int,
-    current_task: str,
-    background_tasks: int,
-) -> str:
-    pct = min(100, int(total_tokens / max(auto_compact_threshold, 1) * 100))
-    return (
-        f" {session_mode}  ·  {model.split(':')[0]}  ·  {pathlib.Path(cwd).name or cwd}  ·  "
-        f"ctx {pct}%  ·  bg {background_tasks}  ·  task {_shorten_display(_format_activity_label(current_task), 32)}  ·  Ctrl+G editor "
-    )
-
-
 def _make_key_bindings() -> KeyBindings:
     bindings = KeyBindings()
 
@@ -1013,35 +998,10 @@ def _clear_terminal() -> None:
             pass
 
 
-def _activity_icon(label: str) -> str:
-    normalized = (label or "").strip().lower()
-    if not normalized or normalized == "ready":
-        return "○"
-    if any(word in normalized for word in ("think", "brainstorm", "summariz", "plan", "reason")):
-        return "🧠"
-    if any(word in normalized for word in ("read", "inspect", "explain", "review", "diagnostic", "resume", "lookup")):
-        return "📖"
-    if any(word in normalized for word in ("search", "explor", "navigat", "discover")):
-        return "🔎"
-    if any(word in normalized for word in ("apply", "edit", "patch", "write", "create", "fix")):
-        return "✍️"
-    if any(word in normalized for word in ("run", "execut", "start", "validat", "test", "hibernat")):
-        return "▶"
-    return "●"
-
-
-def _format_activity_label(label: str) -> str:
-    text = (label or "").strip() or "Ready"
-    return f"{_activity_icon(text)} {text}"
-
-
 def _print_progress_message(message: str, detail: str | None = None, *, color: str = "cyan") -> None:
     from rich.text import Text
 
-    console.print()
-    console.print(Text.assemble((f"{_activity_icon(message)} ", f"bold {color}"), (message, "white")))
-    if detail:
-        console.print(Text(detail, style="dim"))
+    console.print(ui.tool_line(message, detail=_shorten_display(detail, 110) if detail else ""))
 
 
 def _build_intent_progress_message(intent: str, user_input: str) -> tuple[str, str | None] | None:
@@ -3369,13 +3329,13 @@ def _chat():
         history=InMemoryHistory(),
         completer=completer,
         key_bindings=_make_key_bindings(),
-        bottom_toolbar=lambda: _build_bottom_toolbar(
-            session_mode=session_mode,
+        style=ui.prompt_style(),
+        bottom_toolbar=lambda: ui.status_line(
             model=model,
-            cwd=shell_agent.get_cwd(),
+            mode=session_mode,
             total_tokens=sess_in + sess_out,
-            auto_compact_threshold=auto_compact_threshold,
-            current_task=current_task,
+            context_limit=auto_compact_threshold,
+            cwd=shell_agent.get_cwd(),
             background_tasks=shell_agent.count_background_tasks(only_running=True),
         ),
     )
@@ -3384,7 +3344,7 @@ def _chat():
 
     while True:
         _set_current_task("Ready")
-        user_input = session.prompt(prompt_str)
+        user_input = session.prompt([("class:prompt", prompt_str)])
 
         if user_input.strip() in ["/exit", "exit", "quit"]:
             event_bus.emit(event_bus.SessionEndEvent(
@@ -3901,9 +3861,8 @@ def _chat():
 
         messages.append(HumanMessage(content=user_input))
 
-        # ── Turn separator ────────────────────────────────────────────────────
         console.print()
-        console.print(Rule(style="dim"))
+        turn_started = time.monotonic()
 
         try:
             # ── Invoke with streaming ─────────────────────────────────────────
@@ -3915,23 +3874,13 @@ def _chat():
             streamed_text = ""
             has_tool_calls = False
 
-            _print_progress_message("Thinking through the request")
-            with console.status("[bold green]Thinking...[/bold green]", spinner="dots") as status:
-                for chunk in main_llm.stream(messages):
-                    streamed_chunks.append(chunk)
-                    if getattr(chunk, "tool_call_chunks", None):
-                        has_tool_calls = True
-                    content_piece = getattr(chunk, "content", "") or ""
-                    if isinstance(content_piece, str):
-                        streamed_text += content_piece
-
-            # Reconstruct AIMessage from streamed chunks
-            response = streamed_chunks[-1]
-            for c in streamed_chunks[:-1]:
-                try:
-                    response = c + response
-                except Exception:
-                    pass
+            streamed = ui.stream_reply(console, main_llm.stream(messages), show_reasoning=show_reasoning)
+            streamed_chunks = streamed.chunks
+            streamed_text = streamed.text
+            has_tool_calls = any(getattr(c, "tool_call_chunks", None) for c in streamed_chunks)
+            if streamed.message is None:
+                raise RuntimeError("The model returned an empty reply.")
+            response = streamed.message
 
             # Fall back to invoke if streaming didn't give tool calls properly
             if not response.tool_calls and has_tool_calls:
@@ -3942,17 +3891,8 @@ def _chat():
             turn_in += t_in; turn_out += t_out
             messages.append(response)
 
-            # ── Show thinking (models that emit <think>…</think>) ─────────────
+            # Thinking was shown (or summarised in one line) while streaming.
             thinking, clean_content = _extract_thinking(response.content or "")
-            if thinking and show_reasoning:
-                console.print(
-                    Panel(
-                        f"[dim italic]{thinking[:3000]}{'…' if len(thinking) > 3000 else ''}[/dim italic]",
-                        title="[dim]Thinking[/dim]",
-                        border_style="dim",
-                        padding=(0, 1),
-                    )
-                )
 
             ai_reply = ""
             skip_follow_up = False
@@ -3975,30 +3915,29 @@ def _chat():
 
                     if tc["name"] == "run_command":
                         # ── Shell Agent ───────────────────────────────────────
-                        _print_progress_message("Running shell command", request[:120], color="blue")
                         _LAST_SHELL_COMMAND = _extract_command(request)
+                        console.print(ui.shell_start(_LAST_SHELL_COMMAND))
                         shell_result = shell_agent.execute(
                             command=_LAST_SHELL_COMMAND,
                             cwd=None,
                             console=console,
                         )
-                        console.print(shell_agent.render(shell_result))
+                        console.print(ui.shell_done(shell_result))
                         messages.append(ToolMessage(content=shell_result.to_llm_summary(), tool_call_id=tc["id"]))
                         ai_reply = shell_result.to_llm_summary()
                         tool_result = shell_result
                     elif tc["name"] == "read_codebase":
                         # ── Code Reader Agent ─────────────────────────────────
-                        _print_progress_message("Inspecting the codebase", request[:120], color="magenta")
                         reader_resp = reader_agent.run(local_llm, request, console=console)
                         turn_in  += reader_resp.tokens_in
                         turn_out += reader_resp.tokens_out
                         messages.append(ToolMessage(content=reader_resp.summary, tool_call_id=tc["id"]))
-                        console.print(reader_agent.render(reader_resp))
+                        console.print()
+                        console.print(Markdown(reader_resp.summary or "(no findings)"))
                         ai_reply = reader_resp.summary
                         skip_follow_up = True
                         tool_result = reader_resp
                     elif tc["name"] == "browse_web":
-                        _print_progress_message("Searching the web", request[:120], color="cyan")
                         web_resp = web_agent.run(local_llm, request, console=console)
                         turn_in += web_resp.tokens_in
                         turn_out += web_resp.tokens_out
@@ -4009,7 +3948,6 @@ def _chat():
                         tool_result = web_resp
                     elif tc["name"] == "execute_plan":
                         # ── Planner Agent ─────────────────────────────────────
-                        _print_progress_message("Executing the active plan", request[:120], color="yellow")
                         plan_summary = _execute_approved_plan(
                             workspace=cfg["workspace"],
                             llm=local_llm,
@@ -4025,12 +3963,10 @@ def _chat():
                         tool_result = plan_summary
                     else:
                         # ── Filesystem Agent ──────────────────────────────────
-                        _print_progress_message("Applying file changes", request[:120])
                         agent_resp = filesystem.run(codegen_llm, request, console=console)
                         turn_in += agent_resp.tokens_in
                         turn_out += agent_resp.tokens_out
                         messages.append(ToolMessage(content=agent_resp.summary, tool_call_id=tc["id"]))
-                        console.print(render(agent_resp))
                         ai_reply = agent_resp.summary
                         tool_result = agent_resp
 
@@ -4043,46 +3979,33 @@ def _chat():
                     ))
 
                 if not skip_follow_up:
-                    _print_progress_message("Summarizing the result")
-                    with console.status("[bold green]Summarizing the result...[/bold green]", spinner="dots"):
-                        follow_up = main_llm.invoke(messages)
+                    console.print()
+                    fu = ui.stream_reply(console, main_llm.stream(messages), show_reasoning=show_reasoning,
+                                         label="Writing")
+                    follow_up = fu.message if fu.message is not None else AIMessage(content="")
                     f_in, f_out = _get_tokens(follow_up)
                     turn_in += f_in; turn_out += f_out
                     messages.append(follow_up)
-                    _, fu_content = _extract_thinking(follow_up.content or "")
-                    if fu_content.strip():
-                        console.print(
-                            Panel(
-                                Markdown(fu_content),
-                                title="[bold cyan]Mitra[/bold cyan]",
-                                border_style="cyan",
-                            )
-                        )
-                        ai_reply = fu_content.strip()
+                    if fu.text:
+                        ai_reply = fu.text
 
             elif clean_content.strip():
                 ai_reply = clean_content.strip()
-                # Render markdown (syntax highlighting for code fences)
-                console.print(
-                    Panel(
-                        Markdown(ai_reply),
-                        title="[bold cyan]Mitra[/bold cyan]",
-                        border_style="cyan",
-                    )
-                )
+                if not streamed.printed:
+                    console.print(Markdown(ai_reply))
+            else:
+                # A failed or empty model reply is an error, never a silent pass.
+                console.print(ui.tool_line(
+                    "Empty reply", ok=False,
+                    detail="the model returned no answer"
+                    + (f" after {streamed.thinking_tokens} thinking tokens" if streamed.thinking_tokens else "")
+                    + ". Try again, or /compact if the context is full.",
+                ))
 
             # ── Token bar ─────────────────────────────────────────────────────
             sess_in += turn_in; sess_out += turn_out
             if turn_in or turn_out:
-                total = sess_in + sess_out
-                pct = min(100, int(total / auto_compact_threshold * 100))
-                bar_filled = pct // 5   # 20 chars wide
-                bar = "█" * bar_filled + "░" * (20 - bar_filled)
-                compact_hint = "  [yellow bold]⚡ /compact[/yellow bold]" if total >= auto_compact_threshold * 0.8 else ""
-                console.print(
-                    f"  [dim]tokens  ↑ {turn_in:,} in  ↓ {turn_out:,} out"
-                    f"  ·  session {total:,} [{bar}] {pct}%[/dim]{compact_hint}"
-                )
+                console.print(ui.turn_footer(time.monotonic() - turn_started, turn_in, turn_out))
 
             # ── Auto-compact ──────────────────────────────────────────────────
             if sess_in + sess_out >= auto_compact_threshold:

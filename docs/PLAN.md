@@ -78,6 +78,8 @@ Design, ability list and what happens to local-codex's code: [M2_PLAN.md](M2_PLA
 - [ ] Modes: ask each time / auto-edit / plan only (read-only); diff approval screen
 - [ ] `/undo` (last change, whole session), `/diff`, `/commit` (drafted message, you approve, never pushes)
 - [ ] Session saved per project, `/resume`, fresh round with a handoff note when context fills
+- [x] Terminal interface part 1 (D-031, 2026-11-06): `app/ui/` with the Phosphor theme, live streamed answers (markdown per finished block), a thinking line with timer and token count, one line per tool step (no panels), status line (model, mode, ctx %, tokens, folder, branch; warns at 80%), turn footer
+- [ ] Terminal interface part 2: arrow-key approval menu with diff, `/` menu with descriptions, `@` files, saved history, shift+tab modes, esc to stop, startup header
 - [ ] `/model`, `/context`, `/think`; prompt tokens and context use in the status line, warning before the limit
 - [ ] Project notes (AGENTS.md / CLAUDE.md) within the byte budget; skills loaded on demand (FastAPI, LangGraph, Next.js, uv on Windows)
 - [x] Model picker and `/model list` show only compatible models: chat + native tool calling, >= 1.5B parameters, >= 32K context; `mitra models --all` shows the rest and why (2026-11-05)

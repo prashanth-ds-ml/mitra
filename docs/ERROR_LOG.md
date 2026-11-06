@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-016 | 2026-11-06 | M2 | High | Claude (live UI check) | qwen3.5 replies looked frozen: langchain-ollama drops a thinking model's reasoning when `reasoning` is unset, so a plain question ran 116 s / 8.2K tokens with nothing on screen and no answer shown | closed | F-012 |
 | E-015 | 2026-11-05 | M2 | High | user (terminal test) | A bare `/run` went to the model, which used `qwen3:14b` (hard-coded role default the user does not have): 404. Startup also asked for an Ollama cloud key though Mitra is local-only | closed | F-011 |
 | E-014 | 2026-11-05 | M2 | High | user (terminal test) | `! mkdir snake_game` refused: "command 'mkdir' denied by policy" (default policy ends with deny `*`; `mkdir` is also a shell built-in) | closed | F-010 |
 | E-013 | 2026-11-05 | M2 | Medium | new test | `env_commands` with a quoted path failed on Windows: non-POSIX split kept the quotes | closed | F-009 |
@@ -41,6 +42,20 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-016: Thinking models showed nothing while they thought
+
+- **Date found:** 2026-11-06 · **Milestone:** M2 · **Severity:** High · **Found by:** Claude, live check of the new streaming UI
+- **Status:** closed
+
+**What happened:** with `qwen3.5:4b`, a 3-bullet question took 116 s and 8.2K output tokens; the thinking timer showed
+0 thinking tokens and no answer text appeared.
+**Root cause:** langchain-ollama 1.1.0 with `reasoning=None` does not ask Ollama to separate thinking and does not
+keep it, so the reasoning was neither shown nor counted; Mitra also printed nothing for an empty reply.
+**Fix:** F-012.
+**Regression test:** `test_thinking_models_get_reasoning_on_so_thinking_is_not_dropped`,
+`test_non_thinking_models_keep_their_default` (tests/test_llm.py).
+**Lesson?** L-026.
 
 ### E-015: Unknown slash command went to the model, which used a model the user does not have
 

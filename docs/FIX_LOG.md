@@ -8,6 +8,7 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-012 | 2026-11-06 | E-016 | `get_local_llm(reasoning="auto")` turns thinking on for models with the `thinking` capability; an empty reply prints an error line | `app/llm.py`, `app/main.py` | `test_thinking_models_get_reasoning_on_so_thinking_is_not_dropped` | works |
 | F-011 | 2026-11-05 | E-015 | Role models default to the picked model; unknown slash commands answered locally; no cloud-key prompt | `app/config.py`, `app/agents/registry.py`, `app/main.py` | `test_no_role_defaults_to_a_model_the_user_may_not_have` | works |
 | F-010 | 2026-11-05 | E-014 | `execute(typed_by_user=True)`: user's shell (PowerShell / sh), no allow-list, policy or confirm; still workspace-only with a timeout | `app/agents/shell.py`, `app/main.py` | `TestTypedByUser` | works |
 | F-009 | 2026-11-05 | E-013 | Strip quotes from tokens after the Windows split | `app/mcp.py` | `test_resolve_expands_workspace_env_commands_and_env` | works |
@@ -36,6 +37,14 @@ again.
 ```
 
 ## Entries
+
+### F-012: Thinking is captured and shown (E-016)
+**Change:** `get_local_llm` asks Ollama `/api/show` for the model's capabilities and passes `reasoning=True` to
+thinking models, so reasoning arrives in `reasoning_content` and the thinking line counts it. Models without the
+capability keep their default (Ollama rejects `think` for them). An empty answer now prints "Empty reply" instead of
+nothing.
+**Test:** 2 tests in `tests/test_llm.py`. Live: same question, `qwen3.5:4b`: "Thought for 32s · 2.0K tokens", then the
+answer streamed (was 116 s, nothing shown).
 
 ### F-011: No hard-coded models (E-015)
 **Change:** every role in `agent_models` defaults to empty, which resolves to the model picked at startup; `mitra.toml`

@@ -12,7 +12,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from app.agents.response import AgentResponse, ToolResult
 from app.agents.shell import ShellResult
 from app.main import (
-    _build_bottom_toolbar,
     _build_context_reply,
     _build_commit_readiness,
     _build_resources_reply,
@@ -357,10 +356,10 @@ class TestCloudRoutingConfig:
 
 class TestPromptLabel:
     def test_prompt_label_uses_mitra_name(self):
-        assert _build_prompt_label("qwen3.5:latest") == "\n[Mitra · approve · builder] (qwen3.5)> "
+        assert _build_prompt_label("qwen3.5:latest") == "\n› "
 
     def test_prompt_label_can_show_mode(self):
-        assert _build_prompt_label("qwen3.5:latest", "read-only", "mentor") == "\n[Mitra · read-only · mentor] (qwen3.5)> "
+        assert _build_prompt_label("qwen3.5:latest", "read-only", "mentor") == "\n› "
 
 
 class TestRoleRouting:
@@ -400,25 +399,6 @@ class TestTerminalSurfaceHelpers:
         assert "projects\\extra" in reply
         assert "`delete_file`" in reply
         assert "`python`" in reply
-
-    def test_bottom_toolbar_shows_core_session_state(self):
-        toolbar = _build_bottom_toolbar(
-            session_mode="approve",
-            model="qwen3.5:latest",
-            cwd=r"C:\Users\dev\projects\snake-game",
-            total_tokens=24000,
-            auto_compact_threshold=120000,
-            current_task="Inspecting the workspace first",
-            background_tasks=1,
-        )
-        assert "approve" in toolbar
-        assert "qwen3.5" in toolbar
-        assert "snake-game" in toolbar
-        assert "ctx 20%" in toolbar
-        assert "bg 1" in toolbar
-        assert "📖 Inspecting the workspace first" in toolbar
-        assert "Ctrl+G editor" in toolbar
-
 
 class TestTerminalHelpers:
     def test_clear_terminal_uses_console(self, monkeypatch):

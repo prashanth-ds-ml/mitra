@@ -21,7 +21,7 @@ def test_build_idea_llm_prefers_best_local_model(monkeypatch):
     monkeypatch.setattr("app.main.config.get_total_system_memory_gib", lambda: 24.0)
     monkeypatch.setattr("app.main.model_advisor.get_best_local_model", lambda inventory, vram_gib, ram_gib: "qwen3.5:latest")
 
-    def fake_get_local_llm(model, temperature, base_url=None, num_ctx=None, num_gpu=None, num_predict=None):
+    def fake_get_local_llm(model, temperature, base_url=None, num_ctx=None, num_gpu=None, num_predict=None, **_kw):
         captured.update(
             model=model,
             temperature=temperature,

@@ -25,6 +25,25 @@ class TestGetLocalLlm:
         assert captured["base_url"] == "http://localhost:11434"
         assert "client_kwargs" not in captured
 
+    def test_thinking_models_get_reasoning_on_so_thinking_is_not_dropped(self, monkeypatch):
+        """E-016: with reasoning unset, langchain-ollama drops a thinking model's reasoning; Mitra looked frozen."""
+        captured = {}
+        monkeypatch.setattr(llm, "ChatOllama", lambda **kw: captured.update(kw) or kw)
+        monkeypatch.setattr("app.config.get_model_facts", lambda name: {"capabilities": ("completion", "tools", "thinking")})
+
+        llm.get_local_llm("qwen3.5:4b")
+
+        assert captured["reasoning"] is True
+
+    def test_non_thinking_models_keep_their_default(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(llm, "ChatOllama", lambda **kw: captured.update(kw) or kw)
+        monkeypatch.setattr("app.config.get_model_facts", lambda name: {"capabilities": ("completion", "tools")})
+
+        llm.get_local_llm("llama3.1:8b")
+
+        assert "reasoning" not in captured
+
 
 class TestGetCloudLlm:
     def test_uses_cloud_base_url_and_auth(self, monkeypatch):

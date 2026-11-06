@@ -26,6 +26,7 @@ def get_llm(
     num_ctx: int | None = None,
     num_gpu: int | None = None,
     num_predict: int | None = None,
+    reasoning: bool | None = None,
 ) -> ChatOllama:
     """Return a ChatOllama instance for the given model name."""
     kwargs = {
@@ -40,6 +41,8 @@ def get_llm(
         kwargs["num_predict"] = num_predict
     if base_url:
         kwargs["base_url"] = base_url
+    if reasoning is not None:
+        kwargs["reasoning"] = reasoning
     client_kwargs = _make_client_kwargs(api_key)
     if client_kwargs:
         kwargs["client_kwargs"] = client_kwargs
@@ -54,8 +57,15 @@ def get_local_llm(
     num_ctx: int | None = None,
     num_gpu: int | None = None,
     num_predict: int | None = None,
+    reasoning: bool | None | str = "auto",
 ) -> ChatOllama:
-    """Return a client for the local Ollama daemon."""
+    """Return a client for the local Ollama daemon.
+
+    reasoning="auto" turns thinking on for models that report the `thinking` capability, so the model's reasoning
+    arrives separately (shown as the thinking line) instead of being dropped by langchain-ollama (E-016).
+    """
+    if reasoning == "auto":
+        reasoning = model_supports_thinking(model)
     return get_llm(
         model,
         temperature,
@@ -63,7 +73,21 @@ def get_local_llm(
         num_ctx=num_ctx,
         num_gpu=num_gpu,
         num_predict=num_predict,
+        reasoning=reasoning,
     )
+
+
+def model_supports_thinking(model: str) -> bool | None:
+    """True for thinking models, None (model default) when unknown or not a thinking model."""
+    try:
+        from app import config
+
+        facts = config.get_model_facts(model)
+    except Exception:
+        return None
+    if facts and "thinking" in (facts.get("capabilities") or ()):
+        return True
+    return None
 
 
 def get_cloud_llm(

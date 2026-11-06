@@ -932,7 +932,7 @@ def _invoke_tool_call(tool_name: str, args: dict, tool_map: dict[str, object], c
         if not approved:
             return f"✗ Skipped: user declined {tool_name}"
     if console is not None:
-        with console.status(f"[bold cyan]Running {tool_name}...[/bold cyan]", spinner="dots"):
+        with console.status(f"[m.dim]Running {tool_name}...[/m.dim]", spinner="dots", spinner_style="m.accent"):
             return fn.invoke(args)
     return fn.invoke(args)
 
@@ -974,7 +974,7 @@ def run(llm, user_request: str, console=None) -> AgentResponse:
         while True:
             phase = "Summarizing file changes..." if any(isinstance(m, ToolMessage) for m in messages) else "Planning file changes..."
             if console is not None:
-                with console.status(f"[bold cyan]{phase}[/bold cyan]", spinner="dots"):
+                with console.status(f"[m.dim]{phase}[/m.dim]", spinner="dots", spinner_style="m.accent"):
                     response: AIMessage = llm_with_tools.invoke(messages)
             else:
                 response = llm_with_tools.invoke(messages)
@@ -992,19 +992,12 @@ def run(llm, user_request: str, console=None) -> AgentResponse:
                 return agent_response
 
             for tc in response.tool_calls:
-                # Show live progress
-                if console is not None:
-                    args_str = ", ".join(
-                        f"{k}={repr(str(v))[:50]}" for k, v in tc["args"].items()
-                    )
-                    console.print(
-                        f"  [dim cyan]⋯[/dim cyan] [cyan]{tc['name']}[/cyan][dim]({args_str})[/dim]"
-                    )
-
                 output = _invoke_tool_call(tc["name"], tc["args"], tool_map, console=console)
-                agent_response.steps.append(
-                    ToolResult(tool=tc["name"], args=tc["args"], output=str(output))
-                )
+                step = ToolResult(tool=tc["name"], args=tc["args"], output=str(output))
+                agent_response.steps.append(step)
+                if console is not None:
+                    from app.ui import step_line
+                    console.print(step_line(step.tool, step.args, step.output, step.ok))
                 messages.append(ToolMessage(content=str(output), tool_call_id=tc["id"]))
     finally:
         _discard_active_change_set()

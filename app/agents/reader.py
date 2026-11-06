@@ -96,14 +96,14 @@ MAX_SEARCH_RESULTS = 30
 def _invoke_with_status(llm_with_tools, messages: list, console: Console | None, label: str) -> AIMessage:
     if console is None:
         return llm_with_tools.invoke(messages)
-    with console.status(f"[bold magenta]{label}[/bold magenta]", spinner="dots"):
+    with console.status(f"[m.dim]{label}[/m.dim]", spinner="dots", spinner_style="m.accent"):
         return llm_with_tools.invoke(messages)
 
 
 def _run_tool_with_status(fn, args: dict, console: Console | None, label: str) -> str:
     if console is None:
         return fn.invoke(args)
-    with console.status(f"[bold magenta]{label}[/bold magenta]", spinner="dots"):
+    with console.status(f"[m.dim]{label}[/m.dim]", spinner="dots", spinner_style="m.accent"):
         return fn.invoke(args)
 
 
@@ -466,18 +466,15 @@ def run(llm, user_request: str, console: Console | None = None) -> ReaderRespons
             return response_obj
 
         for tc in response.tool_calls:
-            if console is not None:
-                args_str = ", ".join(
-                    f"{k}={repr(str(v))[:50]}" for k, v in tc["args"].items()
-                )
-                console.print(
-                    f"  [dim magenta]⋯[/dim magenta] [magenta]{tc['name']}[/magenta][dim]({args_str})[/dim]"
-                )
             fn = tool_map.get(tc["name"])
             if fn is None:
                 output = f"✗ Unknown tool: {tc['name']}"
             else:
                 output = _run_tool_with_status(fn, tc["args"], console, f"Running {tc['name']}...")
+            if console is not None:
+                from app.ui import step_line
+                text = str(output)
+                console.print(step_line(tc["name"], tc["args"], text, not text.lstrip().startswith("✗")))
             response_obj.findings.append(f"{tc['name']}: {str(output)[:200]}")
             messages.append(ToolMessage(content=str(output), tool_call_id=tc["id"]))
 

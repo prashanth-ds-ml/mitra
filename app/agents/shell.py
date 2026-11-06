@@ -586,7 +586,7 @@ def execute(
                 line = raw.rstrip("\n")
                 lines.append(line)
                 if _config.stream_to_console and console is not None:
-                    console.print(f"  [dim]{line}[/dim]")
+                    console.print(Text("     " + line, style="m.dim"), soft_wrap=True)
                 if len(lines) > _config.max_output_lines * 2:
                     lines[:] = lines[-_config.max_output_lines:]
         except Exception:
