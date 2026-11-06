@@ -1,10 +1,22 @@
 # Status
 
-**Now:** M2 terminal cleanup done; next is M1 (core loop) on the user's go · **Last updated:** 2026-11-06 · **Repo:** https://github.com/prashanth-ds-ml/mitra
+**Now:** M1 stage 1-2 done (core loop, chat on it, old engine removed); next: Level 01 run on the user's ok · **Last updated:** 2026-11-06 · **Repo:** https://github.com/prashanth-ds-ml/mitra
 **Plan:** [PLAN.md](PLAN.md) · **Scope:** [SCOPE.md](SCOPE.md) · **Decisions:** [DECISIONS.md](DECISIONS.md) ·
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next
+2026-11-06 evening (all pushed; 431 tests; Windows + Linux CI green):
+- **M1 core loop** (`app/core/`): one loop, 7 tools, tests decide done; `mitra solve "task"` and `mitra solve --plan plan.md`
+  (task by task until each task's "Done when" test passes). Live: fizzbuzz solved in 4 steps / 12 s.
+- **The chat runs on it** (D-037): every message is one agent loop until the model answers (tools: core + shell, web,
+  MCP, run_plan); ask / auto-edit / plan modes; `/fix` = the loop until the command passes. Live: the user's
+  "plan, implement, test, fix, repeat" message -> 10 steps, failing test fixed, all tests pass.
+- **Old engine removed**: router, planner/brainstorm/reader/subagent/registry, file/shell/web agent loops, LangGraph
+  fix workflow, work modes, plugins, advisor, cloud builders (-5,212 app lines, -2,805 test lines).
+- **Level 01** (mitra-playground): plan + 17 visible + 55 hidden tests + reference; `scripts/run_level.py`.
+  Waiting on the user's ok to run Mitra on it.
+- 4B and 9B at 128K (D-036); context use = latest prompt size (E-025).
+
 2026-11-06, terminal assistant session (all pushed; 645 tests; Windows **and Linux** CI green, Linux blocking again):
 - **Interface (D-031..D-035):** `app/ui/` with the Phosphor theme, live streaming, thinking line, one line per tool
   step, inline arrow-key approvals with coloured diffs, startup straight to the header (remembered model), framed
