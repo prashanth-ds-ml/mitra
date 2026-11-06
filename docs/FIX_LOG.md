@@ -8,6 +8,8 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-022 | 2026-11-06 | E-005 | Skill paths stored as posix and read from either form; one PowerShell path style in run hints (`_ps_path`); status-line folder from either path style; native paths for file actions; Linux CI blocking | `app/skills.py`, `app/main.py`, `app/ui/status.py`, CI | Linux CI + `tests/test_review_fixes.py` | works |
+| F-021 | 2026-11-06 | E-022 | `IntentRouter._lead_intent`: the first verb after polite openers decides (fix, plan, test, review, refactor, document); test keywords match whole words | `app/routing.py` | `test_leading_verb_routes_the_request` | works |
 | F-020 | 2026-11-06 | E-021 | `_split_command` strips one pair of outer quotes per argument on Windows | `app/agents/shell.py` | `test_split_command_strips_outer_quotes_on_windows` | works |
 | F-019 | 2026-11-06 | E-003 | File and shell path checks refuse when no workspace is set; inline code from the model (`-c`, `-e`, `-Command`) runs only after approval | `app/agents/filesystem.py`, `app/agents/shell.py` | `tests/test_review_fixes.py` | works |
 | F-018 | 2026-11-06 | E-002 | File, reader, web and shell agent loops stop after 20 model calls with a clear message | `app/agents/limits.py` + 4 agents | `tests/test_review_fixes.py` | works |

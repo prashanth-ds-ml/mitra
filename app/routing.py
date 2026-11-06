@@ -51,6 +51,11 @@ class IntentRouter:
         if self._is_continue_request(normalized):
             return IntentDecision("continue", 0.95, "explicit continue request", workflow_hint="continue")
 
+        # E-022: the leading verb decides ("make a plan ... 3. test" is a plan; "fix the failing test" is a fix).
+        lead = self._lead_intent(normalized)
+        if lead:
+            return IntentDecision(lead, 0.95, "leading verb", workflow_hint=lead)
+
         if self._is_test_request(normalized):
             return IntentDecision("test", 0.95, "test or verification request", workflow_hint="test")
 
@@ -79,6 +84,29 @@ class IntentRouter:
             return IntentDecision("explain", 0.9, "explanation or guidance request", workflow_hint="explain")
 
         return IntentDecision("explain", 0.4, "defaulted to explain for a general request", workflow_hint="explain")
+
+    _SOFT_PREFIX = re.compile(
+        r"^(?:(?:ok(?:ay)?|so|now|then|yes|great|alright|hey|mitra)[\s,]+)*"
+        r"(?:(?:can|could|would|will) you\s+|please\s+|pls\s+|kindly\s+|let'?s\s+|lets\s+|i want you to\s+|"
+        r"i need you to\s+|go ahead and\s+)*"
+    )
+    _LEAD_VERBS = (
+        ("fix", r"(?:fix|debug|repair|solve)\b"),
+        ("plan", r"(?:make|create|write|draft|prepare|give me|come up with|build)\s+(?:a|an|the|me a|me an)?\s*"
+                 r"(?:\w+\s+){0,2}plan\b|plan\b"),
+        ("test", r"(?:test|run (?:the )?tests?|run pytest|pytest|verify)\b"),
+        ("review", r"review\b"),
+        ("refactor", r"(?:refactor|clean up|cleanup)\b"),
+        ("document", r"(?:document|write (?:the )?(?:docs|readme|documentation))\b"),
+    )
+
+    def _lead_intent(self, normalized: str) -> str | None:
+        """Intent from the first verb after polite openers like "ok can you", or None."""
+        text = self._SOFT_PREFIX.sub("", normalized, count=1)
+        for intent, pattern in self._LEAD_VERBS:
+            if re.match(pattern, text):
+                return intent
+        return None
 
     def _normalize(self, user_input: str) -> str:
         normalized = re.sub(r"\s+", " ", (user_input or "").strip().lower())
@@ -130,8 +158,9 @@ class IntentRouter:
         )
 
     def _is_test_request(self, normalized: str) -> bool:
+        # Whole words: "latest", "contest" are not test requests (E-022).
         return any(
-            phrase in normalized
+            re.search(rf"\b{re.escape(phrase)}(?:s|ing)?\b", normalized)
             for phrase in (
                 "test",
                 "pytest",

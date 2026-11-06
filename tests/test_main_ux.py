@@ -1552,3 +1552,24 @@ def test_no_text_mentions_removed_commands():
 def test_unapproved_plan_reply_names_no_command():
     from app.main import _build_plan_unapproved_reply
     assert "/" not in _build_plan_unapproved_reply()
+
+
+# ── The leading verb decides the route (E-022) ───────────────────────────────
+
+@pytest.mark.parametrize("text,intent", [
+    ("can you make a clean plan for Level 01  1. plan  2. implement 3. test 4. fix if any issues", "plan"),
+    ("fix the failing test in test_game.py", "fix"),
+    ("ok can you fix the bug in snake.py", "fix"),
+    ("create a plan for a high score table with sqlite and tests", "plan"),
+    ("run the tests", "test"),
+    ("review my changes", "review"),
+])
+def test_leading_verb_routes_the_request(text, intent):
+    from app.main import _classify_intent
+    assert _classify_intent(text) == intent
+
+
+def test_words_containing_test_are_not_test_requests():
+    from app.routing import IntentRouter
+    assert IntentRouter()._is_test_request("pull the latest changes") is False
+    assert IntentRouter()._is_test_request("add tests for the parser") is True

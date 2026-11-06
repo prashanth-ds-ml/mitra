@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-022 | 2026-11-06 | M2 | Medium | user (terminal test) | "can you make a clean plan for Level 01 ... 3. test ..." was routed as a test request; "fix the failing test" too; "latest" counted as "test" | closed | F-021 |
 | E-021 | 2026-11-06 | M2 | Medium | Claude (E-003 test) | On Windows the command splitter kept quote marks: `python -c "print(42)"` ran the literal string and printed nothing; quoted program paths failed the allow-list | closed | F-020 |
 | E-020 | 2026-11-06 | M2 | High | user (terminal test) | "make a clean plan for Level 01 ... plan, implement, test, fix, repeat" showed two thinking lines and nothing else: the model called `execute_plan`, got "not approved, use `/plan approve`" (a removed command), then wrote an empty follow-up, which Mitra did not report | closed | F-016 |
 | E-019 | 2026-11-06 | M2 | High | user (errors.log review) | Questions and "no coding" requests started builds: "whats the plan now" became a plan goal and ran twice; "plan ... no coding" wrote code; files went to a nested `mitra-playground/mitra-playground/` | closed | F-015 |
@@ -24,7 +25,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 | E-008 | 2026-10-26 | M0 | High | live run (token count check) | Model screen long-prompt case (C09) was silently cut by Ollama: 17K-token prompt at num_ctx 16K, so the model never saw the task and the case scored as a model failure | closed | F-004 |
 | E-007 | 2026-10-24 | M0 | Medium | runner test | `diff.patch` missed files the agent created (`git diff` ignores untracked files) | closed | F-003 |
 | E-006 | 2026-10-24 | M0 | High | config review | In agent workspaces `python` was the system Python 3.10 without pytest/FastAPI: every agent would have failed to run tests | closed | F-002 |
-| E-005 | 2026-10-24 | M0 | Medium | CI (Linux) | local-codex is Windows-only: 8 tests fail on Linux (backslash paths, PowerShell commands, skill paths) | open (fix in M1); Linux CI non-blocking | - |
+| E-005 | 2026-10-24 | M0 | Medium | CI (Linux) | local-codex is Windows-only: 8 tests fail on Linux (backslash paths, PowerShell commands, skill paths) | closed | F-022 |
 | E-004 | 2026-10-24 | M0 | Medium | lint (F821) on import | Model-advisor command crashes after finishing: stray copy of brainstorm code with undefined `raw`, `llm` | closed | F-001 |
 | E-003 | 2026-10-24 | review | Medium | local-codex review | Shell allowlist checks only the program name; path checks pass when no workspace is set | closed | F-019 |
 | E-002 | 2026-10-24 | review | Medium | local-codex review | Agent loops run `while True` with no step limit | closed | F-018 |
@@ -47,6 +48,19 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-022: The router picked the first keyword it checked, anywhere in the message
+
+- **Date found:** 2026-11-06 · **Milestone:** M2 · **Severity:** Medium · **Found by:** user, terminal test (with E-020)
+- **Status:** closed
+
+**What happened:** "can you make a clean plan for Level 01 ... 3. test" -> `test` ("Preparing a verification step");
+"fix the failing test in test_game.py" -> `test`.
+**Root cause:** the keyword checks run in a fixed order (test before fix, plan, ...) and match substrings anywhere.
+**Fix:** F-021.
+**Regression test:** `test_leading_verb_routes_the_request` (6 cases incl. the user's message),
+`test_words_containing_test_are_not_test_requests`.
+**Lesson?** L-029 (same class as E-019).
 
 ### E-021: Windows command splitting kept the quotes
 
@@ -245,14 +259,14 @@ tool.
 
 ### E-005: local-codex is Windows-only
 
-- **Date found:** 2026-10-24 · **Milestone:** M0 · **Severity:** Medium · **Found by:** first CI run on Linux · **Status:** open (fix in M1)
+- **Date found:** 2026-10-24 · **Milestone:** M0 · **Severity:** Medium · **Found by:** first CI run on Linux · **Status:** closed (2026-11-06)
 
 **What happened:** 553 passed, 8 failed on ubuntu-latest (all pass on Windows): skill bodies not found
 (`Could not read skills\05-rag-pipeline\SKILL.md`), run hints mix `\` and `/`, intent routing returns Windows paths
 (`tests/test_main_ux.py`, `tests/test_skills.py`).
 **Root cause:** paths built and stored as Windows strings; PowerShell assumed for run commands.
-**Fix:** - (M1 rewrite uses `pathlib` relative paths and POSIX-safe commands). Until then the Linux CI job is non-blocking.
-**Regression test:** the Linux CI job becomes blocking again when fixed.
+**Fix:** F-022 (fixed now instead of waiting for M1). The Linux CI job is blocking again.
+**Regression test:** the 8 Linux failures pass; `tests/test_review_fixes.py` E-005 section; Linux CI blocking.
 **Lesson?** L-019.
 
 ### E-004: Model-advisor command crashes after finishing
