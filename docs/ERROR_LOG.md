@@ -8,6 +8,9 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-032 | 2026-11-06 | M1 | High | user session (brick breaker) | A model's `run_command python ...` found Mitra's own Python inside the installed command (Windows searches the parent's folder first): `No module named pytest` | closed | F-032 |
+| E-031 | 2026-11-06 | M1 | High | user session (brick breaker) | `python -c "import os; os.makedirs(...)"` ran without asking because `python` had been trusted in that folder: trust by program name let inline code through in ask mode | closed | F-031 |
+| E-030 | 2026-11-06 | M2 | Medium | user session (brick breaker) | A 154-line new file was shown as an 80-line diff ending "… 1 more lines": two cut-offs stacked; new files shown as `+` diff lines, printed twice | closed | F-030 |
 | E-029 | 2026-11-06 | M1 | High | Claude (own mistake) | `uv tool install --reinstall` while the user had `mitra` open: Windows locked the tool's python.exe, uv had already deleted the tool's packages, so new `mitra` launches failed with `No module named 'app'` | closed | F-029 |
 | E-028 | 2026-11-06 | M1 | High | health check (live run step) | Installed as the `mitra` command, run_tests used Mitra's private Python: `No module named pytest`, so every test run in a user's project failed | closed | F-028 |
 | E-027 | 2026-11-06 | M2 | High | Claude (review of `/commit`) | `/commit` committed unstaged and untracked files: it used the `git_commit` tool, which runs `git add -A` first; with nothing staged, `--generate` drafted a message from "(no diff)" and committed everything | closed | F-027 |
@@ -55,6 +58,35 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-032: The shell's `python` was Mitra's own Python
+
+- **Date found:** 2026-11-06 · **Milestone:** M1 · **Severity:** High · **Found by:** user's brick-breaker session (activity log)
+- **Status:** closed
+
+**What happened:** `run_command("python -m pytest -v tests/")` failed with `No module named pytest` from the uv tool's
+Python. **Root cause:** commands start with CreateProcess, which on Windows looks for `python` in the parent's folder
+before PATH; E-028 fixed only run_tests. **Fix:** F-032. **Regression test:** `test_model_python_command_uses_the_projects_python`.
+
+### E-031: "Trusted" let inline code run without asking
+
+- **Date found:** 2026-11-06 · **Milestone:** M1 · **Severity:** High · **Found by:** user's brick-breaker session
+- **Status:** closed
+
+**What happened:** after `mkdir` was refused, the model ran `python -c "import os; os.makedirs(...)"`; it ran with
+"Trusted `python`" and no prompt. **Root cause:** trust is stored per program name; the E-003 inline-code rule only
+applied in auto mode. **Fix:** F-031 (and a `make_dir` tool, so the model does not need the shell for folders).
+**Regression test:** `test_inline_code_asks_even_when_the_program_is_trusted`, `test_make_dir_creates_folders_inside_the_workspace`.
+
+### E-030: File approvals were a wall of `+` lines with a wrong count
+
+- **Date found:** 2026-11-06 · **Milestone:** M2 · **Severity:** Medium · **Found by:** user, brick-breaker session
+- **Status:** closed
+
+**What happened:** each new file appeared as a unified diff (`--- a/ +++ b/ @@ -0,0 +1,154 @@`, every line `+`), cut
+at 80 lines with "… 1 more lines", then repeated as `● Write <file>`. **Root cause:** `diff_text` cut at 80 lines and
+added its own note, then `detail_block` cut again at 80 and counted only that note. **Fix:** F-030.
+**Regression test:** `test_new_file_card_has_header_numbers_and_an_honest_fold`, `test_edit_view_shows_numbered_change_with_context`.
 
 ### E-029: Reinstalling the command under an open session broke it
 

@@ -138,6 +138,8 @@ def run_tool(ws: T.Workspace, name: str, args: dict) -> tuple[str, T.TestRun | N
             return T.read_file(ws, args.get("path", ""), args.get("start", 1), args.get("end", 0)), None
         if name == "search":
             return T.search(ws, args.get("pattern", ""), args.get("path", ".")), None
+        if name == "make_dir":
+            return T.make_dir(ws, args.get("path", "")), None
         if name == "write_file":
             return T.write_file(ws, args.get("path", ""), args.get("content", "")), None
         if name == "edit_file":
@@ -146,7 +148,8 @@ def run_tool(ws: T.Workspace, name: str, args: dict) -> tuple[str, T.TestRun | N
             run = T.run_tests(ws)
             head = "PASSED" if run.passed else "FAILED"
             return f"{head}: {run.summary}\n\n{run.output}", run
-        return f"✗ Unknown tool '{name}'. Tools: list_files, read_file, search, write_file, edit_file, run_tests, finish.", None
+        return (f"✗ Unknown tool '{name}'. Tools: list_files, read_file, search, make_dir, write_file, edit_file, "
+                "run_tests, finish."), None
     except T.ToolError as exc:
         return f"✗ {exc}", None
     except Exception as exc:  # a crash in a tool is reported, never fatal (E-018)

@@ -7,16 +7,16 @@ Budget: 3,000 tokens per view for the fixed prompt + tool specs (SCOPE.md; check
 
 | View | Part | Chars | Est. tokens |
 |---|---|---:|---:|
-| Chat (`mitra`) | System prompt (`app.core.chat.CHAT_PROMPT`) | 681 | 195 |
-| Chat (`mitra`) | Tool specs (`app.core.chat.tool_specs("approve")`) | 2,718 | 777 |
-| **Chat (`mitra`)** | **total** | | **972** |
+| Chat (`mitra`) | System prompt (`app.core.chat.CHAT_PROMPT`) | 956 | 274 |
+| Chat (`mitra`) | Tool specs (`app.core.chat.tool_specs("approve")`) | 2,910 | 832 |
+| **Chat (`mitra`)** | **total** | | **1,106** |
 | Solve (`mitra solve`) | System prompt (`app.core.loop.SYSTEM_PROMPT`) | 619 | 177 |
-| Solve (`mitra solve`) | Tool specs (`app.core.tools.TOOL_SPECS`) | 1,533 | 438 |
-| **Solve (`mitra solve`)** | **total** | | **615** |
+| Solve (`mitra solve`) | Tool specs (`app.core.tools.TOOL_SPECS`) | 1,725 | 493 |
+| **Solve (`mitra solve`)** | **total** | | **670** |
 
 ## Chat (`mitra`)
 
-### System prompt (`app.core.chat.CHAT_PROMPT`): ~195 tokens
+### System prompt (`app.core.chat.CHAT_PROMPT`): ~274 tokens
 
 ````text
 You are Mitra, a local coding assistant working in the user's project folder.
@@ -26,16 +26,21 @@ look first (list_files, read_file, search), make small changes (edit_file, write
 run_command), and fix what fails. Read a file before you edit it. For a plan file with tasks (plan.md), use run_plan:
 it builds the tasks one at a time and runs each task's tests. Use web_search / fetch_url for facts you do not know.
 
+Run the tests right after you write code, before writing more files. Create folders with make_dir.
+A new project gets its code, its tests and a plan.md; folders like reference/ or tests/hidden/ are only for test
+levels, so do not copy them unless the user asks for a level.
+
 When the work is done, or you need the user, reply in a few short lines: what you did, what is left. Do not describe
 changes you did not make.
 ````
 
-### Tool specs (`app.core.chat.tool_specs("approve")`): ~777 tokens
+### Tool specs (`app.core.chat.tool_specs("approve")`): ~832 tokens
 
 ````text
 {"name": "list_files", "description": "List files in the workspace (or a folder).", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}}
 {"name": "read_file", "description": "Read a text file with line numbers. Read a file before editing it.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "start": {"type": "integer"}, "end": {"type": "integer"}}, "required": ["path"]}}
 {"name": "search", "description": "Find a regex in files; returns file:line: text.", "parameters": {"type": "object", "properties": {"pattern": {"type": "string"}, "path": {"type": "string"}}, "required": ["pattern"]}}
+{"name": "make_dir", "description": "Create a folder (and parent folders) in the project.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}
 {"name": "write_file", "description": "Create a file, or replace a file you have read, with the full content.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}
 {"name": "edit_file", "description": "Replace one exact block of lines `old` with `new` in a file you have read.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "old": {"type": "string"}, "new": {"type": "string"}}, "required": ["path", "old", "new"]}}
 {"name": "run_tests", "description": "Run the tests. Returns pass/fail and the output.", "parameters": {"type": "object", "properties": {}}}
@@ -64,12 +69,13 @@ How to work:
 Keep replies short. Use tools instead of describing what you would do. Paths are relative to the project folder.
 ````
 
-### Tool specs (`app.core.tools.TOOL_SPECS`): ~438 tokens
+### Tool specs (`app.core.tools.TOOL_SPECS`): ~493 tokens
 
 ````text
 {"name": "list_files", "description": "List files in the workspace (or a folder).", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}}
 {"name": "read_file", "description": "Read a text file with line numbers. Read a file before editing it.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "start": {"type": "integer"}, "end": {"type": "integer"}}, "required": ["path"]}}
 {"name": "search", "description": "Find a regex in files; returns file:line: text.", "parameters": {"type": "object", "properties": {"pattern": {"type": "string"}, "path": {"type": "string"}}, "required": ["pattern"]}}
+{"name": "make_dir", "description": "Create a folder (and parent folders) in the project.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}
 {"name": "write_file", "description": "Create a file, or replace a file you have read, with the full content.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}
 {"name": "edit_file", "description": "Replace one exact block of lines `old` with `new` in a file you have read.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "old": {"type": "string"}, "new": {"type": "string"}}, "required": ["path", "old", "new"]}}
 {"name": "run_tests", "description": "Run the tests. Returns pass/fail and the output.", "parameters": {"type": "object", "properties": {}}}

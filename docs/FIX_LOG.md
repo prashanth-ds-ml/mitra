@@ -8,6 +8,9 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-032 | 2026-11-06 | E-032 | `_model_command_args`: a model command's `python` is `project_python()` | `app/agents/shell.py` | `test_model_python_command_uses_the_projects_python` | works |
+| F-031 | 2026-11-06 | E-031 | Inline code is never covered by trust (always asks); new `make_dir` tool | `app/main.py`, `app/core/tools.py` | `test_inline_code_asks_even_when_the_program_is_trusted` | works |
+| F-030 | 2026-11-06 | E-030 | New files as a card (header, syntax colours, line numbers, 20 lines + honest fold), edits as numbered hunks with 2 lines of context, one result line after approval; Yes / Yes to all / No with a reason | `app/ui/files.py`, `app/core/chat.py`, `app/main.py` | `tests/test_display_fixes.py` | works |
 | F-029 | 2026-11-06 | E-029 | health_check skips the reinstall while `mitra.exe` is running; repair = `uv pip install --python <tool python> -e .` | `scripts/health_check.py` | live check passed after repair | works |
 | F-028 | 2026-11-06 | E-028 | `project_python()`: the project's .venv, then `python` on PATH if it has pytest, then Mitra's own Python (pytest added to Mitra's dependencies) | `app/core/tools.py`, `pyproject.toml` | `test_tests_run_with_the_projects_python` | works |
 | F-027 | 2026-11-06 | E-027 | `/commit` refuses when nothing is staged and runs plain `git commit -m` (no `git add -A`, no push) with timeouts; the drafted message comes from `git diff --cached`; a cancelled menu or empty typed message does not commit | `app/main.py` (`_cmd_commit`, `_generate_commit_message`) | `tests/test_commit_command.py` | works |

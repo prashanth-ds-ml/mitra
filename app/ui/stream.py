@@ -113,6 +113,7 @@ def stream_reply(
     label: str = "Thinking",
     stop=None,
     folded=None,
+    thinking_line: bool = True,
 ) -> StreamResult:
     """Consume model chunks, drawing the thinking timer and the answer live. Returns the merged message."""
     res = StreamResult()
@@ -134,12 +135,15 @@ def stream_reply(
             think_shown = True
             return
         think_shown = True
-        live.console.print(thinking_done(clock() - start, res.thinking_tokens, hint=not show_reasoning))
         if folded is not None and not show_reasoning:
             folded.remember("Thinking", res.thinking)
         if show_reasoning and res.thinking.strip():
+            live.console.print(thinking_done(clock() - start, res.thinking_tokens, hint=False))
             live.console.print(Text(res.thinking.strip()[:4000], style="m.faint italic"))
-        live.console.print()
+            live.console.print()
+        elif thinking_line:  # the chat turns this off: the live timer already showed it (user feedback 2026-11-06)
+            live.console.print(thinking_done(clock() - start, res.thinking_tokens, hint=not show_reasoning))
+            live.console.print()
 
     def handle(parts: list[tuple[str, str]], live: Live) -> None:
         nonlocal say, printed_blocks

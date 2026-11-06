@@ -1900,10 +1900,11 @@ def _chat():
     from app.core.chat import ChatSession, Hooks, repair_history
     from app.core.cli import EventPrinter
 
-    def _chat_stream(chunks):
+    def _chat_stream(chunks, step=1):
         with ui.KeyWatcher() as keys:
             streamed = ui.stream_reply(console, chunks, show_reasoning=show_reasoning, stop=keys.stop,
-                                       folded=ui_state.folded)
+                                       folded=ui_state.folded, label=f"Thinking · step {step}",
+                                       thinking_line=False)
         typed_buffer.append(keys.take_typed())
         return streamed
 
@@ -1915,9 +1916,43 @@ def _chat():
             console.print(ui.tool_line("Tests", ok=ok, detail=first))
             ui_state.folded.remember("Test output", out)
             return
-        console.print(ui.step_line({"write_file": "create_file", "list_files": "list_directory",
-                                    "search": "search_text", "web_search": "search_web"}.get(name, name),
-                                   args, out, ok))
+        if name in ("write_file", "edit_file"):
+            first, _, warning = out.partition("\n")
+            if chat.mode == "approve" and ok:  # the card was just shown: one result line, no repeat
+                console.print(Text("  ⎿  " + first, style="m.dim"))
+            else:
+                console.print(ui.tool_line("Write" if name == "write_file" else "Edit",
+                                           str(args.get("path", "")), ok=ok, detail="" if ok else first))
+            if warning.strip():
+                console.print(Text("  " + warning.strip(), style="m.err"))
+            return
+        if name == "make_dir":
+            console.print(ui.tool_line("Folder", str(args.get("path", "")), ok=ok, detail="" if ok else out))
+            return
+        console.print(ui.step_line({"list_files": "list_directory", "search": "search_text",
+                                    "web_search": "search_web"}.get(name, name), args, out, ok))
+
+    def _chat_confirm_write(rel, old, new):
+        """New files as a card, edits as numbered hunks; the full text is behind ctrl+o (user feedback)."""
+        view, hidden = ui.files.change_view(rel, old, new)
+        console.print()
+        console.print(view)
+        if hidden:
+            ui_state.folded.remember(f"{rel} (proposed)", new if old is None else "\n".join(
+                difflib.unified_diff((old or "").splitlines(), new.splitlines(), lineterm="")))
+        verb = "Create this file" if old is None else "Apply this edit"
+        choice = ui.menu.choose(console, f"{verb}?", [("yes", "Yes"), ("all", "Yes to all for this request"),
+                                                     ("no", "No, and tell Mitra why")], default="yes")
+        if choice in ("yes", "all"):
+            return choice
+        try:
+            reason = console.input("[m.accent]  why? [/m.accent]").strip()
+        except (EOFError, KeyboardInterrupt):
+            reason = ""
+        return f"no: {reason}"
+
+    def _chat_working(label):
+        return console.status(f"[m.dim]{label}…[/m.dim]", spinner="dots", spinner_style="m.accent")
 
     def _chat_confirm(title, detail, question):
         choice = _choose_approval_option(title, f"{detail}\n\n{question}",
@@ -1958,6 +1993,8 @@ def _chat():
             mcp_find=_chat_mcp_find,
             mcp_call=_chat_mcp_call,
             on_plan_event=EventPrinter(console),
+            confirm_write=_chat_confirm_write,
+            working=_chat_working,
         ),
     )
 
@@ -2290,7 +2327,10 @@ def _chat():
             # ── Token bar ─────────────────────────────────────────────────────
             sess_in += turn_in; sess_out += turn_out
             if turn_in or turn_out:
-                console.print(ui.turn_footer(time.monotonic() - turn_started, turn_in, turn_out))
+                console.print(ui.turn_summary(
+                    seconds=time.monotonic() - turn_started, steps=turn.steps,
+                    files=len({e["path"] for e in turn.journal}), tests_run=turn.tests_run,
+                    last_test_ok=turn.last_test_ok, tokens_in=turn_in, tokens_out=turn_out))
             ui.notify.done(console, time.monotonic() - turn_started)
 
             # ── Auto-compact ──────────────────────────────────────────────────
@@ -2375,7 +2415,9 @@ def _confirm_shell(command: str, cwd: str) -> str | None:
     """
     workspace = shell_agent._config.root_workspace or cwd
     command_name = _shell_command_name(command)
-    if memory.is_shell_command_trusted(workspace, cwd, command_name):
+    # Inline code (python -c, node -e, ...) is never covered by "trusted": the program name says nothing about
+    # what the code does (2026-11-06: `python -c "os.makedirs(...)"` ran without asking).
+    if memory.is_shell_command_trusted(workspace, cwd, command_name) and not shell_agent.runs_inline_code(command):
         _print_approval_result(f"Trusted `{command_name}` in {cwd}", approved=True)
         return command
 

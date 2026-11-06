@@ -148,6 +148,39 @@ def search(ws: Workspace, pattern: str, path: str = ".") -> str:
     return "\n".join(hits) if hits else f"No matches for '{pattern}'."
 
 
+def make_dir(ws: Workspace, path: str) -> str:
+    """Create a folder (and its parents) inside the workspace. Without it the model tried `mkdir` in the shell,
+    was refused, and told the user it could not create folders (2026-11-06 session)."""
+    full = ws.path(path)
+    ws.check_writable(full / "x")
+    existed = full.is_dir()
+    full.mkdir(parents=True, exist_ok=True)
+    return f"{'Folder already exists' if existed else 'Created folder'}: {ws.rel(full)}"
+
+
+def syntax_note(rel: str, text: str) -> str:
+    """A warning when a written .py / .json / .toml file does not parse, so the model fixes it right away
+    (2026-11-06: Mitra wrote level.toml as Markdown bullets)."""
+    suffix = rel.rsplit(".", 1)[-1].lower() if "." in rel else ""
+    try:
+        if suffix == "py":
+            compile(text, rel, "exec")
+        elif suffix == "json":
+            import json
+            json.loads(text)
+        elif suffix == "toml":
+            import tomllib
+            tomllib.loads(text)
+        else:
+            return ""
+    except SyntaxError as exc:
+        return f"\n⚠ {rel} is not valid Python: line {exc.lineno}: {exc.msg}. Fix it before going on."
+    except ValueError as exc:  # json.JSONDecodeError and tomllib.TOMLDecodeError are ValueErrors
+        kind = "JSON" if suffix == "json" else "TOML"
+        return f"\n⚠ {rel} is not valid {kind}: {exc}. Fix it before going on."
+    return ""
+
+
 def write_file(ws: Workspace, path: str, content: str) -> str:
     full = ws.path(path)
     ws.check_writable(full)
@@ -158,7 +191,7 @@ def write_file(ws: Workspace, path: str, content: str) -> str:
         import json
         content = json.dumps(content, indent=2) + "\n"
     _commit(ws, full, str(content))
-    return f"Wrote {rel} ({len(str(content).splitlines())} lines)."
+    return f"Wrote {rel} ({len(str(content).splitlines())} lines)." + syntax_note(rel, str(content))
 
 
 def _loose(s: str) -> str:
@@ -199,7 +232,7 @@ def edit_file(ws: Workspace, path: str, old: str, new: str) -> str:
         lines[i:i + len(want)] = new_lines
         text = "\n".join(lines) + "\n"
     _commit(ws, full, text)
-    return f"Edited {rel}."
+    return f"Edited {rel}." + syntax_note(rel, text)
 
 
 def rollback(entries: list[dict]) -> int:
@@ -301,6 +334,8 @@ TOOL_SPECS = [
     {"name": "search", "description": "Find a regex in files; returns file:line: text.",
      "parameters": {"type": "object", "properties": {"pattern": {"type": "string"}, "path": {"type": "string"}},
                     "required": ["pattern"]}},
+    {"name": "make_dir", "description": "Create a folder (and parent folders) in the project.",
+     "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}},
     {"name": "write_file", "description": "Create a file, or replace a file you have read, with the full content.",
      "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
                     "required": ["path", "content"]}},

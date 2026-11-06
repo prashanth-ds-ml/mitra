@@ -28,10 +28,14 @@ look first (list_files, read_file, search), make small changes (edit_file, write
 run_command), and fix what fails. Read a file before you edit it. For a plan file with tasks (plan.md), use run_plan:
 it builds the tasks one at a time and runs each task's tests. Use web_search / fetch_url for facts you do not know.
 
+Run the tests right after you write code, before writing more files. Create folders with make_dir.
+A new project gets its code, its tests and a plan.md; folders like reference/ or tests/hidden/ are only for test
+levels, so do not copy them unless the user asks for a level.
+
 When the work is done, or you need the user, reply in a few short lines: what you did, what is left. Do not describe
 changes you did not make."""
 
-READ_ONLY_TOOLS = {"list_files", "read_file", "search", "web_search", "fetch_url", "mcp_find"}
+READ_ONLY_TOOLS = {"list_files", "read_file", "search", "web_search", "fetch_url", "mcp_find"}  # plan mode
 MAX_STEPS = 40
 
 EXTRA_SPECS = [
@@ -92,10 +96,15 @@ def diff_text(rel: str, old: str | None, new: str, max_lines: int = 80) -> str:
     return "\n".join(lines) if lines else "(no change)"
 
 
+def _no_activity(label: str):
+    import contextlib
+    return contextlib.nullcontext()
+
+
 @dataclass
 class Hooks:
     """What the chat needs from the terminal (main.py provides these)."""
-    stream: Callable                      # (chunks) -> ui.StreamResult-like (text, message, stopped, printed)
+    stream: Callable                      # (chunks, step=n) -> ui.StreamResult-like (text, message, stopped, printed)
     show: Callable[[str, dict, str, bool], None]  # (tool, args, output, ok)
     confirm: Callable[[str, str, str], bool]      # (title, detail, question) -> approved
     run_shell: Callable[[str], tuple[str, bool]]  # command -> (output for the model, ok)
@@ -104,6 +113,9 @@ class Hooks:
     mcp_find: Callable[[str], str]
     mcp_call: Callable[[str, str, dict], str]
     on_plan_event: Callable | None = None  # core loop events while run_plan works
+    # (rel, old text or None, new text) -> "yes" | "all" | "no: <reason>"; None = use `confirm` with a plain diff
+    confirm_write: Callable[[str, str | None, str], str] | None = None
+    working: Callable[[str], object] = _no_activity  # (label) -> context manager shown while a tool runs
 
 
 @dataclass
@@ -116,6 +128,8 @@ class TurnResult:
     stopped: bool = False
     stop_reason: str = ""
     journal: list = field(default_factory=list)
+    tests_run: int = 0
+    last_test_ok: bool | None = None
 
 
 class ChatSession:
@@ -126,11 +140,22 @@ class ChatSession:
         # every step of every turn, scrubbed, one file per day: follow a session live, replay it later (D-022)
         self.rec = core_loop.Recorder(self.ws.root / ".mitra" / "runs" / f"chat-{time.strftime('%Y%m%d')}.jsonl")
         self.turn_no = 0
+        self.approve_all = False  # "yes to all" for the rest of this turn
 
     # approval for edits in ask mode
     def _before_write(self, rel: str, old: str | None, new: str) -> None:
-        if self.mode != "approve":
+        if self.mode != "approve" or self.approve_all:
             return
+        if self.hooks.confirm_write is not None:
+            answer = self.hooks.confirm_write(rel, old, new)
+            if answer == "all":
+                self.approve_all = True
+                return
+            if answer == "yes":
+                return
+            reason = answer.split(":", 1)[1].strip() if ":" in answer else ""
+            raise T.ToolError(f"The user declined the change to {rel}."
+                              + (f" Their reason: {reason}" if reason else " Ask what they want instead."))
         title = f"{'Edit' if old is not None else 'Create'} {rel}"
         if not self.hooks.confirm(title, diff_text(rel, old, new), f"{title}?"):
             raise T.ToolError(f"The user declined the change to {rel}. Ask what they want instead.")
@@ -142,10 +167,12 @@ class ChatSession:
             if name == "run_command":
                 return self.hooks.run_shell(str(args.get("command", "")))
             if name == "web_search":
-                out = self.hooks.web_search(str(args.get("query", "")))
+                with self.hooks.working(f"Searching: {str(args.get('query', ''))[:50]}"):
+                    out = self.hooks.web_search(str(args.get("query", "")))
                 return out, not out.startswith("✗")
             if name == "fetch_url":
-                out = self.hooks.fetch_url(str(args.get("url", "")))
+                with self.hooks.working(f"Reading {str(args.get('url', ''))[:60]}"):
+                    out = self.hooks.fetch_url(str(args.get("url", "")))
                 return out, not out.startswith("✗")
             if name == "mcp_find":
                 return self.hooks.mcp_find(str(args.get("query", ""))), True
@@ -160,7 +187,12 @@ class ChatSession:
                                    str(args.get("test_command") or "python -m pytest -q"))
         except Exception as exc:
             return f"✗ {name} failed: {type(exc).__name__}: {exc}", False
-        out, run = core_loop.run_tool(self.ws, name, args)
+        label = {"run_tests": "Running tests"}.get(name)
+        if label:
+            with self.hooks.working(label):
+                out, run = core_loop.run_tool(self.ws, name, args)
+        else:
+            out, run = core_loop.run_tool(self.ws, name, args)
         ok = run.passed if run is not None else not out.startswith("✗")
         return out, ok
 
@@ -202,6 +234,7 @@ class ChatSession:
         return res
 
     def _turn(self, messages: list, res: TurnResult, max_steps: int) -> TurnResult:
+        self.approve_all = False
         self.ws.journal = res.journal
         self.ws.before_write = self._before_write
         specs = tool_specs(self.mode)
@@ -209,7 +242,7 @@ class ChatSession:
         guard = RepeatGuard(max_repeats=2, max_failures=4)
         for step in range(1, max_steps + 1):
             res.steps = step
-            streamed = self.hooks.stream(bound.stream(messages))
+            streamed = self._stream(bound.stream(messages), step)
             if streamed.stopped:
                 messages.append(AIMessage(content=streamed.text))
                 res.text, res.stopped, res.stop_reason = streamed.text, True, "stopped by you (esc)"
@@ -251,6 +284,9 @@ class ChatSession:
                     out, ok = refused, False
                 else:
                     out, ok = self._run(name, args, self._run_plan)
+                if name == "run_tests":
+                    res.tests_run += 1
+                    res.last_test_ok = ok
                 self.hooks.show(name, args, out, ok)
                 self.rec.write("tool", turn=self.turn_no, step=step, name=name, args=args, ok=ok, output=out[:3000])
                 messages.append(ToolMessage(content=out, tool_call_id=tc["id"]))
@@ -259,6 +295,15 @@ class ChatSession:
                 return self._wrap_up(messages, res, stop)
         return self._wrap_up(messages, res, f"step limit ({max_steps} model calls)")
 
+    def _stream(self, chunks, step: int):
+        import inspect
+
+        try:
+            takes_step = "step" in inspect.signature(self.hooks.stream).parameters
+        except (TypeError, ValueError):
+            takes_step = False
+        return self.hooks.stream(chunks, step=step) if takes_step else self.hooks.stream(chunks)
+
     def _wrap_up(self, messages: list, res: TurnResult, reason: str) -> TurnResult:
         """The loop was cut short: one call without tools, so the user still hears what was done (E-024)."""
         res.stopped, res.stop_reason = True, reason
@@ -266,7 +311,7 @@ class ChatSession:
         messages.append(HumanMessage(content=(
             f"[Mitra stopped the tools: {reason}.] Tell the user in a few short lines what you did, "
             "what failed and what is left. Do not call tools.")))
-        streamed = self.hooks.stream(self.llm.stream(messages))
+        streamed = self._stream(self.llm.stream(messages), res.steps + 1)
         reply = streamed.message if streamed.message is not None else AIMessage(content=streamed.text)
         messages.append(reply)
         res.text = streamed.text

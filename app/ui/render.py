@@ -161,3 +161,20 @@ def detail_block(text: str, *, indent: str = "    ", max_lines: int = 80) -> Tex
     if len(lines) > max_lines:
         out.append(f"\n{indent}… {len(lines) - max_lines} more lines", style="m.faint")
     return out
+
+
+def turn_summary(*, seconds: float, steps: int, files: int, tests_run: int, last_test_ok, tokens_in: int,
+                 tokens_out: int) -> Text:
+    """One line at the end of a turn: what happened, at a glance."""
+    mins, secs = divmod(int(seconds), 60)
+    took = f"{mins}m {secs:02d}s" if mins else f"{secs}s"
+    parts = [f"{steps} step{'s' if steps != 1 else ''}"]
+    if files:
+        parts.append(f"{files} file{'s' if files != 1 else ''} changed")
+    if tests_run:
+        state = "passed" if last_test_ok else "failing"
+        parts.append(f"tests run {tests_run}× (last {state})")
+    parts += [took, f"↑ {format_tokens(tokens_in)} ↓ {format_tokens(tokens_out)} tokens"]
+    t = Text("  ✓ " if last_test_ok is not False else "  ✗ ", style="m.ok" if last_test_ok is not False else "m.err")
+    t.append(" · ".join(parts), style="m.faint")
+    return t

@@ -241,6 +241,21 @@ def runs_inline_code(command: str) -> bool:
     return exe in _INTERPRETERS and any(arg.lower() in _INLINE_CODE_FLAGS for arg in parts[1:])
 
 
+def _model_command_args(command: str, cwd: str) -> list[str]:
+    """Split a model's command; `python` means the project's Python (E-028).
+
+    On Windows a child process looks for `python` next to the parent's exe first, so inside the installed `mitra`
+    command a bare `python` found Mitra's private Python ("No module named pytest", 2026-11-06 session).
+    """
+    args = _split_command(command)
+    if args and args[0].lower() in ("python", "python3", "py", "python.exe"):
+        from app.core.tools import project_python
+
+        root = _config.root_workspace or cwd
+        args[0] = project_python(pathlib.Path(root))
+    return args
+
+
 def _confirm_command(command: str, cwd: str) -> str | None:
     """Call confirm_fn and return the (possibly amended) command, or None if denied."""
     if _config.confirm_fn is None:
@@ -493,7 +508,7 @@ def execute(
 
     try:
         proc = subprocess.Popen(
-            _user_shell_args(command) if typed_by_user else _split_command(command),
+            _user_shell_args(command) if typed_by_user else _model_command_args(command, resolved_cwd),
             cwd=resolved_cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
