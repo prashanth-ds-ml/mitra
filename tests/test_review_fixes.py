@@ -69,7 +69,8 @@ def test_web_agent_stops_at_the_step_limit(monkeypatch):
     monkeypatch.setattr(web, "_run_tool_with_status", lambda fn, args, console, label: "result")
     llm = AlwaysCallsATool("search_web", lambda n: {"query": f"q{n}"})
     resp = web.run(llm, "keep searching")
-    assert llm.calls == MAX_AGENT_STEPS and "step limit" in resp.summary
+    # 20 tool-calling turns, then one call for the answer (E-024); this fake model gives none, so the reason shows
+    assert llm.calls == MAX_AGENT_STEPS + 1 and "step limit" in resp.summary
 
 
 # ── E-023: the same call over and over (100+ identical searches) ────────────
@@ -91,7 +92,7 @@ def test_identical_calls_are_not_rerun_and_then_stop(monkeypatch):
     llm = AlwaysCallsATool("search_web", {"query": "Qwen model specifications", "max_results": 5})
     resp = web.run(llm, "search")
     assert len(runs) == 1                      # the search ran once
-    assert llm.calls == 4                      # then 3 repeats were refused
+    assert llm.calls == 5                      # then 3 repeats were refused, then one call for the answer
     assert "kept repeating" in resp.summary
 
 

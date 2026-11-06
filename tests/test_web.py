@@ -15,13 +15,21 @@ class TestSearchWeb:
         <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fdocs.example.com%2Fpackaging">Packaging Docs</a>
         </body></html>
         """
-        monkeypatch.setattr(web_agent, "_http_get", lambda url, timeout=15: html)
+        from app.agents import search_sources
+
+        def fake_get(url, timeout=None):
+            if "duckduckgo" in url:
+                return html
+            raise OSError("not in this test")
+
+        monkeypatch.setattr(search_sources, "_get", fake_get)
+        monkeypatch.setattr(search_sources._Ddg, "available", True)
 
         result = web_agent.search_web.invoke({"query": "python packaging"})
 
         assert "Web results for 'python packaging'" in result
-        assert "Python Packaging Guide" in result
-        assert "https://docs.example.com/packaging" in result
+        assert "[Web] Python Packaging Guide" in result
+        assert "https://docs.example.com/packaging" in result      # DuckDuckGo redirect resolved
 
     def test_search_web_requires_query(self):
         result = web_agent.search_web.invoke({"query": ""})

@@ -150,29 +150,29 @@ class _PageTextParser(HTMLParser):
 @tool
 def search_web(query: str, max_results: int = 5) -> str:
     """
-    Search the public web for a topic and return the top result titles with URLs.
-    Use for online research, current information, documentation lookups, and general internet search.
+    Search Wikipedia, Hugging Face (models), GitHub (code), arXiv (papers) and the Ollama library at once.
+    Returns titles, URLs and short snippets labelled by source; read a result with fetch_url.
+    Use short queries (2-5 words), e.g. "Qwen3.5" or "qwen3.5 benchmark".
     """
+    from app.agents.search_sources import format_results, search
+
     q = (query or "").strip()
     if not q:
         return "✗ No search query provided."
-    try:
-        url = "https://duckduckgo.com/html/?" + urllib.parse.urlencode({"q": q})
-        html_text = _http_get(url)
-    except Exception as exc:
-        return f"✗ Web search failed: {exc}"
+    per_source = max(2, min(int(max_results or 4), 8))
+    results, errors = search(q, per_source=per_source)
+    return format_results(q, results, errors)
 
-    parser = _SearchResultsParser()
-    parser.feed(html_text)
-    results = parser.results[: max(1, min(max_results, 10))]
-    if not results:
-        return f"No web results found for '{q}'."
 
-    lines = [f"# Web results for '{q}'"]
-    for index, (title, href) in enumerate(results, 1):
-        lines.append(f"{index}. {title}")
-        lines.append(f"   {href}")
-    return "\n".join(lines)
+def readme_url(url: str) -> str | None:
+    """Raw README for a Hugging Face model/dataset page or a GitHub repo page, else None."""
+    m = re.match(r"^https?://huggingface\.co/(datasets/)?([\w.-]+)/([\w.-]+)/?$", url)
+    if m and m.group(2) not in {"docs", "blog", "spaces", "papers", "models", "datasets"}:
+        return f"https://huggingface.co/{m.group(1) or ''}{m.group(2)}/{m.group(3)}/raw/main/README.md"
+    m = re.match(r"^https?://github\.com/([\w.-]+)/([\w.-]+?)(?:\.git)?/?$", url)
+    if m and m.group(1) not in {"orgs", "topics", "search", "marketplace", "features"}:
+        return f"https://raw.githubusercontent.com/{m.group(1)}/{m.group(2)}/HEAD/README.md"
+    return None
 
 
 @tool
@@ -186,6 +186,14 @@ def fetch_url(url: str, max_chars: int = _MAX_FETCH_CHARS) -> str:
         return "✗ No URL provided."
     if not re.match(r"^https?://", target, re.IGNORECASE):
         target = "https://" + target
+    # E-024: model and repo pages are mostly site menus; read their README instead.
+    raw = readme_url(target)
+    if raw:
+        try:
+            text = _http_get(raw)
+            return f"# README of {target}\nURL: {target}\n\n{text[:max_chars].rstrip()}"
+        except Exception:
+            pass  # fall back to the page itself
     try:
         html_text = _http_get(target)
     except Exception as exc:
@@ -223,12 +231,17 @@ def _first_failure_text(tool_outputs: list[str]) -> str:
 
 
 def _finalize_summary(tool_outputs: list[str], model_summary: str) -> str:
-    failures = [output for output in tool_outputs if (output or "").strip().startswith("✗")]
+    # Refused repeats are not errors; a failed call never hides the model's answer (E-024).
+    failures = [output for output in tool_outputs
+                if (output or "").strip().startswith("✗") and not (output or "").startswith("✗ Not run:")]
     if not failures:
         return model_summary
+    real_calls = [o for o in tool_outputs if not (o or "").startswith("✗ Not run:")]
+    if model_summary.strip() and len(failures) < len(real_calls):  # if every call failed, the answer was made up
+        return f"{model_summary.rstrip()}\n\n_{len(failures)} of {len(real_calls)} web calls failed._"
 
     first_error = _first_failure_text(tool_outputs)
-    if len(failures) == len(tool_outputs):
+    if len(failures) == len(real_calls):
         return f"Could not complete the web request. {first_error}." if first_error else "Could not complete the web request."
     if first_error:
         return f"Completed part of the web request, but hit {len(failures)} error{'s' if len(failures) != 1 else ''}. {first_error}."
@@ -280,10 +293,32 @@ def run(llm, user_request: str, console: Console | None = None) -> WebResponse:
             messages.append(ToolMessage(content=str(output), tool_call_id=tc["id"]))
             stop = guard.after(tc["name"], str(output))
             if stop is not None:
-                response_obj.summary = stop + (" Mitra may be offline, or the search site is blocking requests."
-                                               if tc["name"] == "search_web" else "")
-                return response_obj
-    response_obj.summary = stopped_message()
+                if "failed" in stop and tc["name"] == "search_web":
+                    stop += " Mitra may be offline, or the search sites are blocking requests."
+                return _answer_now(llm, messages, response_obj, stop, console)
+    return _answer_now(llm, messages, response_obj, stopped_message(), console)
+
+
+def _answer_now(llm, messages: list, response_obj, reason: str, console) -> "WebResponse":
+    """The loop was stopped: one last call without tools, so the user still gets an answer (E-024)."""
+    from langchain_core.messages import HumanMessage as _Human
+
+    if not response_obj.tool_outputs or all(str(o).startswith("✗") for o in response_obj.tool_outputs):
+        response_obj.summary = reason
+        return response_obj
+    messages.append(_Human(content=(
+        "Stop searching now. Answer the original request using only the results above. "
+        "Say clearly what you could not find. Cite the URLs you used.")))
+    try:
+        final = _invoke_with_status(llm, messages, console, "Writing the answer...")
+    except Exception as exc:  # the stop reason is still worth showing
+        response_obj.summary = f"{reason} (and the final answer failed: {exc})"
+        return response_obj
+    meta = getattr(final, "usage_metadata", None) or {}
+    response_obj.tokens_in += meta.get("input_tokens", 0)
+    response_obj.tokens_out += meta.get("output_tokens", 0)
+    text = (getattr(final, "content", "") or "").strip()
+    response_obj.summary = (text + f"\n\n_{reason.lstrip('✗ ')}_") if text else reason
     return response_obj
 
 

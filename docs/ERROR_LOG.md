@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-024 | 2026-11-06 | M2 | High | user ("its mitra job") | Mitra could not research anything: its only search was DuckDuckGo's HTML page, which times out from this machine; a stopped search gave no answer; one failed call replaced the whole answer with an error line | closed | F-024 |
 | E-023 | 2026-11-06 | M2 | High | user (terminal test) | "search about 3.5+ series models": the web agent ran 100+ `search_web` calls, most with the identical query, while every search timed out | closed | F-023 |
 | E-022 | 2026-11-06 | M2 | Medium | user (terminal test) | "can you make a clean plan for Level 01 ... 3. test ..." was routed as a test request; "fix the failing test" too; "latest" counted as "test" | closed | F-021 |
 | E-021 | 2026-11-06 | M2 | Medium | Claude (E-003 test) | On Windows the command splitter kept quote marks: `python -c "print(42)"` ran the literal string and printed nothing; quoted program paths failed the allow-list | closed | F-020 |
@@ -49,6 +50,22 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-024: Mitra's web search did not work
+
+- **Date found:** 2026-11-06 · **Milestone:** M2 · **Severity:** High · **Found by:** user, after E-023 ("its mitra job, what is the point of it if you do it")
+- **Status:** closed
+
+**What happened:** `search_web` only scraped DuckDuckGo, which times out from this machine on every endpoint (duckduckgo.com,
+html., lite.). Bing answers automated requests with unrelated pages; Mojeek returns a captcha. When the repeat guard
+stopped the loop, the user got only "Stopped" and no answer; `_finalize_summary` replaced the model's answer with
+"Completed part of the web request, but hit N errors" whenever any call had failed.
+**Root cause:** one scraped search page as the only source; no final answer after a stop; errors overrode answers.
+**Fix:** F-024.
+**Regression test:** `tests/test_web_search.py` (6). Live, qwen3.5:4b, "search about the Qwen 3.5 and newer Qwen
+series models": 1 search + 4 reads (Hugging Face model cards, Ollama, GitHub), a sourced answer in 30 s; before the
+fix it ran 100+ failing searches with no answer.
+**Lesson?** L-032.
 
 ### E-023: The same failing search, over and over
 
