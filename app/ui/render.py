@@ -134,3 +134,26 @@ def turn_footer(seconds: float, tokens_in: int, tokens_out: int) -> Text:
         f"  {seconds:.0f}s · ↑ {format_tokens(tokens_in)} ↓ {format_tokens(tokens_out)} tokens",
         style="m.faint",
     )
+
+
+def detail_block(text: str, *, indent: str = "    ", max_lines: int = 80) -> Text:
+    """Indented detail under a tool line; unified-diff lines are coloured (+ green, - red, @@ mint)."""
+    out = Text()
+    lines = (text or "").rstrip().splitlines()
+    for n, line in enumerate(lines[:max_lines]):
+        if n:
+            out.append("\n")
+        if line.startswith("+") and not line.startswith("+++"):
+            style = "m.add"
+        elif line.startswith("-") and not line.startswith("---"):
+            style = "m.del"
+        elif line.startswith("@@"):
+            style = "m.info"
+        elif line.startswith(("+++", "---")):
+            style = "m.faint"
+        else:
+            style = "m.text"
+        out.append(indent + line, style=style)
+    if len(lines) > max_lines:
+        out.append(f"\n{indent}… {len(lines) - max_lines} more lines", style="m.faint")
+    return out

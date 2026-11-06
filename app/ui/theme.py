@@ -67,6 +67,7 @@ def prompt_style() -> Style:
         "status": f"noreverse {P['dim']}",
         "status.accent": f"noreverse {P['accent']}",
         "status.warn": f"noreverse {P['err']}",
+        "status.rule": f"noreverse {P['faint']}",
         "completion-menu": f"bg:{P['panel']} {P['text']}",
         "completion-menu.completion.current": f"bg:{P['add_bg']} {P['accent']}",
     })

@@ -23,7 +23,6 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.shortcuts import radiolist_dialog
 
 from app.llm import get_cloud_llm, get_local_llm, probe_ollama
 from app.prompts import SYSTEM_PROMPT
@@ -59,11 +58,17 @@ except Exception:
     from misc.ascii import generate_mitra_banner_art
 
 
+
+def _say(markdown_text: str) -> None:
+    """Mitra's reply to a command: plain markdown in the Phosphor theme, no box (D-031)."""
+    console.print()
+    console.print(Markdown(markdown_text or ""))
+
+
 def show_banner():
-    """One-line title (D-031); the header box with model, folder and MCP follows once a model is picked."""
-    console.print()
-    console.print(ui.header.title_line())
-    console.print()
+    """Nothing up front: the header box after startup is the welcome screen (D-031 mock).
+    The title line is shown only when the model picker has to ask."""
+    return None
 
 
 _MITRA_MD_TEMPLATE = """\
@@ -310,14 +315,14 @@ def cmd_mcp(
     """List, test and manage MCP servers."""
     cfg, workspace = _phase5_workspace(cwd)
     reply = _build_mcp_reply(workspace, cfg, " ".join(args or []))
-    console.print(Panel(Markdown(reply), title="[bold cyan]MCP Integration[/bold cyan]", border_style="cyan"))
+    _say(reply)
 
 
 def cmd_logs(target: str = typer.Argument("summary"), cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection.")) -> None:
     """Inspect saved `.mitra` logs and traces."""
     _cfg, workspace = _phase5_workspace(cwd)
     reply = _build_logs_reply(workspace, target)
-    console.print(Panel(Markdown(reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
+    _say(reply)
 
 
 cli.command("status")(cmd_status)
@@ -2129,7 +2134,17 @@ def _handle_model_command(
         )
         return f"{detail}\n\n{inventory}"
 
-    return "Usage: `/model`, `/model list`, or `/model remove <name>`."
+    if action in {"use", "switch", "set"}:
+        if len(parts) < 3 or not parts[2].strip():
+            return "Usage: `/model use <name>`."
+        target = parts[2].strip()
+        names = {m.name for m in config.get_local_model_inventory()}
+        if target not in names:
+            return f"`{target}` is not one of Mitra's models. `/model list` shows them."
+        config.save_last_model(target)
+        return f"Mitra will start with `{target}` next time. Type `exit` and start Mitra again to switch now."
+
+    return "Usage: `/model`, `/model list`, `/model use <name>`, or `/model remove <name>`."
 
 
 def _build_brainstorm_prompt(workspace: str, request: str) -> str:
@@ -2665,47 +2680,26 @@ def _choose_approval_option(
     *,
     fallback_default: str | None = None,
 ) -> str | None:
-    try:
-        return radiolist_dialog(
-            title=title,
-            text=prompt,
-            values=options,
-            ok_text="Select",
-            cancel_text="Cancel",
-        ).run()
-    except Exception:
-        pass
-
+    """Show what needs approval as a tool line + detail, then an inline arrow-key menu (D-031)."""
+    lines = (prompt or "").rstrip().splitlines()
+    question = "What should Mitra do?"
+    while lines and not lines[-1].strip():
+        lines.pop()
+    if lines and (lines[-1].strip().endswith("?") or lines[-1].strip().startswith("Choose ")):
+        last = lines.pop().strip()
+        if last.endswith("?"):
+            question = last
     console.print()
-    lines = [prompt, ""]
-    for index, (_, label) in enumerate(options, 1):
-        lines.append(f"{index}. {label}")
-    lines.append("")
-    lines.append("Enter a number to choose. Press Enter for the default option.")
-    console.print(
-        Panel(
-            "\n".join(lines),
-            title=f"[bold yellow]{title}[/bold yellow]",
-            border_style="yellow",
-            padding=(0, 2),
-        )
-    )
-    try:
-        answer = console.input("  ").strip()
-    except (EOFError, KeyboardInterrupt):
-        return None
-    if not answer:
-        return fallback_default
-    if answer.isdigit():
-        index = int(answer) - 1
-        if 0 <= index < len(options):
-            return options[index][0]
-    return None
+    console.print(ui.tool_line(title))
+    detail = "\n".join(lines).strip()
+    if detail:
+        console.print(ui.detail_block(detail))
+    return ui.menu.choose(console, question, options, default=fallback_default)
 
 
 def _print_approval_result(message: str, *, approved: bool) -> None:
-    style = "[green]✔[/green]" if approved else "[red]✘[/red]"
-    console.print(f"  {style} {message}")
+    from rich.text import Text as _T
+    console.print(_T(f"    {message}", style="m.faint" if approved else "m.err"))
 
 
 def _shell_command_name(command: str) -> str:
@@ -2913,6 +2907,25 @@ def _placement_badge(placement: str) -> str:
     return {"gpu": "[green]GPU[/green]", "split": "[yellow]GPU+CPU[/yellow]", "cpu": "[red]CPU[/red]"}.get(placement, "")
 
 
+def _startup_model(cfg: dict) -> str:
+    """Model for this session without asking: mitra.toml, else the last one used, else qwen3.5:4b (D-034).
+    Falls back to the picker only when none of those is installed."""
+    configured = cfg.get("local_model") or cfg.get("model")
+    if configured:
+        return configured
+    names = [m.name for m in config.get_local_model_inventory()]
+    last = config.load_last_model()
+    if last and last in names:
+        return last
+    for preferred in config.DEFAULT_MODELS:
+        if preferred in names:
+            return preferred
+    console.print()
+    console.print(ui.header.title_line())
+    console.print()
+    return _pick_model(cfg)
+
+
 def _pick_model(cfg: dict) -> str:
     """Return the model to use: from config if set, otherwise prompt the user."""
     configured = cfg.get("local_model") or cfg.get("model")
@@ -2953,7 +2966,7 @@ def _pick_model(cfg: dict) -> str:
             ram_free_gib=free_ram_gib,
             ram_total_gib=total_ram_gib,
         ))
-        if gpu_info is not None and budget_gib is not None and gpu_info.free_gib < budget_gib:
+        if gpu_info is not None and budget_gib is not None and gpu_info.free_gib + 0.5 < budget_gib:
             console.print(Text("  GPU memory is partly in use by another program; larger models may spill to CPU.",
                                style="m.err"))
         if not recommended_models:
@@ -3090,7 +3103,8 @@ def _chat():
     show_banner()
 
     cfg = config.load()
-    model = _pick_model(cfg)
+    model = _startup_model(cfg)
+    config.save_last_model(model)
     codegen_model = _resolve_codegen_model(cfg)
     temperature = cfg.get("temperature", 0.2)
     session_mode = _normalize_session_mode(cfg.get("session_mode"))
@@ -3107,10 +3121,7 @@ def _chat():
     _placement = _model_info.placement if _model_info else config.get_model_placement(None, _vram)
     num_gpu = config.get_num_gpu_for_placement(_placement, gpu_layers_cfg)
 
-    _placement_labels = {"gpu": "🟢 full GPU", "split": "🟡 GPU+CPU split", "cpu": "🔴 CPU only"}
-    _gpu_hint = _placement_labels.get(_placement, "")
-    if _vram is not None:
-        console.print(f"[m.faint]  · GPU VRAM: {_vram:.1f} GB  ·  {model}: {_gpu_hint}[/m.faint]")
+    loaded: list[str] = []  # shown on one line in the header
 
     _apply_session_mode(cfg, session_mode)
 
@@ -3118,27 +3129,25 @@ def _chat():
     system_prompt = SYSTEM_PROMPT
     if cfg.get("rules"):
         system_prompt += f"\n\n## Project Rules (from MITRA.md)\n{cfg['rules']}"
-        console.print("[m.faint]  · Project rules loaded from MITRA.md[/m.faint]")
+        loaded.append("MITRA.md")
 
     project_instructions = cfg.get("project_instructions") or []
     instructions_prompt = _build_project_instructions_prompt(project_instructions)
     if instructions_prompt:
         system_prompt += f"\n\n{instructions_prompt}"
         count = len(project_instructions)
-        console.print(f"[m.faint]  · Project instruction file{'s' if count != 1 else ''} loaded: {count}[/m.faint]")
+        loaded.append(f"{count} instruction file{'s' if count != 1 else ''}")
 
     available_skills = skills_registry.discover(cfg["workspace"], cfg.get("skill_dirs"))
     skills_prompt = _build_skills_prompt(available_skills)
     if skills_prompt:
         system_prompt += f"\n\n{skills_prompt}"
         count = len(available_skills)
-        console.print(f"[m.faint]  · Mitra skill{'s' if count != 1 else ''} loaded: {count}[/m.faint]")
+        loaded.append(f"{count} skill{'s' if count != 1 else ''}")
 
     plugin_commands = plugin_registry.discover(cfg["workspace"], cfg.get("plugin_dirs"))
     if plugin_commands.commands:
-        console.print(
-            f"[m.faint]  · Workspace plugin command{'s' if len(plugin_commands.commands) != 1 else ''} loaded: {len(plugin_commands.commands)}[/m.faint]"
-        )
+        loaded.append(f"{len(plugin_commands.commands)} plugin command{'s' if len(plugin_commands.commands) != 1 else ''}")
     if plugin_commands.errors:
         console.print(
             f"[m.err]  · Plugin load issue{'s' if len(plugin_commands.errors) != 1 else ''}: {len(plugin_commands.errors)} (see /plugins)[/m.err]"
@@ -3147,34 +3156,18 @@ def _chat():
     ctx_text = memory.load_context(cfg["workspace"])
     if ctx_text:
         system_prompt += f"\n\n## Project Memory (from .mitra/context.md)\n{ctx_text}"
-        console.print("[m.faint]  · Project memory loaded from .mitra/context.md[/m.faint]")
+        loaded.append("project memory")
 
     startup_project_brief = _build_startup_project_brief(cfg["workspace"])
     if startup_project_brief:
         system_prompt += f"\n\n{startup_project_brief}"
-        console.print("[m.faint]  · Startup project brief auto-detected from the workspace[/m.faint]")
+        loaded.append("project brief")
 
     plan_text = memory.load_plan(cfg["workspace"])
     if plan_text:
         system_prompt += f"\n\n## Active Plan (from .mitra/plan.md)\n{plan_text}"
-        console.print("[m.faint]  · Active plan loaded from .mitra/plan.md[/m.faint]")
+        loaded.append("plan")
 
-    console.print(
-        _build_startup_status(
-            cfg["workspace"],
-            has_memory=bool(ctx_text),
-            has_plan=bool(plan_text),
-            session_mode=session_mode,
-            work_mode=work_mode,
-            show_reasoning=show_reasoning,
-            num_ctx=num_ctx,
-            auto_compact_threshold=int(cfg.get("auto_compact_threshold", _AUTO_COMPACT_THRESHOLD)),
-        )
-    )
-    console.print("[dim]Ask naturally, or use /help for the full command list.[/dim]")
-
-    if ctx_text or plan_text:
-        console.print()
 
     cloud_api_key = _resolve_cloud_api_key(cfg)
     local_llm = _build_role_llm(
@@ -3210,14 +3203,6 @@ def _chat():
         cloud_base_url=cfg.get("ollama_cloud_base_url"),
         fallback_model=model,
     )
-    if cloud_api_key:
-        console.print(
-            f"[m.faint]  · Cloud codegen model: {codegen_model}[/m.faint]"
-        )
-    else:
-        console.print(
-            "[dim]No Ollama API key provided. Code generation stays on the local model.[/dim]"
-        )
     idea_llm = _build_idea_llm(cfg)
     agent_models = agent_registry.resolve_agent_models(
         cfg,
@@ -3268,6 +3253,7 @@ def _chat():
         context=num_ctx,
         placement=_placement,
         mcp_servers=_mcp_names,
+        loaded=loaded,
     ))
     console.print(ui.header.tips())
     prompt_str = _build_prompt_label(model, session_mode, work_mode)
@@ -3286,7 +3272,7 @@ def _chat():
         completer=completer,
         key_bindings=_make_key_bindings(),
         style=ui.prompt_style(),
-        bottom_toolbar=lambda: ui.status_line(
+        bottom_toolbar=lambda: ui.framed_status(
             model=model,
             mode=session_mode,
             total_tokens=sess_in + sess_out,
@@ -3300,7 +3286,7 @@ def _chat():
 
     while True:
         _set_current_task("Ready")
-        user_input = session.prompt([("class:prompt", prompt_str)])
+        user_input = session.prompt(ui.prompt_message)
 
         if user_input.strip() in ["/exit", "exit", "quit"]:
             event_bus.emit(event_bus.SessionEndEvent(
@@ -3628,14 +3614,14 @@ def _chat():
 
         if cmd.startswith("/skills"):
             ai_reply = _build_skills_reply(available_skills, user_input, workspace=cfg["workspace"])
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
 
         if cmd == "/context":
             ai_reply = _build_context_reply(sess_in + sess_out, auto_compact_threshold, num_ctx)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3654,14 +3640,14 @@ def _chat():
                 num_ctx=num_ctx,
                 agent_models=agent_models,
             )
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
 
         if cmd == "/mcp" or cmd.startswith("/mcp "):
             ai_reply = _build_mcp_reply(cfg["workspace"], cfg, user_input.strip()[len("/mcp"):].strip())
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3675,7 +3661,7 @@ def _chat():
 
         if cmd.startswith("/logs"):
             ai_reply = _cmd_logs(user_input, cfg["workspace"])
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3693,7 +3679,7 @@ def _chat():
                     _apply_session_mode(cfg, session_mode)
                     prompt_str = _build_prompt_label(model, session_mode, work_mode)
                     ai_reply = _build_mode_reply(session_mode)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3710,7 +3696,7 @@ def _chat():
                 ai_reply = _build_reasoning_reply(show_reasoning)
             else:
                 ai_reply = "Usage: `/think on` or `/think off`."
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3722,7 +3708,7 @@ def _chat():
                 codegen_model,
                 cloud_codegen_enabled=bool(cloud_api_key),
             )
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3737,7 +3723,7 @@ def _chat():
 
         if cmd == "/diff":
             ai_reply = _build_diff_reply(cfg["workspace"])
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3753,7 +3739,7 @@ def _chat():
 
         if cmd == "/undo":
             ai_reply = filesystem.undo_last_change_set(cfg["workspace"])
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3765,7 +3751,7 @@ def _chat():
                 rest = rest.replace("--generate", "").replace("-g", "").strip()
             message = rest if rest and not generate else None
             ai_reply = _cmd_commit(cfg["workspace"], local_llm, message=message, staged=True, generate=generate)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3773,7 +3759,7 @@ def _chat():
         if cmd.startswith("/fix"):
             fix_command = _extract_fix_command(user_input, last_command=_LAST_SHELL_COMMAND)
             ai_reply = _cmd_fix(fix_command or "", cfg["workspace"], codegen_llm)
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Mitra[/bold cyan]", border_style="cyan"))
+            _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
             continue
@@ -3800,19 +3786,17 @@ def _chat():
                 _build_permissions_reply(cfg, session_mode),
                 "## MCP\n\n" + mcp_registry.summarize(mcp_registry.discover(cfg["workspace"])),
             ])
-            console.print(Panel(Markdown(ai_reply), title="[bold cyan]Doctor[/bold cyan]", border_style="cyan"))
+            _say(ai_reply)
             continue
 
         if cmd == "/run" or cmd.startswith("/run "):
-            console.print(Panel(Markdown(
-                "`/run <plan>` comes with the plan runner (M3). For a shell command use `! <command>`, "
-                "for example `! pytest -q`."), title="[bold yellow]Mitra[/bold yellow]", border_style="yellow"))
+            _say("`/run <plan>` comes with the plan runner (M3). For a shell command use `! <command>`, "
+                "for example `! pytest -q`.")
             continue
 
         if user_input.strip().startswith("/"):
             unknown = user_input.strip().split()[0]
-            console.print(Panel(Markdown(f"Unknown command `{unknown}`. Type `/help` for the list."),
-                                title="[bold yellow]Mitra[/bold yellow]", border_style="yellow"))
+            _say(f"Unknown command `{unknown}`. Type `/help` for the list.")
             continue
 
         messages.append(HumanMessage(content=user_input))
@@ -4056,7 +4040,7 @@ def _confirm_shell(command: str, cwd: str) -> str | None:
 
     choice = _choose_approval_option(
         "Run shell command",
-        f"Command:\n{command}\n\nDirectory:\n{cwd}\n\nChoose how to handle this command.",
+        f"{command}\nin {cwd}\n\nRun this command?",
         [
             ("approve", "Yes"),
             ("trust", f"Yes, and don't ask again for `{command_name}` in this directory"),
@@ -4072,7 +4056,8 @@ def _confirm_shell(command: str, cwd: str) -> str | None:
     if choice == "amend":
         return _amend_command(command)
     approved = choice == "approve"
-    _print_approval_result("Approved" if approved else "Skipped", approved=approved)
+    if not approved:
+        _print_approval_result("Skipped", approved=False)
     return command if approved else None
 
 
@@ -4083,9 +4068,9 @@ def _cmd_run(command: str, workspace: str | None = None) -> None:
         return
     global _LAST_SHELL_COMMAND
     _LAST_SHELL_COMMAND = command
-    _print_progress_message("Running shell command", command, color="blue")
+    console.print(ui.shell_start(command))
     result = shell_agent.execute(command=command, cwd=workspace, console=console, typed_by_user=True)
-    console.print(shell_agent.render(result))
+    console.print(ui.shell_done(result))
 
 
 def _extract_fix_command(raw: str, *, last_command: str | None = None) -> str | None:
@@ -4169,15 +4154,16 @@ def _confirm_tool(tool_name: str, args: dict) -> bool:
 
     choice = _choose_approval_option(
         title,
-        f"Action: {label}\nTarget: {detail}\n\n{preview or 'No preview available.'}\n\nChoose what to do next.",
+        f"{label}: {detail}\n\n{preview or 'No preview available.'}\n\n{label} {detail}?",
         [
-            ("deny", f"No, skip {label.lower()}"),
-            ("approve", f"Yes, approve {label.lower()}"),
+            ("approve", "Yes"),
+            ("deny", "No, skip it"),
         ],
-        fallback_default="deny",
+        fallback_default="approve" if tool_name in {"create_file", "edit_file", "update_markdown_file", "mcp_call"} else "deny",
     )
     approved = choice == "approve"
-    _print_approval_result("Approved" if approved else "Skipped", approved=approved)
+    if not approved:
+        _print_approval_result("Skipped", approved=False)
     return approved
 
 

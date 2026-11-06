@@ -542,6 +542,29 @@ LARGE_MODEL_CONTEXT = 131_072
 LARGE_MODEL_PARAMETERS = 6_000_000_000
 
 
+DEFAULT_MODELS = ("qwen3.5:4b", "qwen3.5:9b", "qwen3.5:latest")  # first installed one is used on a first start
+
+
+def _mitra_home() -> pathlib.Path:
+    return pathlib.Path(os.environ.get("MITRA_HOME") or pathlib.Path.home() / ".mitra")
+
+
+def load_last_model() -> str:
+    try:
+        return (_mitra_home() / "last_model").read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def save_last_model(name: str) -> None:
+    try:
+        home = _mitra_home()
+        home.mkdir(parents=True, exist_ok=True)
+        (home / "last_model").write_text(name.strip() + "\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
 def context_for_model(name: str) -> int:
     """num_ctx Mitra uses for a model when mitra.toml does not set one."""
     facts = get_model_facts(name) or {}

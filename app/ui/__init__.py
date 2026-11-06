@@ -2,6 +2,7 @@
 from app.ui.render import (
     action_for,
     agent_steps,
+    detail_block,
     format_tokens,
     shell_done,
     shell_start,
@@ -10,15 +11,15 @@ from app.ui.render import (
     tool_line,
     turn_footer,
 )
-from app.ui import header
-from app.ui.status import git_branch, status_line
+from app.ui import header, menu
+from app.ui.status import framed_status, git_branch, prompt_message, status_line
 from app.ui.stream import StreamResult, ThinkSplitter, split_blocks, stream_reply
 from app.ui.theme import PHOSPHOR, THEME, apply, prompt_style
 
 __all__ = [
     "PHOSPHOR", "THEME", "apply", "prompt_style",
-    "action_for", "agent_steps", "format_tokens", "shell_done", "shell_start", "step_line",
+    "action_for", "agent_steps", "detail_block", "menu", "format_tokens", "shell_done", "shell_start", "step_line",
     "thinking_done", "tool_line", "turn_footer",
-    "header", "git_branch", "status_line",
+    "header", "framed_status", "git_branch", "prompt_message", "status_line",
     "StreamResult", "ThinkSplitter", "split_blocks", "stream_reply",
 ]

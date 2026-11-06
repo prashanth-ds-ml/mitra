@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pathlib
+import shutil
 import subprocess
 import time
 
@@ -58,3 +59,18 @@ def status_line(
     if pct >= 80:
         parts.append(("class:status.warn", "  /compact soon"))
     return parts
+
+
+def _rule() -> str:
+    width = shutil.get_terminal_size((100, 24)).columns
+    return "─" * max(20, width - 1)
+
+
+def prompt_message() -> list[tuple[str, str]]:
+    """The input line, framed like the mock: a rule above, then `› `."""
+    return [("", "\n"), ("class:status.rule", _rule() + "\n"), ("class:prompt", "› ")]
+
+
+def framed_status(**kwargs) -> list[tuple[str, str]]:
+    """A rule under the input, then the status line."""
+    return [("class:status.rule", _rule() + "\n")] + status_line(**kwargs)

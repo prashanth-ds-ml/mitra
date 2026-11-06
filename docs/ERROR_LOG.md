@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-017 | 2026-11-06 | M2 | Medium | user (terminal test) | Old and new interface mixed: model picker, GPU emoji line, "Session Snapshot" box (stale "compact at 120,000"), API-key note, cyan boxes for command replies and a full-screen blue dialog for approvals, around the new header | closed | F-013 |
 | E-016 | 2026-11-06 | M2 | High | Claude (live UI check) | qwen3.5 replies looked frozen: langchain-ollama drops a thinking model's reasoning when `reasoning` is unset, so a plain question ran 116 s / 8.2K tokens with nothing on screen and no answer shown | closed | F-012 |
 | E-015 | 2026-11-05 | M2 | High | user (terminal test) | A bare `/run` went to the model, which used `qwen3:14b` (hard-coded role default the user does not have): 404. Startup also asked for an Ollama cloud key though Mitra is local-only | closed | F-011 |
 | E-014 | 2026-11-05 | M2 | High | user (terminal test) | `! mkdir snake_game` refused: "command 'mkdir' denied by policy" (default policy ends with deny `*`; `mkdir` is also a shell built-in) | closed | F-010 |
@@ -42,6 +43,21 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-017: Old and new terminal interface mixed
+
+- **Date found:** 2026-11-06 · **Milestone:** M2 · **Severity:** Medium · **Found by:** user, terminal test against the mock
+- **Status:** closed
+
+**What happened:** startup showed the model picker, a GPU line with an emoji, four "loaded" notes, a "Session
+Snapshot" box with an out-of-date compact threshold, and "No Ollama API key provided" before the new header. Command
+replies were still cyan boxes, and the plan approval opened a full-screen blue `radiolist_dialog`.
+**Root cause:** part 1 added the new output (`app/ui/`) for the chat turn only; every other print path kept its old
+panel or dialog. Nobody compared the whole session against the mock.
+**Fix:** F-013.
+**Regression test:** `test_startup_shows_no_banner`, `test_startup_model_uses_the_last_model_without_asking`,
+`test_approval_shows_tool_line_coloured_diff_and_question`, menu tests in `tests/test_ui.py`.
+**Lesson?** L-027.
 
 ### E-016: Thinking models showed nothing while they thought
 

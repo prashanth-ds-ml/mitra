@@ -177,10 +177,82 @@ def test_model_table_numbers_models_with_size_and_placement():
     assert lines[1].split() == ["2", "qwen3.5:latest", "6.6", "GB", "128K", "context", "GPU+CPU"]
 
 
-def test_startup_title_replaces_the_big_banner(monkeypatch):
+def test_startup_shows_no_banner(monkeypatch):
     import app.main as main
     c = make_console()
     monkeypatch.setattr(main, "console", c)
     main.show_banner()
+    assert printed(c).strip() == ""
+
+
+def test_startup_model_uses_the_last_model_without_asking(monkeypatch, tmp_path):
+    import app.main as main
+    from app import config
+    monkeypatch.setenv("MITRA_HOME", str(tmp_path))
+    inv = [SimpleNamespace(name="qwen3.5:4b"), SimpleNamespace(name="qwen3.5:latest")]
+    monkeypatch.setattr(config, "get_local_model_inventory", lambda **_kw: inv)
+    monkeypatch.setattr(main, "_pick_model", lambda cfg: (_ for _ in ()).throw(AssertionError("asked")))
+
+    assert main._startup_model({}) == "qwen3.5:4b"          # first start: the default
+    config.save_last_model("qwen3.5:latest")
+    assert main._startup_model({}) == "qwen3.5:latest"      # then the last one used
+    assert main._startup_model({"local_model": "x"}) == "x"  # mitra.toml wins
+
+
+def test_model_use_remembers_the_choice(monkeypatch, tmp_path):
+    import app.main as main
+    from app import config
+    monkeypatch.setenv("MITRA_HOME", str(tmp_path))
+    monkeypatch.setattr(config, "get_local_model_inventory", lambda **_kw: [SimpleNamespace(name="qwen3.5:latest")])
+    reply = main._handle_model_command("/model use qwen3.5:latest", "qwen3.5:4b", "", cloud_codegen_enabled=False)
+    assert "next time" in reply and config.load_last_model() == "qwen3.5:latest"
+    assert "not one of Mitra's models" in main._handle_model_command(
+        "/model use llama3.1:8b", "qwen3.5:4b", "", cloud_codegen_enabled=False)
+
+
+# ── inline menu and approvals ───────────────────────────────────────────────
+
+def test_menu_lines_mark_the_selected_option():
+    lines = ui.menu.menu_lines(["Yes", "No"], 1)
+    assert lines[0] == ("class:menu.option", "    1. Yes\n")
+    assert lines[1] == ("class:menu.selected", "  ❯ 2. No\n")
+
+
+def test_choose_returns_the_key_and_starts_on_the_default():
+    c = make_console()
+    seen = {}
+
+    def runner(labels, start):
+        seen["start"] = start
+        return 0
+
+    key = ui.menu.choose(c, "Run this command?", [("approve", "Yes"), ("deny", "No")], default="deny", runner=runner)
+    assert key == "approve" and seen["start"] == 1
+    out = printed(c)  # export_text empties the record buffer
+    assert "Run this command?" in out and "❯ Yes" in out
+
+
+def test_choose_cancel_returns_none():
+    c = make_console()
+    assert ui.menu.choose(c, "Go?", [("a", "Yes")], runner=lambda labels, start: None) is None
+
+
+def test_approval_shows_tool_line_coloured_diff_and_question(monkeypatch):
+    import app.main as main
+    c = make_console()
+    monkeypatch.setattr(main, "console", c)
+    monkeypatch.setattr(ui.menu, "_run_inline", lambda labels, start: 0)
+    choice = main._choose_approval_option(
+        "File diff preview", "Edit file: a.py\n\n-old\n+new\n\nEdit file a.py?",
+        [("approve", "Yes"), ("deny", "No, skip it")], fallback_default="approve")
     out = printed(c)
-    assert "✻ Mitra" in out and "▓" not in out
+    assert choice == "approve"
+    assert "● File diff preview" in out and "-old" in out and "+new" in out and "Edit file a.py?" in out
+
+
+def test_detail_block_colours_diff_lines():
+    t = ui.detail_block("@@ -1 +1 @@\n-old\n+new\nsame")
+    styles = {span.style for span in t.spans}
+    assert {"m.add", "m.del", "m.info", "m.text"} <= styles
+
+

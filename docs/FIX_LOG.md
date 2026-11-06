@@ -8,6 +8,7 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-013 | 2026-11-06 | E-017 | Startup = header box only (remembered model, loaded items in the header); command replies as plain markdown; approvals as an inline arrow-key menu with a coloured diff; framed input | `app/main.py`, `app/ui/menu.py`, `app/ui/header.py`, `app/ui/status.py`, `app/config.py` | `tests/test_ui.py` (8 new) | works |
 | F-012 | 2026-11-06 | E-016 | `get_local_llm(reasoning="auto")` turns thinking on for models with the `thinking` capability; an empty reply prints an error line | `app/llm.py`, `app/main.py` | `test_thinking_models_get_reasoning_on_so_thinking_is_not_dropped` | works |
 | F-011 | 2026-11-05 | E-015 | Role models default to the picked model; unknown slash commands answered locally; no cloud-key prompt | `app/config.py`, `app/agents/registry.py`, `app/main.py` | `test_no_role_defaults_to_a_model_the_user_may_not_have` | works |
 | F-010 | 2026-11-05 | E-014 | `execute(typed_by_user=True)`: user's shell (PowerShell / sh), no allow-list, policy or confirm; still workspace-only with a timeout | `app/agents/shell.py`, `app/main.py` | `TestTypedByUser` | works |
@@ -37,6 +38,17 @@ again.
 ```
 
 ## Entries
+
+### F-013: One interface, matching the mock (E-017)
+**Change:** startup goes straight to the header box: the model comes from `mitra.toml`, else the last one used
+(`~/.mitra/last_model`), else qwen3.5:4b; the picker appears only if none is installed. What was loaded (instruction
+files, memory, plan) is one row in the header. The Session Snapshot box, the GPU line and the API-key note are gone.
+17 boxed command replies are now plain markdown (`_say`). `radiolist_dialog` is replaced by `ui.menu.choose`: a tool
+line, the detail with a coloured diff, the question, then an inline arrow-key menu (number keys work too; esc
+cancels). The input has a rule above and below it, then the status line. `/model use <name>` sets the next start's
+model.
+**Test:** 8 tests in `tests/test_ui.py`; the real menu driven with simulated keys (down, down, up, enter -> 2nd
+option; "3" -> 3rd; enter -> default).
 
 ### F-012: Thinking is captured and shown (E-016)
 **Change:** `get_local_llm` asks Ollama `/api/show` for the model's capabilities and passes `reasoning=True` to

@@ -42,7 +42,7 @@ def model_table(models) -> Table:
 
 
 def header(*, model: str, folder: str, context: int | None = None, placement: str = "",
-           mcp_servers: list[str] | None = None, version: str = "") -> Panel:
+           mcp_servers: list[str] | None = None, loaded: list[str] | None = None, version: str = "") -> Panel:
     rows = Table.grid(padding=(0, 2))
     rows.add_column(style="m.dim")
     rows.add_column(style="m.text")
@@ -61,6 +61,8 @@ def header(*, model: str, folder: str, context: int | None = None, placement: st
             mcp.append("● ", style="m.accent")
             mcp.append(name, style="m.text")
         rows.add_row("mcp", mcp)
+    if loaded:
+        rows.add_row("loaded", Text(" · ".join(loaded), style="m.dim"))
     title = Text("✻ Mitra", style="m.accent.b")
     if version:
         title.append(f" {version}", style="m.dim")
