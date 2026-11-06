@@ -196,11 +196,15 @@ def test_load_merges_agent_model_overrides(tmp_path):
 # ── Compatible models only (user request 2026-11-05) ─────────────────────────
 
 @pytest.mark.parametrize("facts,problem", [
-    ({"capabilities": ("completion", "tools", "thinking"), "parameters": 4_700_000_000, "context": 262_144}, None),
+    ({"family": "qwen35", "capabilities": ("completion", "tools", "thinking"), "parameters": 4_700_000_000, "context": 262_144}, None),
+    ({"family": "qwen35", "capabilities": ("completion", "tools", "thinking"), "parameters": 9_650_000_000, "context": 262_144}, None),
+    ({"family": "qwen35", "capabilities": ("completion", "tools", "thinking"), "parameters": 2_270_000_000, "context": 262_144}, "too small (2.3B parameters)"),
+    ({"family": "llama", "capabilities": ("completion", "tools"), "parameters": 8_000_000_000, "context": 131_072}, "not qwen3.5 (family llama)"),
+    ({"family": "qwen3", "capabilities": ("completion", "tools", "thinking"), "parameters": 8_190_000_000, "context": 40_960}, "not qwen3.5 (family qwen3)"),
     ({"capabilities": ("tools", "embedding"), "parameters": 4_000_000_000, "context": 40_960}, "not a chat model"),
     ({"capabilities": ("completion", "vision"), "parameters": 4_300_000_000, "context": 131_072}, "no tool calling"),
     ({"capabilities": ("completion", "tools"), "parameters": 268_000_000, "context": 32_768}, "too small (0.3B parameters)"),
-    ({"capabilities": ("completion", "tools", "vision"), "parameters": 2_500_000_000, "context": 16_384}, "context too short (16K)"),
+    ({"capabilities": ("completion", "tools", "vision"), "parameters": 4_500_000_000, "context": 16_384}, "context too short (16K)"),
     (None, None),  # Ollama could not say: keep it listed
 ])
 def test_compatibility_problem(facts, problem):

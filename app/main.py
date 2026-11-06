@@ -2930,8 +2930,8 @@ def _pick_model(cfg: dict) -> str:
         incompatible = len(config.get_local_model_inventory(include_incompatible=True)) - len(inventory)
         if incompatible > 0:
             console.print(Text(
-                f"  {incompatible} installed models hidden (no tool calling, too small or under 32K context): "
-                "`mitra models --all`",
+                f"  {incompatible} other installed models hidden: Mitra runs on qwen3.5 (4B or larger). "
+                "`mitra models --all` lists them",
                 style="m.faint",
             ))
 
@@ -2999,8 +2999,15 @@ def _pick_model(cfg: dict) -> str:
         elif choice in {model.name for model in visible_models}:
             return choice
         elif choice in {model.name for model in hidden_models}:
-            console.print("[yellow]That model runs on CPU only (too large for GPU). You can still use it but expect slower responses.[/yellow]")
+            console.print("[m.err]  That model runs on CPU only (too large for GPU); expect slow replies.[/m.err]")
             return choice
+        else:
+            # Typing the exact name of a hidden model still works, with a warning.
+            others = {m.name: m for m in config.get_local_model_inventory(include_incompatible=True)}
+            if choice in others:
+                problem = config.compatibility_problem(config.get_model_facts(choice)) or "untested with Mitra"
+                console.print(f"[m.err]  {choice} is not a Mitra model ({problem}); it may fail at tool calls.[/m.err]")
+                return choice
         console.print("[yellow]Invalid choice, try again.[/yellow]")
 
 

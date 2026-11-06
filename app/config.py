@@ -528,7 +528,9 @@ def get_recommended_model_budget_gib() -> float | None:
 
 
 REQUIRED_CAPABILITIES = ("completion", "tools")
-MIN_PARAMETERS = 1_500_000_000   # smaller models cannot drive a coding agent
+# Mitra is built and tested on qwen3.5 4B and 9B (D-015, D-029); the picker lists only those (user, 2026-11-06).
+SUPPORTED_FAMILIES = ("qwen35",)
+MIN_PARAMETERS = 4_000_000_000   # qwen3.5:2b and smaller cannot drive a coding agent
 MIN_CONTEXT = 32_768             # Mitra's prompt + code + tool results need room
 _facts_cache: dict[str, dict | None] = {}
 
@@ -560,6 +562,7 @@ def get_model_facts(name: str) -> dict | None:
         context = next((v for k, v in info.items() if k.endswith(".context_length") and isinstance(v, int)), None)
         params = info.get("general.parameter_count")
         facts = {
+            "family": str((data.get("details") or {}).get("family") or "") or None,
             "capabilities": tuple(str(c) for c in data.get("capabilities") or ()),
             "parameters": params if isinstance(params, int) else None,
             "context": context,
@@ -584,6 +587,8 @@ def compatibility_problem(facts: dict | None) -> str | None:
         return "not a chat model"
     if "tools" not in caps:
         return "no tool calling"
+    if facts.get("family") and facts["family"] not in SUPPORTED_FAMILIES:
+        return f"not qwen3.5 (family {facts['family']})"
     if facts.get("parameters") and facts["parameters"] < MIN_PARAMETERS:
         return f"too small ({facts['parameters'] / 1e9:.1f}B parameters)"
     if facts.get("context") and facts["context"] < MIN_CONTEXT:
