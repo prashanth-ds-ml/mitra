@@ -974,8 +974,8 @@ class TestOperatorReplies:
 
         assert chosen == "qwen3.5:latest"
         joined = "\n".join(printed)
-        assert "Live GPU usage: 3.5 GB used · 4.5 GB free" in joined
-        assert "waiting may let you run larger models more comfortably" in joined
+        assert "GPU 8.0 GB (4.5 free)" in joined
+        assert "partly in use by another program" in joined
 
     def test_build_status_reply_mentions_plan_and_usage(self, monkeypatch, tmp_path):
         from app.agents import shell as shell_agent

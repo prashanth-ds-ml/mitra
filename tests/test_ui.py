@@ -153,3 +153,34 @@ def test_theme_is_phosphor():
     assert ui.PHOSPHOR["bg"] == "#050a06"
     style = ui.prompt_style()
     assert "prompt" in dict(style.style_rules)
+
+
+# ── startup screen ──────────────────────────────────────────────────────────
+
+def test_header_shows_model_context_placement_folder_and_mcp():
+    c = make_console(width=100)
+    c.print(ui.header.header(model="qwen3.5:4b", folder="snake_game", context=65536, placement="gpu",
+                             mcp_servers=["git", "github"]))
+    out = printed(c)
+    assert "✻ Mitra" in out
+    assert "qwen3.5:4b  (64K context, on GPU)" in out
+    assert "snake_game" in out and "● git  ● github" in out
+
+
+def test_model_table_numbers_models_with_size_and_placement():
+    from types import SimpleNamespace as NS
+    c = make_console()
+    c.print(ui.header.model_table([NS(name="qwen3.5:4b", size_text="3.4 GB", placement="gpu"),
+                                   NS(name="gemma4:e4b", size_text="9.6 GB", placement="split")]))
+    lines = [ln.rstrip() for ln in printed(c).splitlines() if ln.strip()]
+    assert lines[0].split() == ["1", "qwen3.5:4b", "3.4", "GB", "GPU"]
+    assert lines[1].split() == ["2", "gemma4:e4b", "9.6", "GB", "GPU+CPU"]
+
+
+def test_startup_title_replaces_the_big_banner(monkeypatch):
+    import app.main as main
+    c = make_console()
+    monkeypatch.setattr(main, "console", c)
+    main.show_banner()
+    out = printed(c)
+    assert "✻ Mitra" in out and "▓" not in out

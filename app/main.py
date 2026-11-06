@@ -18,6 +18,7 @@ from rich.panel import Panel
 from rich.align import Align
 from rich.rule import Rule
 from rich.table import Table
+from rich.text import Text
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.completion import WordCompleter
@@ -59,42 +60,10 @@ except Exception:
 
 
 def show_banner():
-    try:
-        title = generate_mitra_banner_art()
-    except Exception:
-        from rich.text import Text
-        title = Text("  Mitra  ", style="bold #87ceeb")
-
-    from rich.console import Group
-    from rich.text import Text as RichText
-    subtitle = Align.center(RichText("Your local AI coding companion", style="bold #9aa4af"))
-    p1 = Align.center(RichText.assemble(("◆", "#87ceeb"), ("  Powered by Ollama", "dim")))
-    p2 = Align.center(RichText.assemble(("◆", "#87ceeb"), ("  Runs 100% offline", "dim")))
-    p3 = Align.center(RichText.assemble(("◆", "#87ceeb"), ("  No data leaves your machine", "dim")))
-    hint = Align.center(RichText.assemble(
-        ("Type ", "dim"), ("exit", "#87ceeb"), (" or ", "dim"), ("quit", "#87ceeb"), (" to leave", "dim")
-    ))
-
-    body = Group(
-        Align.center(title),
-        RichText(""),
-        subtitle,
-        RichText(""),
-        p1, p2, p3,
-        RichText(""),
-        hint,
-    )
-
-    console.print(
-        Align.center(
-            Panel(
-                body,
-                border_style="#87ceeb",
-                padding=(1, 3),
-                width=106,
-            )
-        )
-    )
+    """One-line title (D-031); the header box with model, folder and MCP follows once a model is picked."""
+    console.print()
+    console.print(ui.header.title_line())
+    console.print()
 
 
 _MITRA_MD_TEMPLATE = """\
@@ -2915,7 +2884,7 @@ def _auto_plan_request(
     _print_progress_message("Writing the plan", "Saving the next steps to `.mitra/plan.md`.", color="yellow")
     with console.status("[bold green]Generating plan...[/bold green]"):
         plan = planner_agent.create_plan(llm, goal, workspace, context=context, work_mode=work_mode)
-    console.print(f"[dim cyan]  ✦  Plan written to .mitra/plan.md[/dim cyan]")
+    console.print(f"[m.faint]  · Plan written to .mitra/plan.md[/m.faint]")
     console.print(planner_agent.render(plan))
 
     if _normalize_session_mode(session_mode) in {"read-only", "plan"}:
@@ -2947,7 +2916,7 @@ def _pick_model(cfg: dict) -> str:
     """Return the model to use: from config if set, otherwise prompt the user."""
     configured = cfg.get("local_model") or cfg.get("model")
     if configured:
-        console.print(f"[dim cyan]  ✔  Local model: {configured}[/dim cyan]")
+        console.print(f"[m.faint]  · model from config: {configured}[/m.faint]")
         return configured
 
     while True:
@@ -2960,10 +2929,11 @@ def _pick_model(cfg: dict) -> str:
             raise SystemExit(1)
         incompatible = len(config.get_local_model_inventory(include_incompatible=True)) - len(inventory)
         if incompatible > 0:
-            console.print(
-                f"[dim]  {incompatible} installed model(s) hidden: not a chat model with tool calling "
-                "(embedding, OCR, too small, or under 32K context). `mitra models --all` lists them.[/dim]"
-            )
+            console.print(Text(
+                f"  {incompatible} installed models hidden (no tool calling, too small or under 32K context): "
+                "`mitra models --all`",
+                style="m.faint",
+            ))
 
         recommended_models = [model for model in inventory if model.recommended]
         hidden_models = [model for model in inventory if not model.recommended]
@@ -2975,43 +2945,26 @@ def _pick_model(cfg: dict) -> str:
         free_ram_gib = config.get_available_system_memory_gib()
         budget_gib = config.get_recommended_model_budget_gib()
 
-        console.print("\n[bold cyan]Recommended models for this hardware:[/bold cyan]")
-        hw_parts = []
-        if vram_gib is not None:
-            hw_parts.append(f"GPU VRAM: {vram_gib:.1f} GB")
-        if total_ram_gib is not None:
-            hw_parts.append(f"RAM: {total_ram_gib:.1f} GB")
-        if free_ram_gib is not None:
-            hw_parts.append(f"RAM free now: {free_ram_gib:.1f} GB")
-        if cpu_pct is not None:
-            hw_parts.append(f"CPU usage: {cpu_pct:.1f}%")
-        if budget_gib is not None:
-            hw_parts.append(f"GPU budget: {budget_gib:.1f} GB")
-        if hw_parts:
-            console.print(f"[dim]{' · '.join(hw_parts)}[/dim]")
-        if gpu_info is not None:
-            console.print(
-                f"[dim]Live GPU usage: {gpu_info.used_gib:.1f} GB used · {gpu_info.free_gib:.1f} GB free ({gpu_info.usage_pct}% in use)[/dim]"
-            )
-            if budget_gib is not None and gpu_info.free_gib < budget_gib:
-                console.print(
-                    "[yellow]GPU memory is partly busy right now. If another project releases VRAM soon, waiting may let you run larger models more comfortably.[/yellow]"
-                )
+        console.print(Text("  Pick a model", style="m.tool"))
+        console.print(ui.header.hardware_line(
+            vram_gib=vram_gib,
+            vram_free_gib=gpu_info.free_gib if gpu_info else None,
+            ram_free_gib=free_ram_gib,
+            ram_total_gib=total_ram_gib,
+        ))
+        if gpu_info is not None and budget_gib is not None and gpu_info.free_gib < budget_gib:
+            console.print(Text("  GPU memory is partly in use by another program; larger models may spill to CPU.",
+                               style="m.err"))
         if not recommended_models:
-            console.print("[yellow]No installed model fits the recommended budget right now, so Mitra is showing all installed models.[/yellow]")
-        for i, model_info in enumerate(visible_models, 1):
-            size = f" [dim]({model_info.size_text})[/dim]" if model_info.size_text else ""
-            badge = f" {_placement_badge(model_info.placement)}" if model_info.placement else ""
-            console.print(f"  [cyan]{i}[/cyan]  {model_info.name}{size}{badge}")
+            console.print(Text("  No model fits the GPU right now, so all installed models are listed.", style="m.err"))
+        console.print()
+        console.print(ui.header.model_table(visible_models))
         if hidden_models:
-            console.print("\n[dim]CPU-only models (too large for GPU, will be slow):[/dim]")
-            for model_info in hidden_models:
-                size = f" ({model_info.size_text})" if model_info.size_text else ""
-                console.print(f"  [dim]- {model_info.name}{size} {_placement_badge(model_info.placement)}[/dim]")
-            console.print("[dim]Use `rm <name>` to delete CPU-only models and free space.[/dim]")
-        console.print("[dim]Pick a number or name. Use `rm <number|name>` to delete one, or `refresh` to reload.[/dim]")
+            console.print(Text("\n  Too large for the GPU (slow): " + ", ".join(m.name for m in hidden_models),
+                               style="m.faint"))
+        console.print(Text("\n  number or name · rm <n> deletes a model · refresh reloads", style="m.faint"))
 
-        choice = console.input("\n[bold]Pick a model (number or name):[/bold] ").strip()
+        choice = console.input("\n[m.accent]›[/m.accent] ").strip()
         if not choice:
             console.print("[yellow]Pick a model name or number.[/yellow]")
             continue
@@ -3069,24 +3022,6 @@ def _resolve_cloud_api_key(cfg: dict, prompt_fn=None) -> str:
         except (EOFError, KeyboardInterrupt):
             return ""
     return ""
-
-
-def _print_hint_bar() -> None:
-    """Single-line hint shown once after model selection."""
-    console.print(
-        "  [dim]/help[/dim][dim] commands  ·  [/dim]"
-        "[dim]/status[/dim][dim]  ·  [/dim]"
-        "[dim]/permissions[/dim][dim]  ·  [/dim]"
-        "[dim]/tasks[/dim][dim]  ·  [/dim]"
-        "[dim]/search[/dim][dim]  ·  [/dim]"
-        "[dim]/hibernate[/dim][dim]  ·  [/dim]"
-        "[dim]/run --background <cmd>[/dim][dim]  ·  [/dim]"
-        "[dim]/plan <goal>[/dim][dim]  ·  [/dim]"
-        "[dim]Tab[/dim][dim] to complete  ·  [/dim]"
-        "[dim]↑↓[/dim][dim] history[/dim][dim]  ·  [/dim]"
-        "[dim]Ctrl+G[/dim][dim] editor[/dim]"
-    )
-    console.print()
 
 
 def _apply_session_mode(cfg: dict, session_mode: str) -> None:
@@ -3167,7 +3102,7 @@ def _chat():
     _placement_labels = {"gpu": "🟢 full GPU", "split": "🟡 GPU+CPU split", "cpu": "🔴 CPU only"}
     _gpu_hint = _placement_labels.get(_placement, "")
     if _vram is not None:
-        console.print(f"[dim cyan]  ✦  GPU VRAM: {_vram:.1f} GB  ·  {model}: {_gpu_hint}[/dim cyan]")
+        console.print(f"[m.faint]  · GPU VRAM: {_vram:.1f} GB  ·  {model}: {_gpu_hint}[/m.faint]")
 
     _apply_session_mode(cfg, session_mode)
 
@@ -3175,46 +3110,46 @@ def _chat():
     system_prompt = SYSTEM_PROMPT
     if cfg.get("rules"):
         system_prompt += f"\n\n## Project Rules (from MITRA.md)\n{cfg['rules']}"
-        console.print("[dim cyan]  ✦  Project rules loaded from MITRA.md[/dim cyan]")
+        console.print("[m.faint]  · Project rules loaded from MITRA.md[/m.faint]")
 
     project_instructions = cfg.get("project_instructions") or []
     instructions_prompt = _build_project_instructions_prompt(project_instructions)
     if instructions_prompt:
         system_prompt += f"\n\n{instructions_prompt}"
         count = len(project_instructions)
-        console.print(f"[dim cyan]  ✦  Project instruction file{'s' if count != 1 else ''} loaded: {count}[/dim cyan]")
+        console.print(f"[m.faint]  · Project instruction file{'s' if count != 1 else ''} loaded: {count}[/m.faint]")
 
     available_skills = skills_registry.discover(cfg["workspace"], cfg.get("skill_dirs"))
     skills_prompt = _build_skills_prompt(available_skills)
     if skills_prompt:
         system_prompt += f"\n\n{skills_prompt}"
         count = len(available_skills)
-        console.print(f"[dim cyan]  ✦  Mitra skill{'s' if count != 1 else ''} loaded: {count}[/dim cyan]")
+        console.print(f"[m.faint]  · Mitra skill{'s' if count != 1 else ''} loaded: {count}[/m.faint]")
 
     plugin_commands = plugin_registry.discover(cfg["workspace"], cfg.get("plugin_dirs"))
     if plugin_commands.commands:
         console.print(
-            f"[dim cyan]  ✦  Workspace plugin command{'s' if len(plugin_commands.commands) != 1 else ''} loaded: {len(plugin_commands.commands)}[/dim cyan]"
+            f"[m.faint]  · Workspace plugin command{'s' if len(plugin_commands.commands) != 1 else ''} loaded: {len(plugin_commands.commands)}[/m.faint]"
         )
     if plugin_commands.errors:
         console.print(
-            f"[yellow]  ✦  Plugin load issue{'s' if len(plugin_commands.errors) != 1 else ''}: {len(plugin_commands.errors)} (see /plugins)[/yellow]"
+            f"[m.err]  · Plugin load issue{'s' if len(plugin_commands.errors) != 1 else ''}: {len(plugin_commands.errors)} (see /plugins)[/m.err]"
         )
 
     ctx_text = memory.load_context(cfg["workspace"])
     if ctx_text:
         system_prompt += f"\n\n## Project Memory (from .mitra/context.md)\n{ctx_text}"
-        console.print("[dim cyan]  ✦  Project memory loaded from .mitra/context.md[/dim cyan]")
+        console.print("[m.faint]  · Project memory loaded from .mitra/context.md[/m.faint]")
 
     startup_project_brief = _build_startup_project_brief(cfg["workspace"])
     if startup_project_brief:
         system_prompt += f"\n\n{startup_project_brief}"
-        console.print("[dim cyan]  ✦  Startup project brief auto-detected from the workspace[/dim cyan]")
+        console.print("[m.faint]  · Startup project brief auto-detected from the workspace[/m.faint]")
 
     plan_text = memory.load_plan(cfg["workspace"])
     if plan_text:
         system_prompt += f"\n\n## Active Plan (from .mitra/plan.md)\n{plan_text}"
-        console.print("[dim cyan]  ✦  Active plan loaded from .mitra/plan.md[/dim cyan]")
+        console.print("[m.faint]  · Active plan loaded from .mitra/plan.md[/m.faint]")
 
     console.print(
         _build_startup_status(
@@ -3269,7 +3204,7 @@ def _chat():
     )
     if cloud_api_key:
         console.print(
-            f"[dim cyan]  ✦  Cloud codegen model: {codegen_model}[/dim cyan]"
+            f"[m.faint]  · Cloud codegen model: {codegen_model}[/m.faint]"
         )
     else:
         console.print(
@@ -3312,8 +3247,20 @@ def _chat():
         context=hook_ctx,
     ))
 
-    # ── Hint bar + prompt setup ───────────────────────────────────────────────
-    _print_hint_bar()
+    # ── Header + prompt setup ─────────────────────────────────────────────────
+    try:
+        _mcp_names = [spec.name for spec in mcp_registry.discover(cfg["workspace"]) if spec.usable]
+    except Exception:
+        _mcp_names = []
+    console.print()
+    console.print(ui.header.header(
+        model=model,
+        folder=_shorten_display(str(cfg["workspace"]), 60),
+        context=num_ctx,
+        placement=_placement,
+        mcp_servers=_mcp_names,
+    ))
+    console.print(ui.header.tips())
     prompt_str = _build_prompt_label(model, session_mode, work_mode)
     completer = _make_completer(
         cfg["workspace"],
