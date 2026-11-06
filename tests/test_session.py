@@ -9,10 +9,6 @@ class TestSessionAgent:
         metadata = session_agent.ensure_session(str(tmp_path))
         assert metadata["name"] == tmp_path.name
 
-    def test_rename_session_updates_name(self, tmp_path):
-        session_agent.ensure_session(str(tmp_path))
-        metadata = session_agent.rename_session(str(tmp_path), "Focus Sprint")
-        assert metadata["name"] == "Focus Sprint"
 
     def test_build_resume_reply_includes_recent_activity(self, tmp_path):
         memory.append_activity(str(tmp_path), "what changed?", "here is the summary")

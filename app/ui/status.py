@@ -1,7 +1,6 @@
 """The status line under the input: model · mode · ctx % · tokens · folder (branch)."""
 from __future__ import annotations
 
-import pathlib
 import re
 import shutil
 import subprocess

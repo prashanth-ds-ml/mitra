@@ -2,7 +2,6 @@
 import pathlib
 import sys
 import threading
-from types import SimpleNamespace
 
 import pytest
 

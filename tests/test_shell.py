@@ -1,6 +1,4 @@
 """Tests for app/agents/shell.py — execute, whitelist, confirm, ShellResult."""
-import pathlib
-import time
 import pytest
 from app.agents import shell as shell_agent
 
@@ -8,14 +6,12 @@ from app.agents import shell as shell_agent
 @pytest.fixture(autouse=True)
 def reset_config(tmp_path):
     """Reset shell config to a clean state before each test."""
-    shell_agent.reset_background_tasks()
     shell_agent.configure(
         workspace=str(tmp_path),
         stream_to_console=False,
         confirm_fn=None,
     )
     yield
-    shell_agent.reset_background_tasks()
 
 
 # ── Whitelist ─────────────────────────────────────────────────────────────────
@@ -145,56 +141,6 @@ class TestConfirmFn:
         assert result.ok
 
 
-class TestBackgroundTasks:
-    def _wait_for(self, task_id: str, *, timeout: float = 3.0):
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            task = shell_agent.get_background_task(task_id)
-            if task is not None and task.status != "running":
-                return task
-            time.sleep(0.05)
-        return shell_agent.get_background_task(task_id)
-
-    def test_start_background_tracks_completion(self, tmp_path):
-        script = tmp_path / "emit.py"
-        script.write_text("print('boot')\nprint('done')\n", encoding="utf-8")
-        task, error = shell_agent.start_background(
-            f"python {script.name}",
-            cwd=str(tmp_path),
-        )
-
-        assert error is None
-        assert task is not None
-        finished = self._wait_for(task.id)
-
-        assert finished is not None
-        assert finished.status == "completed"
-        assert finished.exit_code == 0
-        assert "boot" in finished.tail
-        assert "done" in finished.tail
-
-    def test_stop_background_task_marks_task_stopped(self, tmp_path):
-        script = tmp_path / "sleepy.py"
-        script.write_text("import time\nprint('start')\ntime.sleep(5)\n", encoding="utf-8")
-        task, error = shell_agent.start_background(
-            f"python {script.name}",
-            cwd=str(tmp_path),
-        )
-
-        assert error is None
-        assert task is not None
-        stopped, stop_error = shell_agent.stop_background_task(task.id)
-
-        assert stop_error is None
-        assert stopped is not None
-        assert stopped.status == "stopped"
-        assert shell_agent.count_background_tasks(only_running=True) == 0
-
-    def test_background_builtin_command_is_rejected(self, tmp_path):
-        task, error = shell_agent.start_background("ls", cwd=str(tmp_path))
-
-        assert task is None
-        assert "Background tasks only support subprocess commands" in error
 
 
 # ── ShellResult ───────────────────────────────────────────────────────────────

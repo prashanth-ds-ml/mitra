@@ -1,6 +1,5 @@
 import json
 import pathlib
-import sqlite3
 
 from app import memory
 
@@ -69,33 +68,5 @@ def test_append_error_writes_markdown_and_trace(tmp_path):
     assert payload["payload"]["summary"] == "Command failed"
 
 
-def test_append_decision_writes_markdown_and_sqlite_event(tmp_path):
-    memory.init_memory(str(tmp_path))
-
-    memory.append_decision(str(tmp_path), "Use local tools first", "The local tool layer is already stable enough.")
-
-    decisions_text = (tmp_path / ".mitra" / "decisions.md").read_text(encoding="utf-8")
-    assert "Use local tools first" in decisions_text
-
-    conn = sqlite3.connect(tmp_path / ".mitra" / "memory.sqlite")
-    try:
-        rows = conn.execute("SELECT event_type, payload_json FROM events ORDER BY id DESC").fetchall()
-    finally:
-        conn.close()
-
-    assert rows
-    assert rows[0][0] == "decision"
-    assert "Use local tools first" in rows[0][1]
 
 
-def test_update_task_board_overwrites_board_and_traces(tmp_path):
-    memory.init_memory(str(tmp_path))
-
-    memory.update_task_board(str(tmp_path), ["Implement traces", "Verify logs"])
-
-    board_text = (tmp_path / ".mitra" / "task_board.md").read_text(encoding="utf-8")
-    trace_lines = (tmp_path / ".mitra" / "execution_trace.jsonl").read_text(encoding="utf-8").splitlines()
-
-    assert "Implement traces" in board_text
-    payload = json.loads(trace_lines[-1])
-    assert payload["event_type"] == "task_board"

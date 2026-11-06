@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from rich.markdown import Markdown
-from rich.panel import Panel
 
 from app.prompts import REVIEWER_SYSTEM_PROMPT as _SYSTEM_PROMPT
 

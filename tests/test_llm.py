@@ -45,41 +45,6 @@ class TestGetLocalLlm:
         assert "reasoning" not in captured
 
 
-class TestGetCloudLlm:
-    def test_uses_cloud_base_url_and_auth(self, monkeypatch):
-        captured = {}
-
-        def fake_chat_ollama(**kwargs):
-            captured.update(kwargs)
-            return kwargs
-
-        monkeypatch.setattr(llm, "ChatOllama", fake_chat_ollama)
-
-        llm.get_cloud_llm("kimi-k2.5:cloud", temperature=0.3, api_key="secret-key", num_ctx=65536)
-
-        assert captured["model"] == "kimi-k2.5:cloud"
-        assert captured["temperature"] == 0.3
-        assert captured["num_ctx"] == 65536
-        assert captured["base_url"] == "https://ollama.com"
-        assert captured["client_kwargs"] == {
-            "headers": {"Authorization": "Bearer secret-key"}
-        }
-
-    def test_reads_api_key_from_env(self, monkeypatch):
-        captured = {}
-
-        def fake_chat_ollama(**kwargs):
-            captured.update(kwargs)
-            return kwargs
-
-        monkeypatch.setattr(llm, "ChatOllama", fake_chat_ollama)
-        monkeypatch.setenv("OLLAMA_API_KEY", "env-secret")
-
-        llm.get_cloud_llm("kimi-k2.5:cloud")
-
-        assert captured["client_kwargs"] == {
-            "headers": {"Authorization": "Bearer env-secret"}
-        }
 
 
 class TestProbeOllama:

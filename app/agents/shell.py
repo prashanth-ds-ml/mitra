@@ -18,20 +18,13 @@ import shlex
 import shutil
 import subprocess
 import threading
-import itertools
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Callable
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_core.tools import tool
 from rich.console import Console, Group
-from rich.panel import Panel
-from rich.rule import Rule
 from rich.text import Text
 
 from app.policy import Policy, Scope, Action, load_policy
-from app.prompts import SHELL_SYSTEM_PROMPT as _SYSTEM_PROMPT
 
 # ─── Allowed executables ──────────────────────────────────────────────────────
 
@@ -64,7 +57,6 @@ class ShellConfig:
 _config = ShellConfig()
 _background_tasks: dict[str, "BackgroundTask"] = {}
 _background_lock = threading.Lock()
-_background_counter = itertools.count(1)
 
 
 def configure(
@@ -154,8 +146,6 @@ class BackgroundTask:
         return "\n".join(self.output_lines[-30:])
 
 
-def _now_stamp() -> str:
-    return datetime.now().isoformat(timespec="seconds")
 
 
 def _task_snapshot(task: BackgroundTask) -> BackgroundTask:
@@ -172,9 +162,6 @@ def _task_snapshot(task: BackgroundTask) -> BackgroundTask:
     )
 
 
-def _trim_background_output(task: BackgroundTask) -> None:
-    if len(task.output_lines) > _config.max_output_lines:
-        task.output_lines[:] = task.output_lines[-_config.max_output_lines:]
 
 
 # ─── Core runner ─────────────────────────────────────────────────────────────
@@ -195,14 +182,6 @@ def get_cwd() -> str:
     return _resolve_cwd(None)
 
 
-def reset_background_tasks() -> None:
-    """Stop and forget all tracked background tasks. Primarily for tests."""
-    with _background_lock:
-        task_ids = list(_background_tasks.keys())
-    for task_id in task_ids:
-        stop_background_task(task_id)
-    with _background_lock:
-        _background_tasks.clear()
 
 
 def _check_path_in_workspace(path: pathlib.Path) -> str | None:
@@ -279,111 +258,10 @@ def _confirm_command(command: str, cwd: str) -> str | None:
     return _config.confirm_fn(command)
 
 
-def _background_worker(task_id: str) -> None:
-    with _background_lock:
-        task = _background_tasks.get(task_id)
-        proc = task.proc if task else None
-
-    if task is None or proc is None:
-        return
-
-    try:
-        if proc.stdout is not None:
-            for raw in proc.stdout:
-                line = raw.rstrip("\n")
-                with _background_lock:
-                    current = _background_tasks.get(task_id)
-                    if current is None:
-                        break
-                    current.output_lines.append(line)
-                    _trim_background_output(current)
-        proc.wait()
-    except Exception as exc:
-        with _background_lock:
-            current = _background_tasks.get(task_id)
-            if current is not None:
-                current.output_lines.append(f"✗ Background task failed: {exc}")
-                _trim_background_output(current)
-    finally:
-        exit_code = proc.returncode if proc.returncode is not None else 1
-        with _background_lock:
-            current = _background_tasks.get(task_id)
-            if current is None:
-                return
-            current.exit_code = exit_code
-            current.completed_at = current.completed_at or _now_stamp()
-            current.proc = None
-            current.watcher_thread = None
-            if current.status == "stopped":
-                return
-            current.status = "completed" if exit_code == 0 else "failed"
 
 
-def _validate_background_command(command: str, resolved_cwd: str) -> str | None:
-    resolved_path = pathlib.Path(resolved_cwd)
-    if err := _check_path_in_workspace(resolved_path):
-        return f"✗ {err}"
-
-    try:
-        parts = _split_command(command)
-    except ValueError:
-        parts = []
-    exe = parts[0].lower() if parts else ""
-    if exe in {"cd", "pwd", "ls", "dir", "ll", "tree", "cat", "type"}:
-        return "✗ Background tasks only support subprocess commands. Use `/run <cmd>` for built-in navigation or listing commands."
-
-    if _config.session_mode in {"read-only", "plan"}:
-        return (
-            f"✗ Shell execution is disabled in `{_config.session_mode}` mode. "
-            "Use `/mode approve` or `/mode auto` to run commands."
-        )
-
-    if err := _check_executable(command):
-        return f"✗ Permission denied: {err}"
-
-    if _config.confirm_fn is not None and _confirm_command(command, resolved_cwd) is None:
-        return "✗ Skipped: user declined"
-
-    return None
 
 
-def start_background(command: str, cwd: str | None = None) -> tuple[BackgroundTask | None, str | None]:
-    """Launch a long-running subprocess command in the background."""
-    resolved_cwd = _resolve_cwd(cwd)
-    error = _validate_background_command(command, resolved_cwd)
-    if error:
-        return None, error
-
-    try:
-        proc = subprocess.Popen(
-            _split_command(command),
-            cwd=resolved_cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            encoding="utf-8",
-            errors="replace",
-        )
-    except FileNotFoundError:
-        return None, f"✗ Executable not found: {_split_command(command)[0]}"
-    except Exception as exc:
-        return None, f"✗ Failed to start process: {exc}"
-
-    task = BackgroundTask(
-        id=f"bg-{next(_background_counter)}",
-        command=command,
-        cwd=resolved_cwd,
-        status="running",
-        started_at=_now_stamp(),
-        proc=proc,
-    )
-    watcher = threading.Thread(target=_background_worker, args=(task.id,), daemon=True)
-    task.watcher_thread = watcher
-    with _background_lock:
-        _background_tasks[task.id] = task
-    watcher.start()
-    return _task_snapshot(task), None
 
 
 def list_background_tasks() -> list[BackgroundTask]:
@@ -394,11 +272,6 @@ def list_background_tasks() -> list[BackgroundTask]:
     return [_task_snapshot(task) for task in tasks]
 
 
-def get_background_task(task_id: str) -> BackgroundTask | None:
-    """Return a snapshot of a specific background task."""
-    with _background_lock:
-        task = _background_tasks.get(task_id)
-    return _task_snapshot(task) if task is not None else None
 
 
 def count_background_tasks(*, only_running: bool = False) -> int:
@@ -410,23 +283,6 @@ def count_background_tasks(*, only_running: bool = False) -> int:
     return len(tasks)
 
 
-def stop_background_task(task_id: str) -> tuple[BackgroundTask | None, str | None]:
-    """Stop a running background task."""
-    with _background_lock:
-        task = _background_tasks.get(task_id)
-        proc = task.proc if task is not None else None
-        if task is None:
-            return None, f"No background task found for `{task_id}`."
-        if task.status != "running" or proc is None:
-            return _task_snapshot(task), None
-        task.status = "stopped"
-        task.completed_at = _now_stamp()
-        task.note = "Stopped by user."
-    try:
-        proc.kill()
-    except Exception as exc:
-        return None, f"Could not stop `{task_id}`. {exc}"
-    return get_background_task(task_id), None
 
 
 def _check_executable(command: str) -> str | None:
@@ -678,71 +534,15 @@ def execute(
 
 # ─── LangChain tool ──────────────────────────────────────────────────────────
 
-@tool
-def run_shell(command: str, cwd: str = "", timeout: int = 60) -> str:
-    """
-    Run a shell command in the project workspace and return the output + exit code.
-    Use for: running scripts, tests, linters, installs, or any terminal command.
-    cwd: working directory relative to the project root (empty = project root).
-    timeout: seconds before the process is killed (default 60).
-    """
-    result = execute(command, cwd=cwd or None, timeout=timeout)
-    return result.to_llm_summary()
 
 
 # ─── Agent loop (for direct invocation) ──────────────────────────────────────
 
 
-def run_agent(llm, user_request: str, console: Console | None = None) -> str:
-    """Run the shell agent with the LLM and return a plain text summary."""
-    llm_with_tools = llm.bind_tools([run_shell])
-    messages: list = [
-        SystemMessage(content=_SYSTEM_PROMPT),
-        HumanMessage(content=user_request),
-    ]
-
-    from app.agents.limits import MAX_AGENT_STEPS, stopped_message
-
-    summary = stopped_message()
-    for _step in range(MAX_AGENT_STEPS):  # E-002: never loop forever
-        phase = "Summarizing command results..." if any(isinstance(m, ToolMessage) for m in messages) else "Planning command execution..."
-        if console is not None:
-            with console.status(f"[m.dim]{phase}[/m.dim]", spinner="dots", spinner_style="m.accent"):
-                response: AIMessage = llm_with_tools.invoke(messages)
-        else:
-            response = llm_with_tools.invoke(messages)
-        messages.append(response)
-
-        if not response.tool_calls:
-            summary = response.content.strip()
-            break
-
-        for tc in response.tool_calls:
-            args = tc["args"]
-            result = execute(
-                command=args.get("command", ""),
-                cwd=args.get("cwd") or None,
-                timeout=args.get("timeout", _config.default_timeout),
-                console=console,
-            )
-            messages.append(ToolMessage(content=result.to_llm_summary(), tool_call_id=tc["id"]))
-
-    return summary
 
 
 # ─── Routing tool (called by the main LLM) ───────────────────────────────────
 
-def make_routing_tool(llm, console: Console | None = None):
-    """Return a LangChain tool the main LLM can call to run shell commands."""
-    @tool
-    def run_command(request: str) -> str:
-        """
-        Run a terminal command or script in the current project.
-        Use when the user asks to run, execute, test, lint, or start something.
-        Pass the full user request unchanged.
-        """
-        return run_agent(llm, request, console=console)
-    return run_command
 
 
 # ─── Rich renderer ───────────────────────────────────────────────────────────

@@ -1,8 +1,5 @@
 """Tests for layered configuration model in app/config.py."""
 
-import tempfile
-import pathlib
-import os
 
 from app import config
 
@@ -148,42 +145,5 @@ class TestLayeredConfig:
         assert cfg["custom_section"]["key3"] == "project3"
 
 
-class TestSaveUserConfig:
-    def test_save_user_config(self, tmp_path, monkeypatch):
-        user_file = tmp_path / "mitra.toml"
-        monkeypatch.setattr(config, "_USER_CONFIG_FILE", user_file)
-        monkeypatch.setattr(config, "_USER_CONFIG_DIR", user_file.parent)
-
-        cfg = {"local_model": "test-model", "temperature": 0.3}
-        ok, msg = config.save_user_config(cfg)
-        assert ok
-        assert user_file.exists()
-
-        # Verify content
-        try:
-            import tomllib
-        except ImportError:
-            import tomli as tomllib
-        with open(user_file, "rb") as f:
-            loaded = tomllib.load(f)
-        assert loaded["local_model"] == "test-model"
-        assert loaded["temperature"] == 0.3
 
 
-class TestSaveLocalConfig:
-    def test_save_local_config(self, tmp_path):
-        cfg = {"local_model": "local-test", "session_mode": "auto"}
-        ok, msg = config.save_local_config(cfg, str(tmp_path))
-        assert ok
-
-        local_file = tmp_path / ".mitra" / "local.toml"
-        assert local_file.exists()
-
-        try:
-            import tomllib
-        except ImportError:
-            import tomli as tomllib
-        with open(local_file, "rb") as f:
-            loaded = tomllib.load(f)
-        assert loaded["local_model"] == "local-test"
-        assert loaded["session_mode"] == "auto"

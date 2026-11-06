@@ -1,9 +1,13 @@
 """Tests for app/policy.py."""
 
-import tempfile
-import pathlib
 
-from app.policy import Policy, Rule, Action, Scope, load_policy, save_policy, DEFAULT_POLICY_YAML
+from app.policy import (
+    Policy,
+    Rule,
+    Action,
+    Scope,
+    load_policy,
+)
 
 
 class TestPolicyEngine:
@@ -79,18 +83,6 @@ rules:
         assert policy.evaluate(Scope.TOOL, "read_file") == Action.ALLOW
         assert policy.evaluate(Scope.TOOL, "create_file") == Action.DENY
 
-    def test_save_policy(self, tmp_path):
-        policy = Policy(rules=[
-            Rule(Action.ALLOW, Scope.TOOL, "test_tool", priority=5),
-        ], default_action=Action.ASK)
-        policy_file = tmp_path / "policy.yaml"
-        save_policy(policy, str(policy_file))
-
-        loaded = load_policy(str(policy_file))
-        assert loaded.default_action == Action.ASK
-        assert len(loaded.rules) == 1
-        assert loaded.rules[0].pattern == "test_tool"
-        assert loaded.rules[0].action == Action.ALLOW
 
 
 class TestRuleMatching:

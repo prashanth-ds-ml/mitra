@@ -9,18 +9,6 @@ from datetime import datetime
 from app import memory
 
 
-WORKFLOW_NAMES = (
-    "PlanWorkflow",
-    "PRDWorkflow",
-    "OrderWorkflow",
-    "TaskWorkflow",
-    "BuildWorkflow",
-    "FixWorkflow",
-    "TestWorkflow",
-    "ReviewWorkflow",
-    "DocsWorkflow",
-    "NextWorkflow",
-)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -88,12 +76,6 @@ def estimate_change_impact(change_set: dict | None) -> ChangeImpact:
     return ChangeImpact(files_changed=len(paths), lines_changed=line_count)
 
 
-def workflow_limits(*, max_iterations: int | None = None) -> WorkflowLimits:
-    """Return the default Phase 3 limits, optionally tightening iteration count."""
-    limits = WorkflowLimits()
-    if max_iterations is None:
-        return limits
-    return dataclasses.replace(limits, max_iterations=max(1, min(limits.max_iterations, max_iterations)))
 
 
 class WorkflowRun:

@@ -153,3 +153,34 @@ def test_run_plan_from_the_chat(tmp_path, monkeypatch):
     assert called["tests"] == "python -m pytest -q"
     assert shown[0][0] == "run_plan" and shown[0][1] is True and "1/1 tasks passed" in shown[0][2]
     assert res.text == "Plan built: 1/1 tasks."
+
+
+def test_undo_restores_files_changed_by_the_loop(tmp_path):
+    """/undo works on core-loop changes: the journal is in the format undo_last_change_set reads."""
+    from app import memory
+    from app.agents import filesystem
+
+    (tmp_path / "calc.py").write_text("old\n", encoding="utf-8")
+    model = Model(call(tc("read_file", 1, path="calc.py")),
+                  call(tc("write_file", 2, path="calc.py", content="new\n")),
+                  call(tc("write_file", 3, path="extra.py", content="x\n")),
+                  AIMessage(content="done"))
+    hooks, _ = fake_hooks()
+    res = C.ChatSession(workspace=tmp_path, llm=model, hooks=hooks, mode="auto").turn(msgs("change it"))
+    memory.record_last_change_set(str(tmp_path), {"entries": res.journal})
+    out = filesystem.undo_last_change_set(str(tmp_path))
+    assert "Undid 2" in out
+    assert (tmp_path / "calc.py").read_text() == "old\n" and not (tmp_path / "extra.py").exists()
+
+
+def test_a_search_that_keeps_failing_stops_and_still_answers(tmp_path):
+    """E-023 on the new chat: 100+ identical failing searches before; now it stops after a few and answers."""
+    model = Model(*[call(tc("web_search", n, query=f"qwen models {n}")) for n in range(30)])
+    hooks, shown = fake_hooks()
+    hooks.web_search = lambda q: "✗ Web search failed: <urlopen error timed out>"
+    session = C.ChatSession(workspace=tmp_path, llm=model, hooks=hooks)
+    model.replies = model.replies[:4] + [AIMessage(content="Search is down; here is what I know.")]
+    res = session.turn(msgs("search about qwen 3.5"))
+    assert len([s for s in shown if s[0] == "web_search"]) == 4
+    assert res.stopped and "failed 4 times" in res.stop_reason
+    assert res.text == "Search is down; here is what I know."

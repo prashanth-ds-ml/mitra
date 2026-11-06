@@ -1,7 +1,6 @@
 """Policy Engine — deny-first rule engine with allow/ask/deny, path/tool/command scopes, precedence."""
 from __future__ import annotations
 
-import pathlib
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
@@ -221,20 +220,3 @@ def load_policy(policy_path: Optional[str] = None) -> Policy:
     return Policy(rules=rules, default_action=default_action)
 
 
-def save_policy(policy: Policy, policy_path: str) -> None:
-    data = {
-        "version": 1,
-        "default_action": policy.default_action.value,
-        "rules": [
-            {
-                "action": r.action.value,
-                "scope": r.scope.value,
-                "pattern": r.pattern,
-                "description": r.description,
-                "priority": r.priority,
-            }
-            for r in policy.rules
-        ],
-    }
-    with open(policy_path, "w") as f:
-        yaml.dump(data, f, default_flow_style=False, sort_keys=False)

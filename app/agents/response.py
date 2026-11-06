@@ -3,9 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from rich.console import Group
-from rich.panel import Panel
-from rich.rule import Rule
-from rich.table import Table
 from rich.text import Text
 
 
@@ -92,22 +89,6 @@ def _extract_action(tool: str) -> str:
 
 # ─── Panel title ──────────────────────────────────────────────────────────────
 
-def _panel_title(response: AgentResponse) -> str:
-    """Derive a context-aware title from the dominant tool called."""
-    tools_used = {s.tool for s in response.steps}
-    if tools_used & {"git_status", "git_diff", "git_commit"}:
-        return "Git"
-    if tools_used & {"install_packages", "create_venv"}:
-        return "Installing packages"
-    if tools_used & {"delete_file", "delete_folder"}:
-        return "Removing files"
-    if tools_used & {"move_file"}:
-        return "Moving files"
-    if tools_used & {"create_file", "create_folder"}:
-        return "Creating files"
-    if tools_used & {"read_file", "list_directory"}:
-        return "Reading project"
-    return "Setup Agent"
 
 
 # ─── Renderer ─────────────────────────────────────────────────────────────────

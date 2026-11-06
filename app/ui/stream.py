@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, Iterable
 
-from rich.console import Console, Group
+from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
 from rich.spinner import Spinner

@@ -9,87 +9,44 @@ from rich.console import Console
 # Ensure project root is importable
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from app.agents.response import AgentResponse, ToolResult
-from app.agents.shell import ShellResult
 from app.main import (
     _build_context_reply,
     _build_commit_readiness,
     _build_resources_reply,
-    _cmd_fix,
     _cmd_resume,
     _cmd_review,
     _clear_terminal,
     _confirm_shell,
     _confirm_tool,
-    _build_intent_progress_message,
     _build_model_inventory_reply,
     _build_permissions_reply,
     _build_project_instructions_prompt,
     _build_skills_prompt,
     _build_skills_reply,
-    _build_small_talk_reply,
     _build_change_set_review_input,
     _build_change_set_diff_reply,
     _build_move_preview,
-    _build_cleanup_preview,
     _build_diff_preview,
     _collect_review_risk_signals,
     _build_diff_reply,
     _build_fix_usage,
-    _build_greeting_reply,
     _build_git_summary,
-    _build_current_folder_reply,
-    _build_next_steps_reply,
-    _handle_cleanup_request,
     _build_model_reply,
     _build_mode_reply,
-    _build_prompt_label,
     _build_reasoning_reply,
-    _build_project_summary,
     _build_startup_project_brief,
-    _build_root_delete_reply,
-    _build_root_rename_reply,
-    _build_run_command_reply,
     _build_status_reply,
-    _classify_intent,
-    _confirm_plan_start,
     _detect_project_state,
     _friendly_error,
     _handle_model_command,
-    _extract_navigation_target,
-    _extract_simple_change_action,
-    _extract_url_from_input,
-    _extract_web_search_query,
-    _extract_workspace_selection_target,
     _extract_command,
     _extract_bang_command,
-    _find_cleanup_candidates,
-    _resolve_cleanup_root,
     _extract_fix_command,
     _parse_review_target,
-    _is_simple_change_request,
-    _is_brainstorm_request,
     _is_bang_command,
-    _is_command_help_request,
-    _is_cleanup_request,
-    _is_current_folder_request,
-    _is_delete_project_request,
-    _is_next_steps_request,
-    _is_project_summary_request,
-    _is_small_talk,
-    _is_simple_greeting,
-    _is_understand_alias_request,
-    _looks_like_explicit_command,
     _normalize_session_mode,
-    _normalize_work_mode,
     _pick_model,
-    _intent_to_model_role,
-    _SLASH_COMMANDS,
-    _strip_soft_prefixes,
-    _should_plan_first,
-    _work_mode_summary,
     _resolve_codegen_model,
-    _resolve_cloud_api_key,
 )
 from app import memory, skills as skills_registry
 
@@ -157,15 +114,6 @@ class TestExtractCommand:
 
 # ── _SLASH_COMMANDS ───────────────────────────────────────────────────────────
 
-class TestSlashCommands:
-    def test_all_expected_commands_present(self):
-        expected = {"/help", "/init", "/status", "/doctor", "/model", "/context", "/think", "/mode", "/test", "/fix",
-                    "/diff", "/undo", "/commit", "/review", "/mcp", "/skills", "/logs", "/resume", "/compact", "/clear"}
-        assert set(_SLASH_COMMANDS) - {"exit", "quit"} == expected
-
-    def test_removed_commands_are_gone(self):
-        for removed in ("/brainstorm", "/prd", "/start", "/playbooks", "/hibernate", "/make-space", "/search", "/thinking", "/reset"):
-            assert removed not in _SLASH_COMMANDS
 
 
 # ── `/` and `@` completion (D-035) ──────────────────────────────────────────
@@ -219,20 +167,8 @@ class TestCloudRoutingConfig:
     def test_codegen_model_prefers_configured_value(self):
         assert _resolve_codegen_model({"codegen_model": "gpt-oss:120b"}) == "gpt-oss:120b"
 
-    def test_api_key_prefers_config(self):
-        value = _resolve_cloud_api_key(
-            {"ollama_api_key": "cfg-secret"},
-            prompt_fn=lambda _: "should-not-be-used",
-        )
-        assert value == "cfg-secret"
 
-    def test_api_key_can_be_entered_interactively(self):
-        value = _resolve_cloud_api_key({}, prompt_fn=lambda _: "typed-secret")
-        assert value == "typed-secret"
 
-    def test_empty_api_key_keeps_local_mode(self):
-        value = _resolve_cloud_api_key({}, prompt_fn=lambda _: "")
-        assert value == ""
 
     def test_load_config_resolves_allowed_roots(self, tmp_path):
         (tmp_path / "extra").mkdir()
@@ -362,23 +298,8 @@ class TestCloudRoutingConfig:
         assert "Usage: `/skills` or `/skills show <name>`" in reply
 
 
-class TestPromptLabel:
-    def test_prompt_label_uses_mitra_name(self):
-        assert _build_prompt_label("qwen3.5:latest") == "\n› "
-
-    def test_prompt_label_can_show_mode(self):
-        assert _build_prompt_label("qwen3.5:latest", "read-only", "mentor") == "\n› "
 
 
-class TestRoleRouting:
-    def test_intent_to_model_role_uses_prd_for_brainstorm(self):
-        assert _intent_to_model_role("brainstorm") == "prd"
-
-    def test_intent_to_model_role_uses_coder_for_build(self):
-        assert _intent_to_model_role("build") == "coder"
-
-    def test_intent_to_model_role_uses_reviewer_for_review(self):
-        assert _intent_to_model_role("review") == "reviewer"
 
 
 class TestTerminalSurfaceHelpers:
@@ -418,24 +339,6 @@ class TestTerminalHelpers:
         assert calls == ["clear"]
 
 
-class TestProgressMessages:
-
-    def test_intent_progress_message_for_brainstorm(self):
-        message = _build_intent_progress_message(
-            "brainstorm",
-            "i always wanted to build a tool for time management",
-        )
-        assert message is not None
-        assert "idea space" in message[0].lower()
-        assert "practical" in (message[1] or "").lower()
-
-    def test_intent_progress_message_for_project_summary(self):
-        message = _build_intent_progress_message(
-            "explain",
-            "go through the folder and tell me what you understand",
-        )
-        assert message is not None
-        assert "Inspecting the workspace first" == message[0]
 
 
 class TestSessionModes:
@@ -452,308 +355,18 @@ class TestSessionModes:
         assert "hidden" in reply
 
 
-class TestWorkModes:
-    def test_normalize_work_mode_falls_back_to_builder(self):
-        assert _normalize_work_mode("weird") == "builder"
 
-    def test_work_mode_summary_mentions_style(self):
-        assert "pair" in _work_mode_summary("collaborator")
 
 
-class TestGreetingHelpers:
-    def test_simple_greeting_detected(self):
-        assert _is_simple_greeting("hi")
-        assert _is_simple_greeting("Hello!")
-        assert _is_simple_greeting("good morning")
-        assert _is_simple_greeting("hi buddy")
-        assert _is_simple_greeting("hello there")
 
-    def test_non_greeting_not_detected(self):
-        assert not _is_simple_greeting("help me debug this")
-        assert not _is_simple_greeting("/help")
 
-    def test_greeting_reply_mentions_mitra_capabilities(self):
-        reply = _build_greeting_reply()
-        assert "Mitra" in reply
-        assert "local coding assistant" in reply
-        assert "run commands" in reply
 
-    def test_small_talk_detected(self):
-        assert _is_small_talk("how are you doing")
-        assert _is_small_talk("thanks")
-        assert _is_small_talk("hi buddy how are you doing")
-        assert not _is_small_talk("ok lets got to projects folder")
 
-    def test_small_talk_reply_is_stable(self):
-        reply = _build_small_talk_reply("how are you doing")
-        assert "ready to help" in reply.lower()
 
-    def test_small_talk_classification_handles_blended_greeting(self):
-        assert _classify_intent("hi buddy how are you doing") == "chat"
 
-    def test_understand_alias_detected(self):
-        assert _is_understand_alias_request("understand")
-        assert _is_understand_alias_request("explain this")
-        assert _classify_intent("tell me about this") == "explain"
 
 
-class TestPlanFirstHeuristics:
-    def test_large_build_request_prefers_plan(self):
-        assert _should_plan_first("build a snake game using python and pygame with arrow key controls")
 
-    def test_fix_request_prefers_plan(self):
-        assert _should_plan_first("fix the login bug in the auth flow with failing tests")
-
-    def test_simple_chat_does_not_prefer_plan(self):
-        assert not _should_plan_first("hi")
-        assert not _should_plan_first("what can you do?")
-
-    def test_continue_does_not_prefer_plan(self):
-        assert not _should_plan_first("continue")
-        assert not _should_plan_first("next step")
-
-    def test_slash_commands_do_not_prefer_plan(self):
-        assert not _should_plan_first("/plan build an api")
-
-    def test_polite_build_request_prefers_plan(self):
-        assert _should_plan_first("i want to build a simple snake game using python")
-
-    def test_cleanup_request_prefers_plan(self):
-        assert _should_plan_first("remove any unwanted files from this project")
-
-    def test_simple_folder_create_does_not_prefer_plan(self):
-        assert not _should_plan_first("create a folder named goal_tracker in projects")
-
-    def test_simple_file_create_does_not_prefer_plan(self):
-        assert not _should_plan_first("create a file named notes.txt")
-
-    def test_simple_venv_create_does_not_prefer_plan(self):
-        assert not _should_plan_first("create a .venv in this folder")
-
-
-class TestSoftPrefixes:
-    def test_strip_soft_prefix(self):
-        assert _strip_soft_prefixes("can you build an api") == "build an api"
-        assert _strip_soft_prefixes("i need you to refactor auth") == "refactor auth"
-        assert _strip_soft_prefixes("ok lets build a snake game") == "build a snake game"
-
-
-class TestCommandHelp:
-    def test_detects_command_help(self):
-        assert _is_command_help_request("can you give me commands to run the code")
-        assert _is_command_help_request("how do i run this app")
-
-    def test_non_command_help_ignored(self):
-        assert not _is_command_help_request("run the tests now")
-
-    def test_extract_web_search_query_detects_explicit_request(self):
-        assert _extract_web_search_query("search the web for python packaging tutorials") == "python packaging tutorials"
-        assert _extract_web_search_query("please look up fastapi docs") == "fastapi docs"
-
-    def test_extract_url_from_input_detects_url(self):
-        assert _extract_url_from_input("read this page https://example.com/docs?q=1.") == "https://example.com/docs?q=1"
-        assert _extract_url_from_input("no link here") is None
-
-
-    def test_build_run_command_reply_uses_powershell_activation(self, tmp_path):
-        src = tmp_path / "src" / "snake_agent"
-        src.mkdir(parents=True)
-        (src / "cli.py").write_text("print('hi')", encoding="utf-8")
-        (tmp_path / "requirements.txt").write_text("pygame\n", encoding="utf-8")
-
-        reply = _build_run_command_reply(str(tmp_path))
-
-        assert ".\\.venv\\Scripts\\Activate.ps1" in reply
-        assert "python -m venv .venv" in reply
-        assert "python .\\src\\snake_agent\\cli.py" in reply
-        assert "pip install -r .\\requirements.txt" in reply
-
-    def test_build_run_command_reply_uses_pyproject_when_present(self, tmp_path):
-        (tmp_path / "pyproject.toml").write_text("[project]\nname='demo'\n", encoding="utf-8")
-        (tmp_path / "main.py").write_text("print('hi')", encoding="utf-8")
-
-        reply = _build_run_command_reply(str(tmp_path))
-
-        assert "pip install -e ." in reply
-
-
-class TestProjectSummary:
-    def test_detects_project_summary_request(self):
-        assert _is_project_summary_request("go through the folder and tell me what you understand")
-        assert _is_project_summary_request("move to snake-game and understand it")
-
-    def test_detects_next_steps_request(self):
-        assert _is_next_steps_request("next steps")
-        assert _is_next_steps_request("what should we do next?")
-        assert not _is_next_steps_request("/next")
-
-    def test_detects_current_folder_request(self):
-        assert _is_current_folder_request("where are we, in which dir we are in and what folders does it contain")
-        assert _classify_intent("now tell me about this folder") == "explain"
-
-    def test_build_project_summary_mentions_entrypoint_and_blockers(self, tmp_path):
-        (tmp_path / "README.md").write_text("# Snake Agent\nSimple snake game project\n", encoding="utf-8")
-        src = tmp_path / "src" / "snake_agent"
-        src.mkdir(parents=True)
-        (src / "cli.py").write_text("print('hi')", encoding="utf-8")
-        (tmp_path / "requirements.txt").write_text("pygame\n", encoding="utf-8")
-
-        summary = _build_project_summary(str(tmp_path))
-
-        assert "You are working in" in summary
-        assert "Simple snake game project" in summary
-        assert ".\\src\\snake_agent\\cli.py" in summary
-        assert "No `.venv` is present yet." in summary
-
-    def test_build_next_steps_reply_prefers_active_plan_when_present(self, tmp_path):
-        from app import memory
-
-        memory.write_plan(str(tmp_path), goal="Ship snake game", steps=["Create snake movement", "Run pytest"])
-        reply = _build_next_steps_reply(str(tmp_path))
-
-        assert "is not approved yet" in reply and "/plan" not in reply
-        assert "Create snake movement" in reply
-
-    def test_build_current_folder_reply_uses_active_path(self, tmp_path):
-        nested = tmp_path / "snake-game"
-        nested.mkdir()
-        (nested / "app.py").write_text("print('hi')\n", encoding="utf-8")
-        (nested / "assets").mkdir()
-
-        reply = _build_current_folder_reply(str(nested), workspace=str(tmp_path))
-
-        assert "Current folder" in reply
-        assert str(nested) in reply
-        assert "snake-game" in reply
-        assert "`assets/`" in reply
-        assert "`app.py`" in reply
-
-    def test_extract_navigation_target_handles_natural_language(self):
-        assert _extract_navigation_target("ok lets got to projects folder") == "projects"
-        assert _extract_navigation_target("move into snake-game") == "snake-game"
-        assert _extract_navigation_target("switch to src directory") == "src"
-        assert _extract_navigation_target("lets navigate to projects folder so that we can work on snake-game") == "projects"
-        assert _extract_navigation_target("great lets move to snake-game and understand it") == "snake-game"
-        assert _extract_navigation_target("enter src") == "src"
-
-    def test_extract_workspace_selection_target_matches_directory_name(self, tmp_path):
-        (tmp_path / "snake-game").mkdir()
-        (tmp_path / "goal_tracker").mkdir()
-
-        assert _extract_workspace_selection_target("lets work with snake game", str(tmp_path)) == "snake-game"
-        assert _extract_workspace_selection_target("lets work on goal tracker", str(tmp_path)) == "goal_tracker"
-
-    def test_extract_workspace_selection_target_ignores_missing_directory(self, tmp_path):
-        (tmp_path / "snake-game").mkdir()
-
-        assert _extract_workspace_selection_target("lets work with weather app", str(tmp_path)) is None
-
-    def test_handle_cleanup_request_targets_current_project(self, monkeypatch, tmp_path):
-        project = tmp_path / "snake-game"
-        project.mkdir()
-        (project / "README.md").write_text("# Snake\n", encoding="utf-8")
-        (project / "__pycache__").mkdir()
-        monkeypatch.setattr("app.main.console.print", lambda *args, **kwargs: None)
-        monkeypatch.setattr("app.main._choose_approval_option", lambda *args, **kwargs: "deny")
-
-        reply = _handle_cleanup_request("i want simple python snake game remove others please", str(project))
-
-        assert "Cleanup target: ." in reply or "cleanup plan" in reply.lower()
-
-
-class TestIntentRouting:
-    def test_classifies_run_help(self):
-        assert _classify_intent("how do i run this app") == "run-help"
-
-    def test_classifies_project_summary(self):
-        assert _classify_intent("go through the folder and tell me what you understand") == "explain"
-        assert _classify_intent("understand") == "explain"
-
-    def test_classifies_cleanup_as_change(self):
-        assert _classify_intent("remove any unwanted files from this project") == "change"
-        assert _classify_intent("i want simple python snake game remove others please") == "change"
-
-    def test_classifies_plan_request(self):
-        assert _classify_intent("build a snake game using python and pygame") == "plan"
-
-    def test_build_request_with_this_folder_is_not_misclassified_as_current_folder(self):
-        prompt = "lets build a simple snakegame in this folder"
-        assert not _is_current_folder_request(prompt)
-        assert _classify_intent(prompt) == "plan"
-
-    def test_classifies_project_wide_rename_as_plan(self):
-        assert _classify_intent("update wherever you find snake-agent to snake-game throughout the codebase") == "plan"
-
-    def test_classifies_simple_folder_create_as_change(self):
-        prompt = "create a folder named goal_tracker in projects"
-        assert _is_simple_change_request(prompt)
-        assert _classify_intent(prompt) == "change"
-
-    def test_classifies_polite_new_folder_create_as_change(self):
-        prompt = "lets create a new folder named demo"
-        assert _is_simple_change_request(prompt)
-        assert _classify_intent(prompt) == "change"
-        assert _extract_simple_change_action(prompt) == ("create_folder", {"path": "demo"})
-
-    def test_classifies_simple_venv_create_as_change(self):
-        prompt = "create a .venv in this folder"
-        assert _is_simple_change_request(prompt)
-        assert _classify_intent(prompt) == "change"
-
-    def test_classifies_polite_simple_venv_create_as_change(self):
-        prompt = "can you create a .venv in this folder"
-        assert _is_simple_change_request(prompt)
-        assert _classify_intent(prompt) == "change"
-
-    def test_extracts_direct_venv_action_for_current_folder(self):
-        prompt = "can you create a .venv in this folder"
-        assert _extract_simple_change_action(prompt) == ("create_venv", {"project_path": "."})
-
-    def test_extracts_direct_venv_action_for_this_folder_with_make(self):
-        prompt = "can you make .venv for this folder"
-        assert _extract_simple_change_action(prompt) == ("create_venv", {"project_path": "."})
-
-    def test_extracts_direct_folder_create_action(self):
-        prompt = "create a folder named goal_tracker in projects"
-        # A native path: it goes to the file tools, which run on Windows and Linux (E-005).
-        assert _extract_simple_change_action(prompt) == ("create_folder", {"path": str(pathlib.Path("projects/goal_tracker"))})
-
-    def test_extracts_direct_file_create_action(self):
-        prompt = "create a file named notes.txt in docs"
-        assert _extract_simple_change_action(prompt) == ("create_file", {"path": str(pathlib.Path("docs/notes.txt")), "content": ""})
-
-    def test_extracts_direct_install_requirements_action(self):
-        prompt = "install dependencies in this folder"
-        assert _extract_simple_change_action(prompt) == ("install_packages", {"project_path": "."})
-
-    def test_skips_direct_action_for_multi_step_request(self):
-        prompt = "create a folder named Med_RAG and make .venv in that folder"
-        assert _extract_simple_change_action(prompt) is None
-
-    def test_classifies_brainstorm_request(self):
-        assert _is_brainstorm_request("lets work on something interesting do you have any ideas")
-        assert _classify_intent("lets work on something interesting do you have any ideas") == "brainstorm"
-
-    def test_actionable_setup_request_does_not_route_to_brainstorm(self):
-        prompt = (
-            "create a folder named Med_RAG and make .venv in that folder and setup obsidian "
-            "and other docs that will help us start planning and brainstorming our ideas and build the project"
-        )
-        assert not _is_brainstorm_request(prompt)
-        assert _classify_intent(prompt) == "change"
-
-    def test_classifies_aspirational_product_prompt_as_brainstorm(self):
-        prompt = (
-            "i always wanted to build a tool that will help track my goals at work and personal "
-            "which is connected to pomodora to improve my time management"
-        )
-        assert _is_brainstorm_request(prompt)
-        assert _classify_intent(prompt) == "brainstorm"
-
-    def test_detects_explicit_command(self):
-        assert _looks_like_explicit_command("python main.py")
-        assert _looks_like_explicit_command("please run `pytest -q`")
-        assert not _looks_like_explicit_command("run the app for me")
 
 
 class TestProjectDetection:
@@ -989,35 +602,20 @@ class TestOperatorReplies:
             "kimi-k2.5:cloud",
             cloud_codegen_enabled=False,
             session_mode="approve",
-            work_mode="mentor",
             show_reasoning=False,
             total_tokens=400,
             auto_compact_threshold=120000,
             num_ctx=131072,
-            agent_models={
-                "planner": "qwen3:14b",
-                "prd": "qwen3:14b",
-                "task": "qwen3:14b",
-                "reviewer": "qwen3:14b",
-                "decision": "qwen3:14b",
-                "coder": "qwen2.5-coder:14b",
-                "tester": "qwen2.5-coder:7b",
-                "docs": "qwen2.5-coder:7b",
-            },
         )
-        assert "Work mode" in reply
-        assert "mentor" in reply
         assert "Session status" in reply
         assert "Session:" in reply
         assert "0/2 done" in reply
         assert "400 tokens" in reply
         assert str(tmp_path) in reply
-        assert "approve" in reply
+        assert "`ask`" in reply  # mode shown by its user-facing name
         assert "131,072" in reply
         assert "120,000" in reply
-        assert "Agent roles:" in reply
         assert "MCP:" in reply
-        assert "planner `qwen3:14b`" in reply
         assert "Git:" in reply
         assert "Commit readiness:" in reply
         assert "Resources:" in reply
@@ -1238,116 +836,6 @@ class TestOperatorReplies:
         reply = _build_fix_usage("pytest -q")
         assert "/fix pytest -q" in reply
 
-    def test_cmd_fix_succeeds_after_retry(self, monkeypatch, tmp_path):
-        from app import main as main_mod
-
-        shell_results = [
-            ShellResult(command="pytest", cwd=str(tmp_path), exit_code=1, output_lines=["FAILED test_example"]),
-            ShellResult(command="pytest", cwd=str(tmp_path), exit_code=0, output_lines=["2 passed"]),
-        ]
-        calls = {"filesystem": 0}
-
-        monkeypatch.setattr(main_mod.console, "print", lambda *args, **kwargs: None)
-        monkeypatch.setattr(main_mod.shell_agent, "render", lambda result: result.output)
-        monkeypatch.setattr(
-            main_mod.shell_agent,
-            "execute",
-            lambda command, cwd, console=None: shell_results.pop(0),
-        )
-
-        def fake_run(llm, request, console=None):
-            calls["filesystem"] += 1
-            return AgentResponse(
-                request=request,
-                steps=[ToolResult(tool="create_file", args={"path": "app.py"}, output="✓ Created file: app.py")],
-                summary="patched",
-            )
-
-        monkeypatch.setattr(main_mod.filesystem, "run", fake_run)
-        monkeypatch.setattr(main_mod, "render", lambda response: response.summary)
-
-        reply = _cmd_fix("pytest", str(tmp_path), codegen_llm=SimpleNamespace())
-
-        assert "now passes" in reply
-        assert calls["filesystem"] == 1
-
-    def test_cmd_fix_stops_when_no_code_changes_applied(self, monkeypatch, tmp_path):
-        from app import main as main_mod
-
-        monkeypatch.setattr(main_mod.console, "print", lambda *args, **kwargs: None)
-        monkeypatch.setattr(main_mod.shell_agent, "render", lambda result: result.output)
-        monkeypatch.setattr(
-            main_mod.shell_agent,
-            "execute",
-            lambda command, cwd, console=None: ShellResult(
-                command=command,
-                cwd=str(tmp_path),
-                exit_code=1,
-                output_lines=["Traceback", "AssertionError"],
-            ),
-        )
-        monkeypatch.setattr(
-            main_mod.filesystem,
-            "run",
-            lambda llm, request, console=None: AgentResponse(
-                request=request,
-                steps=[ToolResult(tool="read_file", args={"path": "app.py"}, output="print('hi')")],
-                summary="inspected only",
-            ),
-        )
-        monkeypatch.setattr(main_mod, "render", lambda response: response.summary)
-
-        reply = _cmd_fix("pytest", str(tmp_path), codegen_llm=SimpleNamespace())
-
-        assert "no code changes were applied" in reply.lower()
-
-
-class TestCleanupFlow:
-    def test_detects_cleanup_request(self):
-        assert _is_cleanup_request("remove any unwanted files from this project")
-
-    def test_find_cleanup_candidates(self, tmp_path):
-        (tmp_path / "demo-live").mkdir()
-        (tmp_path / "__pycache__").mkdir()
-        (tmp_path / "src").mkdir()
-
-        candidates = _find_cleanup_candidates(str(tmp_path))
-
-        assert "demo-live" in candidates
-        assert "__pycache__" in candidates
-        assert "src" not in candidates
-
-    def test_cleanup_preview_lists_candidates(self):
-        preview = _build_cleanup_preview("C:\\tmp", ["demo-live", "__pycache__"])
-        assert "demo-live" in preview
-        assert "__pycache__" in preview
-
-    def test_resolve_cleanup_root_prefers_named_folder(self, tmp_path):
-        (tmp_path / "snake-game").mkdir()
-        (tmp_path / "local-codex").mkdir()
-
-        resolved = _resolve_cleanup_root(str(tmp_path), "remove unwanted files from snake-game folder")
-
-        assert resolved == tmp_path / "snake-game"
-
-    def test_resolve_cleanup_root_returns_none_for_umbrella_workspace(self, tmp_path):
-        (tmp_path / "snake-game").mkdir()
-        (tmp_path / "local-codex").mkdir()
-
-        resolved = _resolve_cleanup_root(str(tmp_path), "remove unwanted files")
-
-        assert resolved is None
-
-    def test_detects_delete_project_request(self):
-        assert _is_delete_project_request("can you delete this project so i can start fresh again")
-
-    def test_build_root_delete_reply(self, tmp_path):
-        reply = _build_root_delete_reply(str(tmp_path / "snake-agent"))
-        assert "cannot delete the current project root from within itself" in reply
-        assert "Remove-Item" in reply
-
-
-class TestRenamePreview:
     def test_build_move_preview_mentions_scope(self, tmp_path):
         src = tmp_path / "snake-agent"
         src.mkdir()
@@ -1359,25 +847,8 @@ class TestRenamePreview:
         preview = _build_move_preview(str(tmp_path / "missing"), str(tmp_path / "snake-game"))
         assert "Source path: not found" in preview
 
-    def test_build_root_rename_reply_for_current_workspace(self, tmp_path):
-        reply = _build_root_rename_reply("can you change the snake-agent name to snake-game", str(tmp_path / "snake-agent"))
-        assert reply is not None
-        assert "cannot rename the root folder from within itself" in reply
-        assert "Rename-Item" in reply
 
 
-class TestPlanStartConfirm:
-    def test_confirm_plan_start_defaults_yes(self, monkeypatch):
-        from app import main as main_mod
-
-        monkeypatch.setattr(main_mod, "_choose_approval_option", lambda *args, **kwargs: "approve")
-        assert _confirm_plan_start() is True
-
-    def test_confirm_plan_start_accepts_no(self, monkeypatch):
-        from app import main as main_mod
-
-        monkeypatch.setattr(main_mod, "_choose_approval_option", lambda *args, **kwargs: "deny")
-        assert _confirm_plan_start() is False
 
 
 class TestApprovalMenus:
@@ -1463,36 +934,6 @@ class TestDiffPreview:
 
 # ── Questions never start a plan or a build (E-019) ──────────────────────────
 
-class TestQuestionsAreAnswered:
-    """The user's own messages from mitra-playground/.mitra/execution_trace.jsonl, 2026-11-06."""
-
-    @pytest.mark.parametrize("text", [
-        "whats the plan now",
-        "what is the status of snake game",
-        "why did it create files?",
-        "is the snake game done?",
-    ])
-    def test_questions_are_explained(self, text):
-        from app.main import _classify_intent
-        assert _classify_intent(text) == "explain"
-
-    @pytest.mark.parametrize("text", [
-        "ok lets start with snake game can you setup all the requirements for the snake and plan for the game first ,no coding",
-        "yes so can tell me what is the plan is and how we are going to build , no code implementation yet just brainstroming",
-    ])
-    def test_no_coding_requests_only_talk(self, text):
-        from app.main import _classify_intent
-        assert _classify_intent(text) == "brainstorm"
-
-    def test_polite_requests_are_still_requests(self):
-        from app.main import _is_question
-        assert not _is_question("can you add a score counter?")
-        assert _is_question("what's next?")
-
-    def test_explain_is_not_a_plan_request(self):
-        from app.routing import IntentRouter
-        assert IntentRouter()._is_plan_request("explain the game loop") is False
-        assert IntentRouter()._is_plan_request("make a plan for the game") is True
 
 
 class TestWorkspaceNameIsNotNested:
@@ -1536,30 +977,12 @@ def test_no_text_mentions_removed_commands():
     assert hits == []
 
 
-def test_unapproved_plan_reply_names_no_command():
-    from app.main import _build_plan_unapproved_reply
-    assert "/" not in _build_plan_unapproved_reply()
 
 
 # ── The leading verb decides the route (E-022) ───────────────────────────────
 
-@pytest.mark.parametrize("text,intent", [
-    ("can you make a clean plan for Level 01  1. plan  2. implement 3. test 4. fix if any issues", "plan"),
-    ("fix the failing test in test_game.py", "fix"),
-    ("ok can you fix the bug in snake.py", "fix"),
-    ("create a plan for a high score table with sqlite and tests", "plan"),
-    ("run the tests", "test"),
-    ("review my changes", "review"),
-])
-def test_leading_verb_routes_the_request(text, intent):
-    from app.main import _classify_intent
-    assert _classify_intent(text) == intent
 
 
-def test_words_containing_test_are_not_test_requests():
-    from app.routing import IntentRouter
-    assert IntentRouter()._is_test_request("pull the latest changes") is False
-    assert IntentRouter()._is_test_request("add tests for the parser") is True
 
 
 def test_mode_names_match_shift_tab():
@@ -1575,3 +998,24 @@ def test_context_use_is_the_latest_prompt_not_the_sum_of_calls():
     assert "if ctx_used >= auto_compact_threshold" in src
     assert "if sess_in + sess_out >= auto_compact_threshold" not in src
     assert "total_tokens=ctx_used,          # E-025" in src and "context_limit=num_ctx," in src
+
+
+def test_fix_runs_the_core_loop(tmp_path, monkeypatch):
+    """/fix <command> = the core loop until the command passes (M1 stage 2)."""
+    from app import main as main_mod
+    from app.core.loop import RunResult
+
+    seen = {}
+
+    def fake_solve(task, ws, llm, **kw):
+        seen["task"], seen["test"] = task, ws.test_command
+        ws.journal.append({"kind": "create_file", "path": str(tmp_path / "a.py"), "existed": False,
+                           "before": None, "after": "x"})
+        return RunResult(status="passed", summary="fixed the import")
+
+    monkeypatch.setattr("app.core.loop.solve", fake_solve)
+    reply = main_mod._cmd_fix("pytest -q", str(tmp_path), object())
+    assert seen["test"] == "pytest -q" and "pytest -q" in seen["task"]
+    assert reply.startswith("`pytest -q`: fixed.")
+    from app import memory
+    assert memory.load_last_change_set(str(tmp_path))["entries"][0]["path"].endswith("a.py")

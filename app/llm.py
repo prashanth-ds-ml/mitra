@@ -7,7 +7,6 @@ from urllib import error, request
 from langchain_ollama import ChatOllama
 
 _LOCAL_BASE_URL = "http://localhost:11434"
-_CLOUD_BASE_URL = "https://ollama.com"
 
 
 def _make_client_kwargs(api_key: str | None = None) -> dict | None:
@@ -90,35 +89,11 @@ def model_supports_thinking(model: str) -> bool | None:
     return None
 
 
-def get_cloud_llm(
-    model: str,
-    temperature: float = 0.2,
-    *,
-    api_key: str | None = None,
-    base_url: str | None = None,
-    num_ctx: int | None = None,
-    num_gpu: int | None = None,
-    num_predict: int | None = None,
-) -> ChatOllama:
-    """Return a client for Ollama's hosted cloud API."""
-    return get_llm(
-        model,
-        temperature,
-        base_url=base_url or _CLOUD_BASE_URL,
-        api_key=api_key,
-        num_ctx=num_ctx,
-        num_gpu=num_gpu,
-        num_predict=num_predict,
-    )
 
 
 # Legacy aliases kept for any existing call sites
-def get_chat_llm(model: str = "qwen2.5-coder:7b", temperature: float = 0.2) -> ChatOllama:
-    return get_local_llm(model, temperature)
 
 
-def get_agent_llm(model: str = "qwen2.5-coder:7b") -> ChatOllama:
-    return get_local_llm(model, temperature=0)
 
 
 def probe_ollama(base_url: str | None = None, timeout: float = 2.0) -> tuple[bool, str]:

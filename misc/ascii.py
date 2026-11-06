@@ -3,7 +3,7 @@ from __future__ import annotations
 from textwrap import dedent
 from typing import Sequence, Tuple
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 import numpy as np
 from rich.text import Text
 

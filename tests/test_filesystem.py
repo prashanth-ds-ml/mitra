@@ -2,9 +2,7 @@
 import pathlib
 from types import SimpleNamespace
 import pytest
-from langchain_core.messages import AIMessage
 from app.agents import filesystem
-from app import memory
 
 
 @pytest.fixture(autouse=True)
@@ -146,117 +144,6 @@ class FakeLLM:
         return self.responses.pop(0)
 
 
-class TestWriteDiffApproval:
-    def test_overwrite_prompts_and_skip_preserves_existing_file(self, tmp_path):
-        target = tmp_path / "app.py"
-        target.write_text("print('old')", encoding="utf-8")
-
-        approvals = []
-        filesystem.configure(
-            workspace=str(tmp_path),
-            confirm_fn=lambda tool, args: approvals.append((tool, args["path"])) or False,
-            require_diff_approval=True,
-        )
-
-        llm = FakeLLM([
-            AIMessage(
-                content="",
-                tool_calls=[{
-                    "name": "create_file",
-                    "args": {"path": str(target), "content": "print('new')"},
-                    "id": "call-1",
-                    "type": "tool_call",
-                }],
-            ),
-            AIMessage(content="done"),
-        ])
-
-        result = filesystem.run(llm, "update the file")
-
-        assert approvals == [("create_file", str(target))]
-        assert "Skipped" in result.steps[0].output
-        assert target.read_text(encoding="utf-8") == "print('old')"
-
-    def test_edit_prompts_and_skip_preserves_existing_file(self, tmp_path):
-        target = tmp_path / "app.py"
-        target.write_text("print('old')", encoding="utf-8")
-
-        approvals = []
-        filesystem.configure(
-            workspace=str(tmp_path),
-            confirm_fn=lambda tool, args: approvals.append((tool, args["path"])) or False,
-            require_diff_approval=True,
-        )
-
-        llm = FakeLLM([
-            AIMessage(
-                content="",
-                tool_calls=[{
-                    "name": "edit_file",
-                    "args": {"path": str(target), "content": "print('new')"},
-                    "id": "call-1",
-                    "type": "tool_call",
-                }],
-            ),
-            AIMessage(content="done"),
-        ])
-
-        result = filesystem.run(llm, "edit the file")
-
-        assert approvals == [("edit_file", str(target))]
-        assert "Skipped" in result.steps[0].output
-        assert target.read_text(encoding="utf-8") == "print('old')"
-
-    def test_new_file_does_not_prompt_for_diff(self, tmp_path):
-        target = tmp_path / "new.py"
-        approvals = []
-        filesystem.configure(
-            workspace=str(tmp_path),
-            confirm_fn=lambda tool, args: approvals.append(tool) or True,
-            require_diff_approval=True,
-        )
-
-        llm = FakeLLM([
-            AIMessage(
-                content="",
-                tool_calls=[{
-                    "name": "create_file",
-                    "args": {"path": str(target), "content": "print('new')"},
-                    "id": "call-1",
-                    "type": "tool_call",
-                }],
-            ),
-            AIMessage(content="done"),
-        ])
-
-        filesystem.run(llm, "create the file")
-
-        assert approvals == []
-        assert target.read_text(encoding="utf-8") == "print('new')"
-
-    def test_run_records_change_set_for_overwrite(self, tmp_path):
-        target = tmp_path / "app.py"
-        target.write_text("print('old')\n", encoding="utf-8")
-
-        llm = FakeLLM([
-            AIMessage(
-                content="",
-                tool_calls=[{
-                    "name": "create_file",
-                    "args": {"path": str(target), "content": "print('new')\n"},
-                    "id": "call-1",
-                    "type": "tool_call",
-                }],
-            ),
-            AIMessage(content="done"),
-        ])
-
-        filesystem.run(llm, "update the file")
-
-        change_set = memory.load_last_change_set(str(tmp_path))
-        assert change_set is not None
-        assert change_set["entries"][0]["kind"] == "create_file"
-        assert change_set["entries"][0]["before"] == "print('old')\n"
 
 
 # ── list_directory tool ───────────────────────────────────────────────────────
@@ -391,129 +278,12 @@ class TestMoveFile:
         result = filesystem.move_file.invoke({"src": str(src), "dest": str(dest)})
         assert "destination already exists" in result
 
-    def test_undo_last_change_set_restores_file_content(self, tmp_path):
-        target = tmp_path / "app.py"
-        target.write_text("print('old')\n", encoding="utf-8")
-
-        llm = FakeLLM([
-            AIMessage(
-                content="",
-                tool_calls=[{
-                    "name": "create_file",
-                    "args": {"path": str(target), "content": "print('new')\n"},
-                    "id": "call-1",
-                    "type": "tool_call",
-                }],
-            ),
-            AIMessage(content="done"),
-        ])
-
-        filesystem.run(llm, "update the file")
-        result = filesystem.undo_last_change_set(str(tmp_path))
-
-        assert "Undid 1 change step" in result
-        assert target.read_text(encoding="utf-8") == "print('old')\n"
-        assert memory.load_last_change_set(str(tmp_path)) is None
-
-    def test_undo_last_change_set_restores_deleted_folder(self, tmp_path):
-        target = tmp_path / "src"
-        nested = target / "pkg" / "mod.py"
-        nested.parent.mkdir(parents=True)
-        nested.write_text("print('hi')\n", encoding="utf-8")
-
-        llm = FakeLLM([
-            AIMessage(
-                content="",
-                tool_calls=[{
-                    "name": "delete_folder",
-                    "args": {"path": str(target)},
-                    "id": "call-1",
-                    "type": "tool_call",
-                }],
-            ),
-            AIMessage(content="done"),
-        ])
-
-        filesystem.configure(workspace=str(tmp_path), confirm_fn=lambda tool, args: True)
-        filesystem.run(llm, "delete the folder")
-        result = filesystem.undo_last_change_set(str(tmp_path))
-
-        assert "Undid 1 change step" in result
-        assert nested.read_text(encoding="utf-8") == "print('hi')\n"
-
-    def test_undo_last_change_set_restores_binary_file(self, tmp_path):
-        target = tmp_path / "image.bin"
-        target.write_bytes(b"\x00\xff\x01")
-
-        llm = FakeLLM([
-            AIMessage(
-                content="",
-                tool_calls=[{
-                    "name": "delete_file",
-                    "args": {"path": str(target)},
-                    "id": "call-1",
-                    "type": "tool_call",
-                }],
-            ),
-            AIMessage(content="done"),
-        ])
-
-        filesystem.configure(workspace=str(tmp_path), confirm_fn=lambda tool, args: True)
-        filesystem.run(llm, "delete the binary file")
-        result = filesystem.undo_last_change_set(str(tmp_path))
-
-        assert "Undid 1 change step" in result
-        assert target.read_bytes() == b"\x00\xff\x01"
 
 
-class TestFilesystemSummary:
-    def test_partial_failure_does_not_claim_full_success(self, tmp_path):
-        src = tmp_path / "snake-agent"
-        dest = tmp_path / "snake-game"
-        src.mkdir()
-        filesystem.configure(workspace=str(tmp_path), confirm_fn=lambda tool, args: True)
-
-        llm = FakeLLM([
-            AIMessage(
-                content="",
-                tool_calls=[
-                    {
-                        "name": "move_file",
-                        "args": {"src": str(src), "dest": str(dest)},
-                        "id": "call-1",
-                        "type": "tool_call",
-                    },
-                    {
-                        "name": "move_file",
-                        "args": {"src": str(src), "dest": str(dest)},
-                        "id": "call-2",
-                        "type": "tool_call",
-                    },
-                ],
-            ),
-            AIMessage(content="The snake-agent directory has been successfully moved to snake-game."),
-        ])
-
-        result = filesystem.run(llm, "rename the folder")
-
-        assert result.ok_count == 1
-        assert result.err_count == 1
-        assert "Completed" in result.summary
-        assert "error" in result.summary
-        assert "source does not exist" in result.summary
 
 
-class TestExecuteCleanup:
-    def test_execute_cleanup_removes_preapproved_items(self, tmp_path):
-        doomed = tmp_path / "demo-live"
-        doomed.mkdir()
-        filesystem.configure(workspace=str(tmp_path), confirm_fn=lambda tool, args: False)
 
-        result = filesystem.execute_cleanup(["demo-live"])
 
-        assert result.ok_count == 1
-        assert result.err_count == 0
-        assert not doomed.exists()
 
 
 class TestMarkdownTools:
@@ -538,30 +308,3 @@ class TestMarkdownTools:
 
 # ── Bad tool arguments never crash a turn (E-018) ─────────────────────────────
 
-class TestBadToolArguments:
-    def _tools(self):
-        return {t.name: t for t in filesystem._ALL_TOOLS}
-
-    def test_json_content_given_as_an_object_is_written_as_json(self, tmp_path):
-        """E-018: qwen3.5 passed create_file content as a dict while writing a config; the plan crashed."""
-        import json
-        args = {"path": str(tmp_path / "config.json"), "content": {"game": {"screen_width": 600, "color": [255, 0, 0]}}}
-        out = filesystem._invoke_tool_call("create_file", args, self._tools())
-        assert not out.startswith("✗"), out
-        written = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
-        assert written == {"game": {"screen_width": 600, "color": [255, 0, 0]}}
-
-    def test_wrong_argument_type_comes_back_as_a_tool_error(self, tmp_path):
-        out = filesystem._invoke_tool_call("list_directory", {"path": {"not": "a path"}}, self._tools())
-        assert out.startswith("✗ Invalid call to list_directory")
-        assert "call it again" in out
-
-    def test_a_crashing_tool_comes_back_as_a_tool_error(self):
-        class Boom:
-            name = "boom"
-
-            def invoke(self, args):
-                raise OSError("disk on fire")
-
-        out = filesystem.safe_invoke(Boom(), "boom", {})
-        assert out.startswith("✗ Invalid call to boom") and "disk on fire" in out

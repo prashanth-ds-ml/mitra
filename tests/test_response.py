@@ -1,48 +1,14 @@
 """Tests for app/agents/response.py — panel rendering, title logic, step truncation."""
-import pytest
-from app.agents.response import AgentResponse, ToolResult, _extract_action, _panel_title, render
+from app.agents.response import (
+    AgentResponse,
+    ToolResult,
+    _extract_action,
+    render,
+)
 
 
 # ── _panel_title ──────────────────────────────────────────────────────────────
 
-class TestPanelTitle:
-    def _resp(self, *tools):
-        steps = [ToolResult(tool=t, args={}, output="✓ ok") for t in tools]
-        return AgentResponse(request="test", steps=steps)
-
-    def test_git_tools(self):
-        assert _panel_title(self._resp("git_commit")) == "Git"
-        assert _panel_title(self._resp("git_status")) == "Git"
-        assert _panel_title(self._resp("git_diff")) == "Git"
-
-    def test_install(self):
-        assert _panel_title(self._resp("install_packages")) == "Installing packages"
-        assert _panel_title(self._resp("create_venv", "install_packages")) == "Installing packages"
-
-    def test_delete(self):
-        assert _panel_title(self._resp("delete_file")) == "Removing files"
-        assert _panel_title(self._resp("delete_folder")) == "Removing files"
-
-    def test_move(self):
-        assert _panel_title(self._resp("move_file")) == "Moving files"
-
-    def test_create(self):
-        assert _panel_title(self._resp("create_file")) == "Creating files"
-        assert _panel_title(self._resp("create_folder")) == "Creating files"
-
-    def test_read(self):
-        assert _panel_title(self._resp("read_file")) == "Reading project"
-        assert _panel_title(self._resp("list_directory")) == "Reading project"
-
-    def test_fallback(self):
-        assert _panel_title(self._resp("run_command")) == "Setup Agent"
-
-    def test_empty_steps(self):
-        assert _panel_title(AgentResponse(request="test")) == "Setup Agent"
-
-    def test_git_takes_priority_over_create(self):
-        # git + create_file → still "Git"
-        assert _panel_title(self._resp("git_commit", "create_file")) == "Git"
 
 
 # ── ToolResult.ok ─────────────────────────────────────────────────────────────

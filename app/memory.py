@@ -169,44 +169,6 @@ def update_context(workspace: str, new_topic: str) -> None:
         path.write_text(content, encoding="utf-8")
 
 
-def append_context_note(workspace: str, title: str, body: str) -> pathlib.Path:
-    """Append a short structured note into context.md under the Notes section."""
-    path = _dir(workspace) / _CONTEXT
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    note_title = (title or "Context update").strip() or "Context update"
-    note_body = (body or "").strip()
-    if not note_body:
-        return path
-
-    section = textwrap.dedent(
-        f"""\
-        ### {note_title} ({now})
-
-        {note_body}
-        """
-    ).strip()
-
-    if path.exists():
-        text = path.read_text(encoding="utf-8")
-        text = _replace_field(text, "updated", now)
-        marker = "## Notes"
-        if marker in text:
-            idx = text.index(marker) + len(marker)
-            remainder = text[idx:]
-            existing_notes = remainder.lstrip("\n")
-            if existing_notes.startswith("<!--"):
-                updated = text[:idx] + f"\n\n{section}\n\n" + existing_notes
-            else:
-                updated = text[:idx] + f"\n\n{section}\n\n" + existing_notes
-            text = updated
-        else:
-            text = text.rstrip() + f"\n\n## Notes\n\n{section}\n"
-        path.write_text(text, encoding="utf-8")
-    else:
-        content = _CONTEXT_TEMPLATE.format(updated=now, topics=f"- `{now}` {note_title}")
-        content = content.rstrip() + f"\n\n## Notes\n\n{section}\n"
-        path.write_text(content, encoding="utf-8")
-    return path
 
 
 # ── Plan file ─────────────────────────────────────────────────────────────────
@@ -250,23 +212,8 @@ def load_brainstorm(workspace: str) -> str | None:
     return None
 
 
-def load_understand(workspace: str) -> str | None:
-    """Return understand.md contents, or None."""
-    path = _dir(workspace) / _UNDERSTAND
-    if path.exists():
-        return path.read_text(encoding="utf-8")
-    return None
 
 
-def load_prd(workspace: str) -> str | None:
-    """Return prd.md contents, or None."""
-    root_path = pathlib.Path(workspace).resolve() / "PRD.md"
-    if root_path.exists():
-        return root_path.read_text(encoding="utf-8")
-    path = _dir(workspace) / _PRD
-    if path.exists():
-        return path.read_text(encoding="utf-8")
-    return None
 
 
 def load_recent_activity(workspace: str, limit: int = 5) -> list[dict[str, str]]:
@@ -312,45 +259,8 @@ def write_plan(workspace: str, goal: str, steps: list[str]) -> pathlib.Path:
     return path
 
 
-def write_understand(workspace: str, goal: str, summary: str, questions: list[str] | None = None) -> pathlib.Path:
-    """Write understand.md with a concise project understanding summary."""
-    path = _dir(workspace) / _UNDERSTAND
-    now = _now_text()
-    question_lines = "\n".join(f"- {q}" for q in (questions or [])) or "- None"
-    content = textwrap.dedent(f"""\
-        ---
-        title: Project Understanding
-        tags: [mitra, understand, memory]
-        updated: {now}
-        ---
-
-        # Project Understanding
-
-        > Managed by Mitra. This note captures the current understanding of the user's idea.
-
-        ## Goal
-        {goal}
-
-        ## Summary
-        {summary.strip()}
-
-        ## Open questions
-        {question_lines}
-
-    """)
-    path.write_text(content, encoding="utf-8")
-    return path
 
 
-def write_prd(workspace: str, title: str, content: str) -> pathlib.Path:
-    """Write the PRD to both .mitra and the workspace root."""
-    ws = pathlib.Path(workspace)
-    path = ws / "PRD.md"
-    mitra_path = _dir(workspace) / _PRD
-    text = content.strip() + "\n"
-    mitra_path.write_text(text, encoding="utf-8")
-    path.write_text(text, encoding="utf-8")
-    return path
 
 
 def mark_step_done(workspace: str, step_index: int) -> None:
@@ -377,32 +287,6 @@ def record_last_change_set(workspace: str, change_set: dict) -> None:
     append_execution_trace(workspace, "change_set", payload)
 
 
-def append_brainstorm_entry(workspace: str, prompt: str, response: str) -> pathlib.Path:
-    """Append one brainstorm exchange to brainstorm.md."""
-    path = _dir(workspace) / _BRAINSTORM
-    now = datetime.now()
-    stamp = now.strftime("%Y-%m-%d %H:%M")
-    if not path.exists():
-        header = textwrap.dedent("""\
-            ---
-            title: Brainstorm Notes
-            tags: [mitra, brainstorm, notes]
-            ---
-
-            # Brainstorm Notes
-
-            > Saved idea exploration and planning notes from Mitra.
-        """)
-        path.write_text(header, encoding="utf-8")
-
-    entry = (
-        f"\n\n## {stamp}\n\n"
-        f"**Prompt:** {prompt.strip()}\n\n"
-        f"**Mitra:**\n\n{response.strip()}\n"
-    )
-    existing = path.read_text(encoding="utf-8")
-    path.write_text(existing + entry, encoding="utf-8")
-    return path
 
 
 def load_last_change_set(workspace: str) -> dict | None:
@@ -460,18 +344,6 @@ def append_execution_trace(workspace: str, event_type: str, payload: dict) -> pa
     return path
 
 
-def append_decision(workspace: str, title: str, rationale: str) -> pathlib.Path:
-    """Append a human-readable decision entry to decisions.md."""
-    path = _dir(workspace) / _DECISIONS
-    stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    entry = (
-        f"\n## {stamp} - {title.strip()}\n\n"
-        f"{rationale.strip()}\n"
-    )
-    existing = path.read_text(encoding="utf-8") if path.exists() else _DECISIONS_TEMPLATE
-    path.write_text(existing + entry, encoding="utf-8")
-    append_execution_trace(workspace, "decision", {"title": title.strip(), "rationale": rationale.strip()})
-    return path
 
 
 def append_error(workspace: str, summary: str, detail: str) -> pathlib.Path:
@@ -489,26 +361,8 @@ def append_error(workspace: str, summary: str, detail: str) -> pathlib.Path:
     return path
 
 
-def update_task_board(workspace: str, tasks: list[str]) -> pathlib.Path:
-    """Overwrite task_board.md with a simple checklist."""
-    path = _dir(workspace) / _TASK_BOARD
-    body = "\n".join(f"- [ ] {task}" for task in tasks) if tasks else "- [ ] No active tracked tasks"
-    path.write_text(_TASK_BOARD_TEMPLATE.format(updated=_now_text(), tasks=body), encoding="utf-8")
-    append_execution_trace(workspace, "task_board", {"tasks": tasks})
-    return path
 
 
-def record_hibernation(workspace: str, summary: str, *, reason: str = "low-memory recovery") -> None:
-    """Persist a lightweight recovery checkpoint into workspace memory files."""
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    append_activity(workspace, f"/hibernate ({reason})", summary)
-    update_context(workspace, f"Hibernated at {now}: {reason}")
-
-    plan_path = _dir(workspace) / _PLAN
-    if plan_path.exists():
-        text = plan_path.read_text(encoding="utf-8")
-        updated = _replace_field(text, "updated", now)
-        plan_path.write_text(updated, encoding="utf-8")
 
 
 def ensure_session_metadata(workspace: str, *, default_name: str | None = None) -> dict:

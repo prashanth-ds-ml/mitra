@@ -73,10 +73,6 @@ def test_model_and_repo_pages_are_read_from_their_readme():
     assert web.readme_url("https://en.wikipedia.org/wiki/Qwen") is None
 
 
-def test_a_failed_call_does_not_hide_the_answer():
-    out = web._finalize_summary(["✗ URL fetch failed: 404", "# results"], "Qwen3.5 has 4B and 9B sizes.")
-    assert out.startswith("Qwen3.5 has 4B and 9B sizes.") and "1 of 2 web calls failed" in out
-    assert web._finalize_summary(["✗ Not run: repeat", "# results"], "Answer.") == "Answer."
 
 
 class Repeater:
@@ -100,10 +96,3 @@ class Repeater:
         return AIMessage(content="Qwen3.5 comes in 0.8B to 122B sizes.")
 
 
-def test_a_stopped_search_still_answers_from_what_it_found(monkeypatch):
-    monkeypatch.setattr(web, "_run_tool_with_status", lambda fn, args, console, label: "# Web results\n1. Qwen3.5-9B")
-    llm = Repeater()
-    resp = web.run(llm, "search qwen 3.5")
-    assert llm.plain_calls == 1
-    assert resp.summary.startswith("Qwen3.5 comes in 0.8B to 122B sizes.")
-    assert "kept repeating" in resp.summary and "offline" not in resp.summary

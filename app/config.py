@@ -451,28 +451,6 @@ def list_reclaimable_processes() -> list[ProcessInfo]:
     return sorted(combined.values(), key=lambda item: (item.name.lower(), item.pid))
 
 
-def stop_reclaimable_processes() -> tuple[list[ProcessInfo], list[str]]:
-    """Terminate reclaimable processes and return (stopped, errors)."""
-    if psutil is None:
-        return [], ["psutil is not available."]
-    candidates = list_reclaimable_processes()
-    stopped: list[ProcessInfo] = []
-    errors: list[str] = []
-    for candidate in candidates:
-        try:
-            proc = psutil.Process(candidate.pid)
-            proc.terminate()
-            try:
-                proc.wait(timeout=3)
-            except psutil.TimeoutExpired:
-                proc.kill()
-                proc.wait(timeout=3)
-            stopped.append(candidate)
-        except psutil.NoSuchProcess:
-            stopped.append(candidate)
-        except Exception as exc:
-            errors.append(f"{candidate.name} ({candidate.pid}): {exc}")
-    return stopped, errors
 
 
 def get_model_placement(size_gib: float | None, vram_gib: float | None) -> str:
@@ -528,7 +506,6 @@ def get_recommended_model_budget_gib() -> float | None:
     return round(max(2.0, total_gib * 0.5), 1)
 
 
-REQUIRED_CAPABILITIES = ("completion", "tools")
 # Mitra is built and tested on qwen3.5 4B and 9B (D-015, D-029); the picker lists only the official qwen3.5 tags,
 # not custom variants such as qwen3.5-32k (D-032, D-033).
 SUPPORTED_FAMILIES = ("qwen35",)
@@ -613,9 +590,6 @@ def get_model_facts(name: str) -> dict | None:
     return facts
 
 
-def get_model_capabilities(name: str) -> tuple[str, ...] | None:
-    facts = get_model_facts(name)
-    return facts["capabilities"] if facts else None
 
 
 def compatibility_problem(facts: dict | None, name: str | None = None) -> str | None:
@@ -654,7 +628,6 @@ def get_local_model_inventory(*, include_incompatible: bool = False) -> list[Loc
             capture_output=True, text=True, timeout=10,
         )
         lines = result.stdout.strip().splitlines()[1:]  # skip header
-        budget_gib = get_recommended_model_budget_gib()
         vram_gib = get_gpu_vram_gib()
         models: list[LocalModelInfo] = []
         for line in lines:
@@ -699,36 +672,8 @@ def get_local_model_inventory(*, include_incompatible: bool = False) -> list[Loc
         return []
 
 
-def list_local_models(*, recommended_only: bool = False) -> list[str]:
-    """Return model names available in the local Ollama installation."""
-    inventory = get_local_model_inventory()
-    if recommended_only:
-        inventory = [model for model in inventory if model.recommended]
-    return [model.name for model in inventory]
 
 
-def stop_local_model(model_name: str) -> tuple[bool, str]:
-    """Ask Ollama to unload a running model from memory."""
-    target = (model_name or "").strip()
-    if not target:
-        return False, "No model name provided."
-
-    try:
-        result = subprocess.run(
-            ["ollama", "stop", target],
-            capture_output=True,
-            text=True,
-            timeout=20,
-        )
-    except Exception as exc:
-        return False, f"Could not run `ollama stop`: {exc}"
-
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout or "").strip() or f"Failed to stop `{target}`."
-        return False, detail
-
-    detail = (result.stdout or "").strip() or f"Stopped `{target}`."
-    return True, detail
 
 
 def remove_local_model(model_name: str) -> tuple[bool, str]:
@@ -864,30 +809,5 @@ def load(cwd: str | None = None, cli_overrides: dict | None = None) -> dict:
     return cfg
 
 
-def save_user_config(config: dict) -> tuple[bool, str]:
-    """Save configuration to user-level config file."""
-    _USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    if tomli_w is None:
-        return False, "tomli_w not installed; cannot write TOML"
-    try:
-        with open(_USER_CONFIG_FILE, "wb") as f:
-            tomli_w.dump(config, f)
-        return True, f"Saved user config to {_USER_CONFIG_FILE}"
-    except Exception as exc:
-        return False, f"Failed to save user config: {exc}"
 
 
-def save_local_config(config: dict, workspace: str) -> tuple[bool, str]:
-    """Save configuration to local override file (.mitra/local.toml)."""
-    root = pathlib.Path(workspace).resolve()
-    local_dir = root / ".mitra"
-    local_dir.mkdir(parents=True, exist_ok=True)
-    local_file = local_dir / _LOCAL_TOML_NAME
-    if tomli_w is None:
-        return False, "tomli_w not installed; cannot write TOML"
-    try:
-        with open(local_file, "wb") as f:
-            tomli_w.dump(config, f)
-        return True, f"Saved local config to {local_file}"
-    except Exception as exc:
-        return False, f"Failed to save local config: {exc}"

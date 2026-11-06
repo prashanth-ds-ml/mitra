@@ -9,13 +9,10 @@ import shlex
 import shutil
 import subprocess
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 
-from app.agents.response import AgentResponse, ToolResult
 from app import memory, mcp as mcp_registry
 from app.policy import Policy, Scope, Action, load_policy
-from app.prompts import FILESYSTEM_SYSTEM_PROMPT as _SYSTEM_PROMPT
 
 # ─── Permissions ────────────────────────────────────────────────────────────__
 
@@ -649,53 +646,10 @@ def _clean(text: str) -> str:
     return text.strip()
 
 
-def _augment_request_with_workspace(user_request: str) -> str:
-    """Attach explicit workspace guidance for path-light requests."""
-    if _guard.workspace is None:
-        return user_request
-
-    normalized = user_request.lower()
-    hints: list[str] = []
-    if any(phrase in normalized for phrase in ("same folder", "current folder", "this folder", "here")):
-        hints.append(f"Use the current workspace as the target path: {_guard.workspace}")
-    if any(phrase in normalized for phrase in (".venv", "venv", "virtual environment")):
-        hints.append("If you need a project path, use '.' which refers to the current workspace.")
-
-    if not hints:
-        return user_request
-    joined = "\n".join(f"- {hint}" for hint in hints)
-    return f"{user_request}\n\nExecution notes:\n{joined}"
 
 
-def _first_error_text(agent_response: AgentResponse) -> str:
-    for step in agent_response.steps:
-        if not step.ok:
-            return step.output.lstrip("✗").strip().splitlines()[0]
-    return ""
 
 
-def _finalize_summary(agent_response: AgentResponse, model_summary: str) -> str:
-    """Prefer deterministic summaries whenever tool execution had any failures."""
-    if agent_response.err_count == 0:
-        return model_summary
-
-    first_error = _first_error_text(agent_response)
-    if agent_response.ok_count == 0:
-        if first_error:
-            return f"Could not complete the request. {first_error}."
-        return "Could not complete the request."
-
-    success_labels = [step.label for step in agent_response.steps if step.ok][:2]
-    completed = ", ".join(label for label in success_labels if label) or f"{agent_response.ok_count} step(s)"
-    if first_error:
-        return (
-            f"Completed {completed}, but hit {agent_response.err_count} error"
-            f"{'s' if agent_response.err_count != 1 else ''}. {first_error}."
-        )
-    return (
-        f"Completed {completed}, but hit {agent_response.err_count} error"
-        f"{'s' if agent_response.err_count != 1 else ''}."
-    )
 
 
 def _record_change(entry: dict) -> None:
@@ -704,21 +658,8 @@ def _record_change(entry: dict) -> None:
         _active_change_set.append(entry)
 
 
-def _persist_active_change_set() -> None:
-    global _active_change_set
-    if not _active_change_set or _guard.workspace is None:
-        _active_change_set = None
-        return
-    memory.record_last_change_set(
-        str(_guard.workspace),
-        {"entries": _active_change_set},
-    )
-    _active_change_set = None
 
 
-def _discard_active_change_set() -> None:
-    global _active_change_set
-    _active_change_set = None
 
 
 def _snapshot_file(path: pathlib.Path) -> dict:
@@ -806,32 +747,6 @@ def undo_last_change_set(workspace: str) -> str:
         return f"Undo failed: {exc}"
 
 
-def execute_cleanup(paths: list[str], request: str = "Apply approved cleanup plan") -> AgentResponse:
-    """Delete a pre-approved list of files/folders with one approval handled upstream."""
-    response = AgentResponse(request=request)
-    saved_confirm = _guard.confirm_fn
-    global _active_change_set
-    _active_change_set = []
-    _guard.confirm_fn = None
-    try:
-        for path in paths:
-            target = _resolve_path(path)
-            if target.is_dir():
-                output = delete_folder.invoke({"path": path})
-                tool_name = "delete_folder"
-            else:
-                output = delete_file.invoke({"path": path})
-                tool_name = "delete_file"
-            response.steps.append(ToolResult(tool=tool_name, args={"path": path}, output=str(output)))
-        response.summary = _finalize_summary(
-            response,
-            f"Removed {response.ok_count} cleanup item{'s' if response.ok_count != 1 else ''}.",
-        )
-        _persist_active_change_set()
-        return response
-    finally:
-        _discard_active_change_set()
-        _guard.confirm_fn = saved_confirm
 
 
 # ─── MCP tools (D-028): the model sees two small tools, not every server's tool list ──
@@ -870,25 +785,6 @@ def mcp_call(server: str, tool: str, arguments: dict | str | None = None) -> str
     return result.text
 
 
-def _should_confirm_write(tool_name: str, args: dict) -> bool:
-    """Return True when a write tool should show a diff preview before execution."""
-    if tool_name not in _WRITE_PREVIEW_TOOLS or not _guard.require_diff_approval:
-        return False
-
-    path = args.get("path")
-    if not path or _guard.check_path(path):
-        return False
-
-    target = pathlib.Path(path)
-    if not target.exists() or not target.is_file():
-        return False
-
-    try:
-        existing = target.read_text(encoding="utf-8")
-    except Exception:
-        return True
-
-    return existing != args.get("content", "")
 
 
 # ─── All tools (unfiltered) ───────────────────────────────────────────────────
@@ -918,134 +814,13 @@ _ALL_TOOLS = [
 
 # ─── Public API ───────────────────────────────────────────────────────────────
 
-def make_routing_tool(llm):
-    """Return a LangChain tool that the main LLM can call to invoke this agent."""
-    @tool
-    def setup_project(request: str) -> str:
-        """
-        Set up a Python project on disk. Use when the user asks to create folders,
-        create files, create a virtual environment (.venv), or install Python packages.
-        Pass the full user request unchanged.
-        """
-        return run(llm, request).summary
-    return setup_project
 
 
-def coerce_tool_args(tool_name: str, args: dict) -> dict:
-    """Fix argument shapes small models get wrong (E-018).
-
-    Writing a JSON file, models often pass `content` as an object instead of text; write it as formatted JSON.
-    """
-    args = dict(args or {})
-    content = args.get("content")
-    if content is not None and not isinstance(content, str):
-        if isinstance(content, (dict, list)):
-            args["content"] = json.dumps(content, indent=2, ensure_ascii=False) + "\n"
-        else:
-            args["content"] = str(content)
-    return args
 
 
-def safe_invoke(fn, tool_name: str, args: dict) -> str:
-    """Run a tool; bad arguments or a crash become a tool error the model can correct, never a crashed turn (E-018)."""
-    try:
-        return fn.invoke(args)
-    except Exception as exc:  # pydantic ValidationError, TypeError, OSError, ...
-        first = str(exc).strip().splitlines()
-        detail = " ".join(line.strip() for line in first[:3])[:400]
-        return (f"✗ Invalid call to {tool_name}: {detail}. "
-                f"Check the argument types in the tool description and call it again.")
 
 
-def _invoke_tool_call(tool_name: str, args: dict, tool_map: dict[str, object], console=None) -> str:
-    fn = tool_map.get(tool_name)
-    if fn is None:
-        return f"✗ Unknown tool: {tool_name}"
-    args = coerce_tool_args(tool_name, args)
-    if _guard.confirm_fn is not None and _should_confirm_write(tool_name, args):
-        approved = _guard.confirm_fn(tool_name, args)
-        if not approved:
-            return f"✗ Skipped: user declined {tool_name}"
-    if console is not None:
-        with console.status(f"[m.dim]Running {tool_name}...[/m.dim]", spinner="dots", spinner_style="m.accent"):
-            return safe_invoke(fn, tool_name, args)
-    return safe_invoke(fn, tool_name, args)
 
 
-def run_direct(tool_name: str, args: dict, *, request: str | None = None, console=None) -> AgentResponse:
-    """Execute one filesystem tool directly without an LLM routing loop."""
-    active_tools = _guard.filter_tools(_ALL_TOOLS)
-    tool_map = {t.name: t for t in active_tools}
-    agent_response = AgentResponse(request=request or tool_name.replace("_", " "))
-
-    global _active_change_set
-    _active_change_set = []
-    try:
-        output = _invoke_tool_call(tool_name, args, tool_map, console=console)
-        agent_response.steps.append(ToolResult(tool=tool_name, args=args, output=str(output)))
-        agent_response.summary = _finalize_summary(agent_response, _clean(str(output).lstrip("✓ ").strip()))
-        _persist_active_change_set()
-        return agent_response
-    finally:
-        _discard_active_change_set()
 
 
-def run(llm, user_request: str, console=None) -> AgentResponse:
-    """Run the filesystem agent and return a structured AgentResponse."""
-    active_tools = _guard.filter_tools(_ALL_TOOLS)
-    tool_map = {t.name: t for t in active_tools}
-    llm_with_tools = llm.bind_tools(active_tools)
-
-    agent_response = AgentResponse(request=user_request)
-
-    messages: list = [
-        SystemMessage(content=_SYSTEM_PROMPT),
-        HumanMessage(content=_augment_request_with_workspace(user_request)),
-    ]
-
-    global _active_change_set
-    _active_change_set = []
-    from app.agents.limits import MAX_AGENT_STEPS, RepeatGuard, stopped_message
-
-    guard = RepeatGuard(max_repeats=2, max_failures=4)  # E-023
-
-    try:
-        for _step in range(MAX_AGENT_STEPS):  # E-002: never loop forever
-            phase = "Summarizing file changes..." if any(isinstance(m, ToolMessage) for m in messages) else "Planning file changes..."
-            if console is not None:
-                with console.status(f"[m.dim]{phase}[/m.dim]", spinner="dots", spinner_style="m.accent"):
-                    response: AIMessage = llm_with_tools.invoke(messages)
-            else:
-                response = llm_with_tools.invoke(messages)
-
-            # Accumulate token usage
-            meta = getattr(response, "usage_metadata", None) or {}
-            agent_response.tokens_in += meta.get("input_tokens", 0)
-            agent_response.tokens_out += meta.get("output_tokens", 0)
-
-            messages.append(response)
-
-            if not response.tool_calls:
-                agent_response.summary = _finalize_summary(agent_response, _clean(response.content))
-                _persist_active_change_set()
-                return agent_response
-
-            for tc in response.tool_calls:
-                repeat = guard.before(tc["name"], tc["args"])
-                output = repeat if repeat is not None else _invoke_tool_call(tc["name"], tc["args"], tool_map, console=console)
-                step = ToolResult(tool=tc["name"], args=tc["args"], output=str(output))
-                agent_response.steps.append(step)
-                if console is not None:
-                    from app.ui import step_line
-                    console.print(step_line(step.tool, step.args, step.output, step.ok))
-                messages.append(ToolMessage(content=str(output), tool_call_id=tc["id"]))
-                stop = guard.after(tc["name"], str(output))
-                if stop is not None:
-                    agent_response.summary = stop
-                    _persist_active_change_set()
-                    return agent_response
-        agent_response.summary = stopped_message()
-        _persist_active_change_set()
-        return agent_response
-    finally:
-        _discard_active_change_set()

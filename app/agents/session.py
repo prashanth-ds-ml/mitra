@@ -5,7 +5,6 @@ import pathlib
 from dataclasses import dataclass
 
 from rich.markdown import Markdown
-from rich.panel import Panel
 
 from app import memory
 
@@ -29,14 +28,6 @@ def ensure_session(workspace: str) -> dict:
     return memory.ensure_session_metadata(workspace, default_name=root.name)
 
 
-def rename_session(workspace: str, new_name: str) -> dict:
-    current = ensure_session(workspace)
-    updated = {
-        **current,
-        "name": new_name.strip(),
-    }
-    memory.save_session_metadata(workspace, updated)
-    return memory.load_session_metadata(workspace) or updated
 
 
 def load_snapshot(workspace: str) -> SessionSnapshot:

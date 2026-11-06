@@ -4,44 +4,31 @@ import json
 import pathlib
 import re
 import subprocess
-import sys
 import time
 import traceback
 from datetime import datetime
 
 import typer
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.panel import Panel
-from rich.align import Align
-from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
-from prompt_toolkit import PromptSession
-from prompt_toolkit.history import InMemoryHistory
-from prompt_toolkit.key_binding import KeyBindings
 
-from app.llm import get_cloud_llm, get_local_llm, probe_ollama
-from app.prompts import SYSTEM_PROMPT
+from app.llm import get_local_llm, probe_ollama
 from app.agents import filesystem
-from app.agents import registry as agent_registry
 from app.agents import reviewer as reviewer_agent
 from app.agents import session as session_agent
 from app.agents import shell as shell_agent
-from app.agents import reader as reader_agent
-from app.agents import planner as planner_agent
 from app.agents import web as web_agent
-from app.agents.response import render
 from app import ui
-from app import config, logs as app_logs, memory, skills as skills_registry, mcp as mcp_registry, advisor as model_advisor, plugins as plugin_registry, policy as policy_module, events as event_bus, workflows, langgraph_workflows, routing as routing_module
+from app import config, logs as app_logs, memory, skills as skills_registry, mcp as mcp_registry, policy as policy_module, events as event_bus, workflows
 
 cli = typer.Typer(invoke_without_command=True, add_completion=False)
 
 
 console = ui.apply(Console())
-intent_router = routing_module.IntentRouter()
 
 
 
@@ -100,27 +87,19 @@ local_model = ""             # leave empty to pick at startup
 codegen_model = "kimi-k2.5:cloud"  # used only when cloud codegen is enabled
 temperature = 0.2
 session_mode = "approve"     # read-only | plan | approve | auto
-work_mode = "builder"        # builder | collaborator | mentor | architect | reviewer | debugger | product
 show_reasoning = false       # show <think> output panels when available
 memory_enabled = false
 require_diff_approval = true
 auto_compact_threshold = 120000  # auto-compact when session tokens exceed this
 num_ctx = 0                      # 0 = per model: qwen3.5 4B and 9B at 128K (measured, D-033, D-036)
-ollama_api_key = ""          # optional; leave empty to be prompted at startup
 ollama_local_base_url = "http://localhost:11434"
 ollama_cloud_base_url = "https://ollama.com"
 allowed_roots = []           # extra folders Mitra may inspect/edit beyond the workspace
-disabled_tools = []          # tool names to disable from the filesystem agent
+disabled_tools = []          # tool names Mitra may not use
 disabled_commands = []       # shell executables to block (e.g. ["python", "git"])
 instruction_files = ["AGENTS.md", "CLAUDE.md", ".mitra/instructions.md", ".github/copilot-instructions.md"]
 skill_dirs = ["skills", ".mitra/skills"]
-playbook_dirs = ["playbooks", ".mitra/playbooks"]
-plugin_dirs = ["plugins", ".mitra/plugins"]
 # MCP servers live in .mitra/mcp.json (project) and ~/.mitra/mcp.json (you); see /mcp
-
-[agent_models]
-# Optional: a different model per role (planner, coder, tester, reviewer, docs, ...).
-# Empty or missing = the model you picked at startup.
 """
 
 _DEFAULT_CLOUD_CODEGEN_MODEL = "kimi-k2.5:cloud"
@@ -352,148 +331,16 @@ def _phase5_workspace(cwd: str | None = None) -> tuple[dict, str]:
     return cfg, workspace
 
 
-def _resolve_role_model(cfg: dict, role: str, *, fallback_model: str | None = None, cloud_codegen_enabled: bool = False) -> str:
-    fallback = (fallback_model or (cfg.get("local_model") or cfg.get("model") or "")).strip()
-    if not fallback:
-        fallback = _resolve_idea_model(cfg)
-
-    configured_override = (cfg.get("agent_models") or {}).get(role)
-    if configured_override:
-        return str(configured_override).strip()
-
-    if role in {"planner", "prd", "reviewer", "decision"}:
-        return fallback or ""
-
-    resolved = agent_registry.resolve_agent_models(
-        cfg,
-        chat_model=fallback,
-        codegen_model=_resolve_codegen_model(cfg),
-        cloud_codegen_enabled=cloud_codegen_enabled,
-    )
-    return (resolved.get(role) or fallback or "").strip()
 
 
-def _resolve_idea_model(cfg: dict) -> str:
-    configured_model = (cfg.get("local_model") or cfg.get("model") or "").strip()
-    inventory = config.get_local_model_inventory()
-    best_model = model_advisor.get_best_local_model(
-        inventory,
-        vram_gib=config.get_gpu_vram_gib(),
-        ram_gib=config.get_total_system_memory_gib(),
-    )
-    fallback = (best_model or configured_model or "").strip()
-    return _resolve_role_model(cfg, "prd", fallback_model=fallback, cloud_codegen_enabled=False)
 
 
-def _build_role_llm(
-    cfg: dict,
-    role: str,
-    *,
-    temperature: float,
-    num_ctx: int,
-    num_gpu: int | None,
-    base_url: str | None,
-    cloud_api_key: str | None = None,
-    cloud_base_url: str | None = None,
-    fallback_model: str | None = None,
-    num_predict: int | None = None,
-):
-    role_model = _resolve_role_model(
-        cfg,
-        role,
-        fallback_model=fallback_model,
-        cloud_codegen_enabled=bool(cloud_api_key),
-    )
-    if role in {"coder", "tester", "docs"} and cloud_api_key:
-        return get_cloud_llm(
-            role_model,
-            temperature,
-            api_key=cloud_api_key,
-            base_url=cloud_base_url,
-            num_ctx=num_ctx,
-            num_predict=num_predict,
-        )
-    return get_local_llm(
-        role_model,
-        temperature,
-        base_url=base_url,
-        num_ctx=num_ctx,
-        num_gpu=num_gpu,
-        num_predict=num_predict,
-    )
 
 
-def _build_idea_llm(cfg: dict):
-    temperature = cfg.get("temperature", 0.2)
-    _model = cfg.get("local_model") or cfg.get("model") or ""
-    num_ctx = int(cfg.get("num_ctx") or 0) or (config.context_for_model(_model) if _model else config.SMALL_MODEL_CONTEXT)
-    return _build_role_llm(
-        cfg,
-        "prd",
-        temperature=temperature,
-        num_ctx=num_ctx,
-        num_gpu=None,
-        base_url=cfg.get("ollama_local_base_url"),
-        cloud_api_key=None,
-        cloud_base_url=cfg.get("ollama_cloud_base_url"),
-        fallback_model=(cfg.get("local_model") or cfg.get("model") or "").strip(),
-    )
 
 
-def _build_workspace_context(
-    workspace: str,
-    *,
-    include_context: bool = True,
-    include_brainstorm: bool = False,
-    include_understand: bool = False,
-    include_prd: bool = False,
-) -> str:
-    """Collect reusable workspace memory for prompts that should not start cold."""
-    sections: list[str] = []
-
-    def add_section(title: str, content: str | None) -> None:
-        text = (content or "").strip()
-        if text:
-            sections.append(f"## {title}\n{text}")
-
-    if include_context:
-        add_section("Project Context", memory.load_context(workspace))
-    if include_brainstorm:
-        add_section("Brainstorm Notes", memory.load_brainstorm(workspace))
-    if include_understand:
-        add_section("Understand Notes", memory.load_understand(workspace))
-    if include_prd:
-        add_section("PRD", memory.load_prd(workspace))
-
-    return "\n\n".join(sections)
 
 
-def _build_plan_context(
-    workspace: str,
-    goal: str,
-    *,
-    include_context: bool = True,
-    include_brainstorm: bool = False,
-    include_understand: bool = False,
-    include_prd: bool = False,
-) -> str:
-    """Build an explicit planning brief from the saved project context."""
-    sections: list[str] = []
-    normalized_goal = (goal or "").strip()
-    if normalized_goal:
-        sections.append(f"## Current goal\n{normalized_goal}")
-
-    workspace_context = _build_workspace_context(
-        workspace,
-        include_context=include_context,
-        include_brainstorm=include_brainstorm,
-        include_understand=include_understand,
-        include_prd=include_prd,
-    )
-    if workspace_context:
-        sections.append(f"## Reused workspace memory\n{workspace_context}")
-
-    return "\n\n".join(sections)
 
 
 @cli.callback(invoke_without_command=True)
@@ -504,20 +351,8 @@ def main(ctx: typer.Context):
     _chat()
 
 
-def _extract_thinking(content: str) -> tuple[str, str]:
-    """Split <think>…</think> from content. Returns (thinking_text, clean_reply)."""
-    match = re.search(r"<think>(.*?)</think>", content, re.DOTALL)
-    if not match:
-        return "", content
-    thinking = match.group(1).strip()
-    reply = (content[: match.start()] + content[match.end() :]).strip()
-    return thinking, reply
 
 
-def _get_tokens(response) -> tuple[int, int]:
-    """Return (input_tokens, output_tokens) from a LangChain response."""
-    meta = getattr(response, "usage_metadata", None) or {}
-    return meta.get("input_tokens", 0), meta.get("output_tokens", 0)
 
 
 # ── Known friendly error patterns ────────────────────────────────────────────
@@ -558,11 +393,6 @@ def _log_error(workspace: str, exc: Exception) -> None:
 
 
 # ── Slash command completer ───────────────────────────────────────────────────
-_SLASH_COMMANDS = [
-    "/help", "/init", "/status", "/doctor", "/model", "/context", "/think", "/mode", "/test", "/fix",
-    "/diff", "/undo", "/commit", "/review", "/mcp", "/skills", "/logs", "/resume", "/compact", "/clear",
-    "exit", "quit",
-]
 _SESSION_MODES = ("read-only", "plan", "approve", "auto")
 _KEY_HELP = [
     ("shift+enter",  "New line (also alt+enter, ctrl+j)"),
@@ -601,263 +431,10 @@ _COMMAND_HELP = [
         ("/clear",         "Clear the conversation (saved files are kept)"),
         ("exit / quit",    "Exit Mitra"),
 ]
-_WORK_MODES = ("builder", "collaborator", "mentor", "architect", "reviewer", "debugger", "product")
-_FIX_MAX_ATTEMPTS = 3
 _LAST_SHELL_COMMAND: str | None = None
 
-_GREETING_INPUTS = {
-    "hi", "hello", "hey", "hiya", "yo",
-    "good morning", "good afternoon", "good evening",
-}
-_SOFT_PREFIXES = (
-    "please ",
-    "can you ",
-    "could you ",
-    "would you ",
-    "lets ",
-    "let's ",
-    "ok ",
-    "okay ",
-    "great ",
-    "i want to ",
-    "i need to ",
-    "i need you to ",
-    "help me ",
-)
-_WEB_SEARCH_PREFIXES = (
-    "search the web for ",
-    "search online for ",
-    "look up ",
-    "find online ",
-    "browse the web for ",
-)
-_PLAN_START_KEYWORDS = (
-    "build", "create", "make", "scaffold", "set up", "setup",
-    "implement", "develop", "refactor", "fix", "debug", "add", "update", "rename",
-    "generate", "start a", "start an", "remove", "delete", "clean up", "cleanup",
-)
-_PLAN_COMPLEXITY_HINTS = (
-    "using", "with", "should", "need to", "project", "app", "application",
-    "api", "game", "feature", "workflow", "codebase", "multiple",
-    "tests", "bug", "module", "unwanted", "folder", "directories", "references", "throughout", "wherever", "root folder",
-)
-_DIRECT_COMMAND_HELP_HINTS = (
-    "give me commands",
-    "give me the commands",
-    "command to run",
-    "commands to run",
-    "how do i run",
-    "how to run",
-    "how can i run",
-    "how do i launch",
-    "how to launch",
-)
-_PROJECT_SUMMARY_HINTS = (
-    "what do you understand",
-    "tell me what you understand",
-    "go through the folder",
-    "go through the project",
-    "understand this project",
-    "understand it",
-    "understand the folder",
-    "explain it",
-    "tell me about this project",
-    "tell me about it",
-    "what have you understood",
-)
-_NEXT_STEPS_HINTS = (
-    "next steps",
-    "what next",
-    "what should we do next",
-    "what should i do next",
-    "what are the next steps",
-    "where do we go from here",
-    "what now",
-)
-_CURRENT_FOLDER_HINTS = (
-    "where are we",
-    "which dir",
-    "which directory",
-    "current dir",
-    "current directory",
-    "tell me about this folder",
-    "what folder does it contain",
-    "what folders does it contain",
-    "what files does it contain",
-    "what does it contain",
-    "what is in this folder",
-    "what's in this folder",
-    "what is in this directory",
-    "what's in this directory",
-)
-_UNDERSTAND_ALIAS_HINTS = (
-    "understand",
-    "understand this",
-    "explain this",
-    "tell me about this",
-    "tell me about it",
-)
-_NAVIGATION_PATTERNS = (
-    r"^(?:go|got)\s+to\s+(.+)$",
-    r"^navigate\s+to\s+(.+)$",
-    r"^move\s+to\s+(.+)$",
-    r"^move\s+into\s+(.+)$",
-    r"^switch\s+to\s+(.+)$",
-    r"^change\s+to\s+(.+)$",
-    r"^open\s+(.+)$",
-    r"^enter\s+(.+)$",
-    r"^cd\s+(.+)$",
-)
-_WORKSPACE_SELECTION_PATTERNS = (
-    r"^work\s+with\s+(.+)$",
-    r"^work\s+on\s+(.+)$",
-    r"^use\s+(.+)$",
-)
-_SMALL_TALK_HINTS = (
-    "how are you",
-    "how are you doing",
-    "what's up",
-    "whats up",
-    "thank you",
-    "thanks",
-    "okay",
-    "ok",
-    "sounds good",
-)
-_SMALL_TALK_EXACT_HINTS = {"okay", "ok", "sounds good"}
-_BRAINSTORM_HINTS = (
-    "brainstorm",
-    "ideas",
-    "idea",
-    "interesting",
-    "what should we build",
-    "give me ideas",
-    "do you have any ideas",
-    "explore options",
-    "let's explore",
-    "lets explore",
-    "always wanted to build",
-    "wanted to build",
-    "i have an idea",
-    "i had an idea",
-)
-_CLEANUP_REQUEST_HINTS = (
-    "remove unwanted",
-    "remove unwnated",
-    "remove others",
-    "remove the others",
-    "clean up",
-    "cleanup",
-    "keep only",
-    "delete unwanted",
-    "delete others",
-)
-_DELETE_PROJECT_HINTS = (
-    "delete this project",
-    "delete the project",
-    "delete this folder",
-    "delete this repo",
-    "start fresh again",
-)
-_CLEANUP_NAME_HINTS = {
-    "__pycache__",
-    ".pytest_cache",
-    ".mypy_cache",
-    "build",
-    "dist",
-    "demo",
-    "demos",
-    "demo-live",
-    "demo-workspace",
-    "example",
-    "examples",
-    "sample",
-    "samples",
-    "tmp",
-    "temp",
-    "backup",
-    "old",
-}
-_EXPLAIN_HINTS = (
-    "explain",
-    "what is",
-    "what does",
-    "understand",
-    "go through",
-    "analyze",
-    "analyse",
-    "review",
-)
-_CHANGE_HINTS = (
-    "create",
-    "make",
-    "add",
-    "change",
-    "rename",
-    "move",
-    "update",
-    "delete",
-    "remove",
-    "refactor",
-    "edit",
-)
-_ACTIONABLE_SETUP_HINTS = (
-    "create",
-    "make",
-    "add",
-    "set up",
-    "setup",
-    "initialize",
-    "init",
-)
-_ACTIONABLE_SETUP_OBJECT_HINTS = (
-    "folder",
-    "directory",
-    "file",
-    ".venv",
-    "venv",
-    "readme",
-    "notes",
-    "doc",
-    "docs",
-    "vault",
-    "obsidian",
-)
-_SIMPLE_CHANGE_PATTERNS = (
-    r"^(create|make|add)\s+(a\s+|an\s+)?(new\s+)?folder\b",
-    r"^(create|make|add)\s+(a\s+|an\s+)?(new\s+)?directory\b",
-    r"^(create|make|add)\s+(a\s+|an\s+)?(new\s+)?file\b",
-    r"^(create|make|add)\s+.*\b(\.venv|venv|virtual environment)\b",
-    r"^(rename|move)\s+(the\s+)?(file|folder|directory)\b",
-)
-_SIMPLE_CURRENT_TARGETS = {
-    ".",
-    "here",
-    "this folder",
-    "current folder",
-    "this directory",
-    "current directory",
-    "this workspace",
-    "current workspace",
-    "workspace",
-}
-_RUN_HINTS = (
-    "run ",
-    "execute ",
-    "start ",
-    "launch ",
-    "test ",
-    "pytest",
-    "python ",
-    "npm ",
-    "node ",
-)
 
 
-def _build_prompt_label(model: str, session_mode: str = "approve", work_mode: str = "builder") -> str:
-    """Return the interactive prompt label shown before each user input."""
-    # Mode and model are shown in the status line under the input (D-031).
-    return "\n› "
 
 
 def _shorten_display(text: str, max_len: int = 28) -> str:
@@ -905,21 +482,8 @@ def _build_permissions_reply(cfg: dict, session_mode: str) -> str:
     )
 
 
-def _build_plan_execution_blocked_reply(session_mode: str, *, active_plan: bool = False) -> str:
-    target = "the active plan" if active_plan else "plan steps"
-    ending = "continue." if active_plan else "act."
-    return (
-        f"Mitra is in `{session_mode}` mode, so it will not execute {target} yet. "
-        f"Use `/mode approve` or `/mode auto` to {ending}"
-    )
 
 
-def _build_plan_unapproved_reply() -> str:
-    # The /plan commands were removed (2026-11-05); planning returns with the M3 runner (E-020).
-    return (
-        "There is no approved plan to run. Ask Mitra to make a plan for the goal; "
-        "it shows the plan and asks before running the first step."
-    )
 
 
 def _build_project_instructions_prompt(instructions: list[dict[str, str]]) -> str:
@@ -989,45 +553,10 @@ def _clear_terminal() -> None:
 
 
 def _print_progress_message(message: str, detail: str | None = None, *, color: str = "cyan") -> None:
-    from rich.text import Text
 
     console.print(ui.tool_line(message, detail=_shorten_display(detail, 110) if detail else ""))
 
 
-def _build_intent_progress_message(intent: str, user_input: str) -> tuple[str, str | None] | None:
-    if intent == "brainstorm":
-        return ("Exploring the idea space", "I’ll keep it practical and structured.")
-    if intent == "plan":
-        return ("This looks like a multi-step request", "Starting with brainstorming and a plan before making changes.")
-    if intent == "build":
-        return ("Starting the build flow", "I’ll turn this request into a concrete implementation path.")
-    if intent == "fix":
-        return ("Investigating the failure", "I’ll focus on the root cause and the smallest safe fix.")
-    if intent == "review":
-        return ("Reviewing the change", "I’ll inspect the relevant context and point out issues.")
-    if intent == "test":
-        return ("Preparing a verification step", "I’ll focus on the most relevant checks.")
-    if intent == "document":
-        return ("Preparing documentation", "I’ll capture the essential context and structure.")
-    if intent == "refactor":
-        return ("Planning a refactor", "I’ll keep the change focused and low-risk.")
-    if intent == "scaffold":
-        return ("Scaffolding the starting point", "I’ll set up the right structure before filling in details.")
-    if intent == "continue":
-        return ("Continuing the workflow", "I’ll pick up from the active plan or last step.")
-    if intent == "run-help":
-        return ("Turning this into concrete terminal steps", None)
-    if _extract_navigation_target(user_input):
-        return ("Navigating to the folder", "I’ll switch the active shell directory.")
-    if intent == "explain" and _is_current_folder_request(user_input):
-        return ("Inspecting the current folder", "I’ll answer with the active directory and its immediate contents.")
-    if intent == "explain" and _is_understand_alias_request(user_input):
-        return ("Understanding the current project", "I’ll summarize the active folder instead of sending this to the raw chat model.")
-    if intent == "explain" and _is_project_summary_request(user_input):
-        return ("Inspecting the workspace first", "I’ll summarize purpose, structure, blockers, and likely next steps.")
-    if intent == "change" and _is_cleanup_request(user_input):
-        return ("Preparing a cleanup preview", "I’ll show likely disposable files before removing anything.")
-    return None
 
 
 _MODE_ALIASES = {"ask": "approve", "auto-edit": "auto", "autoedit": "auto", "auto_edit": "auto"}
@@ -1044,30 +573,10 @@ def _is_known_mode(raw: str) -> bool:
     return mode in _SESSION_MODES or mode in _MODE_ALIASES
 
 
-def _intent_to_model_role(intent: str) -> str:
-    if intent in {"brainstorm", "explain", "document"}:
-        return "prd"
-    if intent in {"build", "fix", "test", "scaffold", "continue"}:
-        return "coder"
-    if intent == "review":
-        return "reviewer"
-    return "planner"
 
 
-def _resolve_runtime_llm_for_intent(intent: str, *, idea_llm, planner_llm, review_llm, codegen_llm):
-    role = _intent_to_model_role(intent)
-    if role == "prd":
-        return idea_llm
-    if role == "coder":
-        return codegen_llm
-    if role == "reviewer":
-        return review_llm
-    return planner_llm
 
 
-def _normalize_work_mode(raw: str | None) -> str:
-    mode = (raw or "builder").strip().lower()
-    return mode if mode in _WORK_MODES else "builder"
 
 
 def _mode_summary(mode: str) -> str:
@@ -1080,423 +589,64 @@ def _mode_summary(mode: str) -> str:
     return summaries.get(mode, summaries["approve"])
 
 
-def _work_mode_summary(mode: str) -> str:
-    summaries = {
-        "builder": "Build directly and keep the focus on shipping the next concrete step.",
-        "collaborator": "Work with the user as a pair and explain tradeoffs while moving forward.",
-        "mentor": "Teach while you work, with extra explanation and safer defaults.",
-        "architect": "Optimize for structure, interfaces, and system boundaries before details.",
-        "reviewer": "Focus on issues, risks, and correctness before approving change.",
-        "debugger": "Prefer diagnosis, evidence, and targeted fixes over broad rewrites.",
-        "product": "Optimize for user outcome, clarity, and workflow usefulness.",
-    }
-    return summaries.get(mode, summaries["builder"])
-
-
-def _is_simple_greeting(user_input: str) -> bool:
-    """Return True when the input is a short greeting that should bypass the LLM."""
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    normalized = re.sub(r"[!?.,]+$", "", normalized)
-    if normalized in _GREETING_INPUTS:
-        return True
-
-    tokens = normalized.split()
-    if not tokens or len(tokens) > 4:
-        return False
-
-    if len(tokens) >= 2 and " ".join(tokens[:2]) in _GREETING_INPUTS:
-        return True
-
-    return tokens[0] in {"hi", "hello", "hey", "hiya", "yo"}
-
-
-def _build_greeting_reply() -> str:
-    """Return a stable greeting so first-run UX does not depend on model quality."""
-    return (
-        "Hello - I'm Mitra, your local coding assistant.\n\n"
-        "I can inspect code, run commands, help plan work, and make file changes inside your workspace. "
-        "Tell me what you want to build, debug, or understand."
-    )
-
-
-def _is_small_talk(user_input: str) -> bool:
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    normalized = re.sub(r"[!?.,]+$", "", normalized)
-    for hint in _SMALL_TALK_HINTS:
-        if hint in _SMALL_TALK_EXACT_HINTS:
-            if hint == normalized:
-                return True
-            continue
-        if hint in normalized:
-            return True
-    return False
-
-
-def _is_understand_alias_request(user_input: str) -> bool:
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    normalized = re.sub(r"[!?.,]+$", "", normalized)
-    return normalized in _UNDERSTAND_ALIAS_HINTS
-
-
-def _normalize_routing_phrase(user_input: str) -> str:
-    normalized = _strip_soft_prefixes(user_input)
-    normalized = re.sub(r"\s+", " ", normalized.strip().lower())
-    normalized = re.sub(r"[!?.,]+$", "", normalized)
-    normalized = re.sub(r"^great\s+", "", normalized)
-    normalized = re.sub(r"^(?:ok|okay)\s+", "", normalized)
-    normalized = re.sub(r"^lets\s+", "", normalized)
-    normalized = re.sub(r"^let's\s+", "", normalized)
-    return normalized
-
-
-def _normalize_entry_name(value: str) -> str:
-    normalized = re.sub(r"[-_.]+", " ", value.strip().lower())
-    return re.sub(r"\s+", " ", normalized).strip()
-
-
-def _extract_navigation_target(user_input: str) -> str | None:
-    normalized = _normalize_routing_phrase(user_input)
-    for pattern in _NAVIGATION_PATTERNS:
-        match = re.match(pattern, normalized)
-        if not match:
-            continue
-        target = match.group(1).strip()
-        target = re.split(r"\s+(?:so that|so we can|so i can|and)\s+", target, maxsplit=1)[0].strip()
-        target = re.sub(r"\b(?:folder|directory)\b", "", target).strip()
-        target = re.sub(r"\s+", " ", target).strip()
-        if target in {"", "the", "this", "that"}:
-            return None
-        return target
-    return None
-
-
-def _extract_workspace_selection_target(user_input: str, cwd: str) -> str | None:
-    normalized = _normalize_routing_phrase(user_input)
-    target_text = None
-    for pattern in _WORKSPACE_SELECTION_PATTERNS:
-        match = re.match(pattern, normalized)
-        if match:
-            target_text = match.group(1).strip()
-            break
-    if not target_text:
-        return None
-
-    target_text = re.split(r"\s+(?:so that|so we can|so i can|and)\s+", target_text, maxsplit=1)[0].strip()
-    target_text = re.sub(r"\b(?:project|folder|directory)\b", "", target_text).strip()
-    if target_text in {"", "the", "this", "that"}:
-        return None
-
-    try:
-        root = pathlib.Path(cwd)
-        candidates = [entry for entry in root.iterdir() if entry.is_dir()]
-    except Exception:
-        return None
-
-    desired = _normalize_entry_name(target_text)
-    exact_matches = [entry.name for entry in candidates if _normalize_entry_name(entry.name) == desired]
-    if len(exact_matches) == 1:
-        return exact_matches[0]
-    return None
-
-
-def _extract_web_search_query(user_input: str) -> str | None:
-    normalized = _normalize_routing_phrase(user_input)
-    for prefix in _WEB_SEARCH_PREFIXES:
-        if normalized.startswith(prefix):
-            query = normalized[len(prefix):].strip()
-            return query or None
-    return None
-
-
-def _extract_url_from_input(user_input: str) -> str | None:
-    match = re.search(r"https?://\S+", user_input, re.IGNORECASE)
-    if not match:
-        return None
-    return match.group(0).rstrip(").,!?]}>")
-
-
-def _build_small_talk_reply(user_input: str) -> str:
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    if "how are you" in normalized:
-        return "Doing well - ready to help you think through ideas, plan something interesting, or jump into code."
-    if "thank" in normalized:
-        return "You're welcome."
-    if normalized in {"okay", "ok", "sounds good"}:
-        return "Great - we can keep going whenever you're ready."
-    return "I'm here and ready to help."
-
-
-def _is_brainstorm_request(user_input: str) -> bool:
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    if not normalized or normalized.startswith("/"):
-        return False
-    if _is_simple_change_request(normalized):
-        return False
-    if (
-        any(token in normalized for token in _ACTIONABLE_SETUP_HINTS)
-        and any(token in normalized for token in _ACTIONABLE_SETUP_OBJECT_HINTS)
-    ):
-        return False
-    if any(hint in normalized for hint in _BRAINSTORM_HINTS):
-        return True
-
-    has_aspirational_prefix = any(
-        phrase in normalized
-        for phrase in (
-            "i always wanted to",
-            "i've always wanted to",
-            "i have always wanted to",
-            "i once read",
-            "i keep thinking about",
-        )
-    )
-    has_building_language = any(
-        token in normalized
-        for token in ("build", "create", "tool", "app", "product", "system")
-    )
-    has_reflective_goal_language = any(
-        phrase in normalized
-        for phrase in (
-            "help me",
-            "improve",
-            "time management",
-            "goal",
-            "workflow",
-            "personal",
-            "work",
-        )
-    )
-    return has_aspirational_prefix and has_building_language and has_reflective_goal_language
-
-
-def _strip_soft_prefixes(user_input: str) -> str:
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    changed = True
-    while changed:
-        changed = False
-        for prefix in _SOFT_PREFIXES:
-            if normalized.startswith(prefix):
-                normalized = normalized[len(prefix):].strip()
-                changed = True
-                break
-    return normalized
-
-
-def _should_plan_first(user_input: str) -> bool:
-    """Return True when a request is substantial enough to benefit from brainstorm + plan."""
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    normalized_core = _strip_soft_prefixes(user_input)
-    if not normalized or normalized.startswith("/"):
-        return False
-    if _is_simple_greeting(normalized):
-        return False
-    if normalized in {"continue", "next step", "proceed", "keep going", "execute the plan"}:
-        return False
-    if _is_simple_change_request(normalized):
-        return False
-
-    has_start_keyword = any(normalized_core.startswith(keyword) for keyword in _PLAN_START_KEYWORDS)
-    has_complexity_hint = any(hint in normalized for hint in _PLAN_COMPLEXITY_HINTS)
-    has_destructive_cleanup = any(keyword in normalized for keyword in ("remove", "delete", "clean up", "cleanup", "unwanted"))
-    word_count = len(normalized.split())
-
-    if has_destructive_cleanup and word_count >= 5:
-        return True
-
-    return has_start_keyword and (word_count >= 6 or has_complexity_hint)
-
-
-def _is_simple_change_request(user_input: str) -> bool:
-    normalized = _strip_soft_prefixes(user_input)
-    if not normalized or normalized.startswith("/"):
-        return False
-    return any(re.match(pattern, normalized) for pattern in _SIMPLE_CHANGE_PATTERNS)
-
-
-def _strip_wrapping_quotes(value: str) -> str:
-    stripped = value.strip()
-    if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {'"', "'"}:
-        return stripped[1:-1]
-    return stripped
-
-
-def _normalize_simple_target(target: str | None) -> str:
-    if target is None:
-        return "."
-    normalized = re.sub(r"[!?.,]+$", "", target.strip().lower())
-    normalized = re.sub(r"^(?:the|a|an)\s+", "", normalized)
-    if normalized in _SIMPLE_CURRENT_TARGETS:
-        return "."
-    return _strip_wrapping_quotes(target.strip().rstrip("!?.,"))
-
-
-def _extract_simple_change_action(user_input: str) -> tuple[str, dict] | None:
-    normalized = _normalize_routing_phrase(user_input)
-    if not normalized or normalized.startswith("/"):
-        return None
-    if any(token in normalized for token in (" and ", " then ", " after ", " before ", " also ")):
-        return None
-
-    venv_match = re.match(
-        r"^(?:create|make|add|setup|set up|initialize|init)\s+(?:a\s+|an\s+)?(?:\.venv|venv|virtual environment)(?:\s+(?:in|inside|under|for|at)\s+(?P<target>.+))?$",
-        normalized,
-    )
-    if venv_match:
-        return "create_venv", {"project_path": _normalize_simple_target(venv_match.group("target"))}
-
-    folder_match = re.match(
-        r"^(?:create|make|add)\s+(?:a\s+|an\s+)?(?:new\s+)?(?:folder|directory)(?:\s+named)?\s+(?P<name>\"[^\"]+\"|'[^']+'|[a-z0-9._-]+)(?:\s+(?:in|inside|under)\s+(?P<target>.+))?$",
-        normalized,
-    )
-    if folder_match:
-        name = _strip_wrapping_quotes(folder_match.group("name"))
-        target = _normalize_simple_target(folder_match.group("target"))
-        path = pathlib.Path(name) if target == "." else pathlib.Path(target) / name
-        return "create_folder", {"path": str(path)}
-
-    file_match = re.match(
-        r"^(?:create|make|add)\s+(?:a\s+|an\s+)?(?:new\s+)?file(?:\s+named)?\s+(?P<name>\"[^\"]+\"|'[^']+'|[a-z0-9._-]+)(?:\s+(?:in|inside|under)\s+(?P<target>.+))?$",
-        normalized,
-    )
-    if file_match:
-        name = _strip_wrapping_quotes(file_match.group("name"))
-        target = _normalize_simple_target(file_match.group("target"))
-        path = pathlib.Path(name) if target == "." else pathlib.Path(target) / name
-        return "create_file", {"path": str(path), "content": ""}
-
-    install_match = re.match(
-        r"^(?:install|setup|set up)\s+(?:the\s+)?(?:requirements|requirements\.txt|dependencies|packages)(?:\s+(?:in|inside|under)\s+(?P<target>.+))?$",
-        normalized,
-    )
-    if install_match:
-        return "install_packages", {"project_path": _normalize_simple_target(install_match.group("target"))}
-
-    return None
-
-
-def _build_simple_change_progress(tool_name: str, args: dict) -> tuple[str, str | None]:
-    if tool_name == "create_venv":
-        target = args.get("project_path") or "."
-        return "Creating the virtual environment", f"Using `{target}` as the target workspace."
-    if tool_name == "create_folder":
-        return "Creating the folder", f"Preparing `{args.get('path', '')}`."
-    if tool_name == "create_file":
-        return "Creating the file", f"Preparing `{args.get('path', '')}`."
-    if tool_name == "install_packages":
-        target = args.get("project_path") or "."
-        return "Installing dependencies", f"Using `{target}` as the project root."
-    return "Applying the change", None
-
-
-def _is_command_help_request(user_input: str) -> bool:
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    if not normalized or normalized.startswith("/"):
-        return False
-    return any(hint in normalized for hint in _DIRECT_COMMAND_HELP_HINTS)
-
-
-def _is_project_summary_request(user_input: str) -> bool:
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    if not normalized or normalized.startswith("/"):
-        return False
-    return any(hint in normalized for hint in _PROJECT_SUMMARY_HINTS)
-
-
-def _is_next_steps_request(user_input: str) -> bool:
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower()).rstrip("!?.,")
-    if not normalized or normalized.startswith("/"):
-        return False
-    return any(hint in normalized for hint in _NEXT_STEPS_HINTS)
-
-
-def _is_current_folder_request(user_input: str) -> bool:
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    if not normalized or normalized.startswith("/"):
-        return False
-    if any(normalized.startswith(hint) or f" {hint} " in f" {normalized} " for hint in _CHANGE_HINTS):
-        return False
-    return any(hint in normalized for hint in _CURRENT_FOLDER_HINTS)
-
-
-def _is_cleanup_request(user_input: str) -> bool:
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    if not normalized or normalized.startswith("/"):
-        return False
-    return any(hint in normalized for hint in _CLEANUP_REQUEST_HINTS) or (
-        any(token in normalized for token in ("remove", "delete"))
-        and any(token in normalized for token in ("unwanted", "unused", "extra", "not needed", "others", "rest"))
-    )
-
-
-def _is_delete_project_request(user_input: str) -> bool:
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    if not normalized or normalized.startswith("/"):
-        return False
-    return any(hint in normalized for hint in _DELETE_PROJECT_HINTS)
-
-
-def _should_use_router_build_intent(user_input: str) -> bool:
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    if not normalized or normalized.startswith("/"):
-        return False
-    if not normalized.startswith(("build", "develop", "implement")):
-        return False
-    complexity_hints = (
-        "using",
-        "with",
-        "should",
-        "need to",
-        "project",
-        "app",
-        "application",
-        "api",
-        "feature",
-        "workflow",
-        "codebase",
-        "multiple",
-        "tests",
-        "bug",
-        "module",
-        "unwanted",
-        "folder",
-        "directories",
-        "references",
-        "throughout",
-        "wherever",
-        "root folder",
-    )
-    if any(hint in normalized for hint in complexity_hints):
-        return False
-    return len(normalized.split()) <= 7
-
-
-_QUESTION_WORDS = ("what", "whats", "what's", "why", "how", "when", "where", "which", "who", "whose",
-                   "is", "are", "was", "were", "does", "did", "do", "should", "status")
-_POLITE_REQUESTS = ("can you", "could you", "would you", "will you", "please", "pls", "kindly")
-_NO_CHANGE_PHRASES = ("no code", "no coding", "without code", "without coding", "don't code", "dont code",
-                      "do not code", "no implementation", "don't implement", "dont implement", "do not implement",
-                      "not implement", "just brainstorm", "only brainstorm", "just plan", "only plan",
-                      "don't change", "dont change", "do not change", "no changes")
-
-
-def _is_question(user_input: str) -> bool:
-    """A question gets an answer, never a build or a plan run (E-019).
-
-    "what's the plan now", "what is the status of snake game?" are questions; "can you add a score?" is a request.
-    """
-    text = re.sub(r"\s+", " ", (user_input or "").strip().lower())
-    if not text or text.startswith(_POLITE_REQUESTS):
-        return False
-    if text.endswith("?"):
-        return True
-    first = re.split(r"[\s,]", text, maxsplit=1)[0]
-    return first in _QUESTION_WORDS
-
-
-def _forbids_changes(user_input: str) -> bool:
-    """The user said not to write code or change files ("no coding", "just brainstorm")."""
-    text = re.sub(r"\s+", " ", (user_input or "").strip().lower())
-    return any(phrase in text for phrase in _NO_CHANGE_PHRASES)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def _ps_path(relative) -> str:
@@ -1509,59 +659,8 @@ def _ps_path(relative) -> str:
     return ".\\" + rel
 
 
-def _classify_intent(user_input: str) -> str:
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    if not normalized:
-        return "chat"
-    if normalized.startswith("/"):
-        return "slash"
-    if _is_simple_greeting(normalized):
-        return "chat"
-    if _is_small_talk(normalized):
-        return "chat"
-    if _forbids_changes(user_input):
-        return "brainstorm"     # talk it through; nothing is written (E-019)
-    if _is_brainstorm_request(normalized):
-        return "brainstorm"
-    if _is_command_help_request(normalized):
-        return "run-help"
-    if _is_question(user_input):
-        return "explain"        # questions never start a plan or a build (E-019)
-    if _is_cleanup_request(normalized):
-        return "change"
-    if _is_simple_change_request(normalized):
-        return "change"
-
-    decision = intent_router.classify(user_input)
-    if decision.intent in {"fix", "test", "review", "document", "refactor", "scaffold", "continue"}:
-        return decision.intent
-    if decision.intent == "build" and _should_use_router_build_intent(normalized):
-        return decision.intent
-
-    if _should_plan_first(normalized):
-        return "plan"
-    if _is_understand_alias_request(normalized):
-        return "explain"
-    if _is_current_folder_request(normalized):
-        return "explain"
-    if _is_project_summary_request(normalized) or any(hint in normalized for hint in _EXPLAIN_HINTS):
-        return "explain"
-    if any(normalized.startswith(hint) or hint in normalized for hint in _RUN_HINTS):
-        return "run"
-    if any(normalized.startswith(hint) or hint in normalized for hint in _CHANGE_HINTS):
-        return "change"
-
-    return decision.intent
 
 
-def _looks_like_explicit_command(user_input: str) -> bool:
-    stripped = user_input.strip()
-    if not stripped:
-        return False
-    if re.search(r"`[^`]+`", stripped):
-        return True
-    lowered = stripped.lower()
-    return bool(re.match(r"^(python|pytest|pip|npm|node|npx|ruff|mypy|black|isort)\b", lowered))
 
 
 def _is_bang_command(user_input: str) -> bool:
@@ -1664,131 +763,10 @@ def _workspace_snapshot(workspace: str) -> tuple[list[str], list[str]]:
     return dirs[:6], files[:6]
 
 
-def _build_current_folder_reply(path: str, *, workspace: str | None = None) -> str:
-    root = pathlib.Path(path).resolve()
-    dirs, files = _workspace_snapshot(str(root))
-    sections = [
-        "## Current folder",
-        f"- **Path:** `{root}`",
-    ]
-    if workspace:
-        try:
-            relative = root.relative_to(pathlib.Path(workspace).resolve())
-            sections.append(
-                f"- **Inside workspace:** `{relative}`" if str(relative) != "." else "- **Inside workspace:** workspace root"
-            )
-        except ValueError:
-            pass
-    sections.append(
-        "- **Folders:** " + (", ".join(f"`{name}/`" for name in dirs) if dirs else "No top-level folders")
-    )
-    sections.append(
-        "- **Files:** " + (", ".join(f"`{name}`" for name in files) if files else "No top-level files")
-    )
-    return "\n".join(sections)
 
 
-def _build_project_summary(workspace: str) -> str:
-    root = pathlib.Path(workspace)
-    state = _detect_project_state(workspace)
-    dirs, files = _workspace_snapshot(workspace)
-    purpose = _read_readme_summary(workspace) or f"Project workspace: {root.name}"
-    targets = _find_run_targets(workspace)
-    entrypoint = state["entrypoint"] or "No obvious Python entrypoint found yet"
-
-    blockers: list[str] = []
-    if not state["venv_exists"]:
-        blockers.append("No `.venv` is present yet.")
-    if state["dependency_source"] and not state["venv_exists"]:
-        blockers.append("Dependencies likely still need to be installed.")
-    if not targets:
-        blockers.append("I could not detect a clear runnable entrypoint.")
-
-    next_steps: list[str] = []
-    if not state["venv_exists"]:
-        next_steps.append("Create a `.venv` in this workspace.")
-    if state["dependency_source"] == "requirements.txt":
-        next_steps.append("Install dependencies from `requirements.txt`.")
-    elif state["dependency_source"] == "pyproject.toml":
-        next_steps.append("Install the project with `pip install -e .`.")
-    if targets:
-        next_steps.append(f"Run `{targets[0]}` from PowerShell to verify the project starts.")
-
-    plan = planner_agent._parse_plan(workspace)
-    plan_status = ""
-    if plan is not None:
-        completed = len(plan.completed)
-        total = len(plan.steps)
-        if plan.pending:
-            next_plan_step = plan.pending[0].text
-            plan_status = (
-                f"An active plan is loaded for **{plan.goal}** "
-                f"({completed}/{total} steps done). The next pending step is: **{next_plan_step}**."
-            )
-        else:
-            plan_status = (
-                f"An active plan is loaded for **{plan.goal}** "
-                f"and all {total} steps are marked complete."
-            )
-
-    narrative = (
-        f"You are working in **{root.name}**. {purpose.rstrip('.')}. "
-        "I inspected the workspace and mapped the current execution shape."
-    )
-    sections = [
-        narrative,
-        plan_status,
-        f"**Purpose:** {purpose}.",
-        f"**Workspace:** `{root.name}`",
-        f"**Key folders:** {', '.join(f'`{d}/`' for d in dirs) if dirs else 'No top-level folders'}",
-        f"**Key files:** {', '.join(f'`{f}`' for f in files) if files else 'No top-level files'}",
-        f"**Entrypoint:** `{entrypoint}`" if targets else f"**Entrypoint:** {entrypoint}",
-    ]
-    if blockers:
-        sections.append("**Current blockers:** " + " ".join(blockers))
-    if next_steps:
-        sections.append(
-            "### Recommended next steps\n"
-            + "\n".join(f"{i}. {step}" for i, step in enumerate(next_steps, start=1))
-        )
-    return "\n\n".join(part for part in sections if part)
 
 
-def _build_next_steps_reply(workspace: str) -> str:
-    root = pathlib.Path(workspace)
-    state = _detect_project_state(workspace)
-    targets = _find_run_targets(workspace)
-    plan = planner_agent._parse_plan(workspace)
-
-    steps: list[str] = []
-    if plan is not None:
-        if plan.pending:
-            next_step = plan.pending[0].text
-            if planner_agent.is_plan_approved(workspace):
-                steps.append(f"Ask Mitra to continue the plan; the next step is: **{next_step}**.")
-            else:
-                steps.append(
-                    f"The plan (`{plan.goal}`) is not approved yet; ask Mitra to run it and approve when asked. "
-                    f"Next step: **{next_step}**."
-                )
-        else:
-            steps.append("Your active plan is complete. Ask Mitra for a new plan to keep going.")
-
-    if not state["venv_exists"]:
-        steps.append("Create and activate the project environment (`python -m venv .venv`, then `.\\.venv\\Scripts\\Activate.ps1`).")
-    if state["dependency_source"] == "requirements.txt":
-        steps.append("Install dependencies with `pip install -r .\\requirements.txt`.")
-    elif state["dependency_source"] == "pyproject.toml":
-        steps.append("Install the project in editable mode with `pip install -e .`.")
-    if targets:
-        steps.append(f"Run `{targets[0]}` and verify the app starts cleanly.")
-
-    if not steps:
-        steps.append("Inspect the current workspace with `/status` and ask Mitra to plan the next goal.")
-
-    intro = f"Here are the most grounded next steps for **{root.name}** based on the current workspace state:"
-    body = "\n".join(f"{i}. {step}" for i, step in enumerate(steps, start=1))
-    return f"{intro}\n\n{body}"
 
 
 def _build_startup_project_brief(workspace: str) -> str | None:
@@ -1892,12 +870,10 @@ def _build_status_reply(
     *,
     cloud_codegen_enabled: bool,
     session_mode: str,
-    work_mode: str,
     show_reasoning: bool,
     total_tokens: int,
     auto_compact_threshold: int,
     num_ctx: int,
-    agent_models: dict[str, str] | None = None,
 ) -> str:
     state = _detect_project_state(
         workspace,
@@ -1918,7 +894,6 @@ def _build_status_reply(
         resource_parts.append(f"RAM `{ram_free:.1f} / {ram_total:.1f} GB free`")
     if gpu_info is not None:
         resource_parts.append(f"GPU `{gpu_info.free_gib:.1f} / {gpu_info.total_gib:.1f} GB free`")
-    agent_models = agent_models or {}
     mcp_summary = mcp_registry.summarize(mcp_registry.discover(workspace))
     return (
         "## Session status\n\n"
@@ -1927,20 +902,15 @@ def _build_status_reply(
         f"- **Shell cwd:** `{shell_cwd}`\n"
         f"- **Entrypoint:** `{state['entrypoint'] or 'Not detected yet'}`\n"
         f"- **Plan:** {_summarize_plan_progress(workspace)}\n"
-        f"- **Brainstorm notes:** {'Saved' if memory.load_brainstorm(workspace) else 'None yet'}\n"
         f"- **Memory:** {'Loaded' if state['has_memory'] else 'Not loaded yet'}\n"
-        f"- **Session mode:** `{session_mode}`\n"
-        f"- **Work mode:** `{work_mode}`\n"
+        f"- **Mode:** `{ui.mode_label(session_mode)}`\n"
         f"- **Reasoning display:** {'shown' if show_reasoning else 'hidden'}\n"
-        f"- **Models:** chat `{model}` · codegen "
-        f"`{codegen_model if cloud_codegen_enabled else model}`\n"
-        f"- **Agent roles:** {agent_registry.summarize_agent_models(agent_models) if agent_models else 'Not resolved yet'}\n"
+        f"- **Model:** `{model}`\n"
         f"- **MCP:** {mcp_summary}\n"
         f"- **Context settings:** `{num_ctx:,}` max · compact at `{auto_compact_threshold:,}`\n"
         f"- **Session usage:** {_format_session_usage(total_tokens, auto_compact_threshold)}\n"
         f"- **Resources:** {' · '.join(resource_parts) if resource_parts else 'Unavailable'}\n"
         f"- **Behavior:** {approval_mode}\n"
-        f"- **Work style:** {_work_mode_summary(work_mode)}\n"
         f"- **Background tasks:** {_summarize_background_tasks()}\n"
         f"- **Git:** {_build_git_summary(workspace)}\n"
         f"- **Commit readiness:** {_build_commit_readiness(workspace)}\n"
@@ -2165,50 +1135,10 @@ def _handle_model_command(
     return "Usage: `/model`, `/model list`, `/model use <name>`, or `/model remove <name>`."
 
 
-def _build_brainstorm_prompt(workspace: str, request: str) -> str:
-    state = _detect_project_state(
-        workspace,
-        has_memory=bool(memory.load_context(workspace)),
-        has_plan=bool(memory.load_plan(workspace)),
-    )
-    return (
-        "You are Mitra in brainstorm mode.\n\n"
-        "Behave like a strong product and engineering brainstorming partner.\n"
-        "Use natural English with clean word order.\n"
-        "Be warm, practical, and idea-focused.\n"
-        "Start with a 1-2 sentence takeaway.\n"
-        "Then use this structure when it fits:\n"
-        "## Strong ideas\n"
-        "1. Idea name - why it matters\n"
-        "2. Idea name - why it matters\n"
-        "## Recommended direction\n"
-        "## Next steps\n"
-        "Keep lists short and easy to scan.\n"
-        "Do not use wide tables, side-by-side layouts, or overly long sections.\n"
-        "If helpful, recommend one direction and explain why.\n"
-        "Do not mention tools, agents, or system prompts.\n"
-        "Do not sound robotic.\n\n"
-        f"Workspace: {state['workspace_name']}\n"
-        f"Entrypoint: {state['entrypoint'] or 'none detected'}\n"
-        f"Plan loaded: {'yes' if state['has_plan'] else 'no'}\n"
-        f"User request: {request}"
-    )
 
 
-def _run_brainstorm_reply(llm, workspace: str, request: str, *, project_context: str = "") -> str:
-    prompt = _build_brainstorm_prompt(workspace, request)
-    if project_context.strip():
-        prompt += f"\n\nWorkspace context:\n{project_context.strip()}"
-    response = llm.invoke([
-        SystemMessage(content=prompt),
-        HumanMessage(content=request),
-    ])
-    return (response.content or "").strip()
 
 
-def _save_brainstorm_reply(workspace: str, prompt: str, reply: str) -> str:
-    memory.append_brainstorm_entry(workspace, prompt, reply)
-    return reply + "\n\n_Saved in brainstorm notes._"
 
 
 def _is_git_repo(workspace: str) -> bool:
@@ -2607,87 +1537,16 @@ def _cmd_resume(workspace: str) -> str:
     return reply
 
 
-def _cmd_search(raw: str, llm) -> str:
-    query = raw.strip()[7:].strip()
-    if not query:
-        return "Give a search query."
-
-    response = web_agent.run(llm, f"Search the web for: {query}", console=console)
-    console.print(web_agent.render(response))
-    return response.summary
 
 
-def _cmd_open_url(raw: str, llm) -> str:
-    target = raw.strip()[9:].strip()
-    if not target:
-        return "Usage: `/open-url <url>`"
-
-    response = web_agent.run(llm, f"Read and summarize this page: {target}", console=console)
-    console.print(web_agent.render(response))
-    return response.summary
 
 
-def _find_cleanup_candidates(workspace: str) -> list[str]:
-    root = pathlib.Path(workspace)
-    candidates: list[str] = []
-    for current_root, dirnames, filenames in os.walk(root, topdown=True, followlinks=False):
-        current = pathlib.Path(current_root)
-        if ".venv" in dirnames:
-            dirnames.remove(".venv")
-        if ".git" in dirnames:
-            dirnames.remove(".git")
-        for dirname in list(dirnames):
-            if dirname.lower() in _CLEANUP_NAME_HINTS:
-                rel = current.joinpath(dirname).relative_to(root)
-                candidates.append(str(rel))
-                dirnames.remove(dirname)
-        for filename in filenames:
-            lowered = filename.lower()
-            if lowered.endswith((".pyc", ".pyo")) or lowered in {"thumbs.db"}:
-                rel = current.joinpath(filename).relative_to(root)
-                candidates.append(str(rel))
-    return sorted(dict.fromkeys(candidates))
 
 
-def _looks_like_project_root(path: pathlib.Path) -> bool:
-    return any(
-        (path / marker).exists()
-        for marker in ("pyproject.toml", "requirements.txt", "package.json", ".git", "README.md")
-    )
 
 
-def _resolve_cleanup_root(workspace: str, user_input: str) -> pathlib.Path | None:
-    root = pathlib.Path(workspace)
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    top_level_dirs = [entry for entry in root.iterdir() if entry.is_dir() and not entry.name.startswith(".")]
-
-    for entry in sorted(top_level_dirs, key=lambda p: len(p.name), reverse=True):
-        name = entry.name.lower()
-        if name in normalized or name.replace("-", " ") in normalized or name.replace("_", " ") in normalized:
-            return entry
-
-    if _looks_like_project_root(root):
-        return root
-
-    if len(top_level_dirs) == 1:
-        return top_level_dirs[0]
-
-    return None
 
 
-def _build_cleanup_preview(workspace: str, candidates: list[str]) -> str:
-    if not candidates:
-        return (
-            "I do not see any obvious cleanup targets in this workspace.\n\n"
-            "If you want something removed, tell me the exact folder or file name and I will preview it first."
-        )
-    preview = "\n".join(f"- `{path}`" for path in candidates[:12])
-    if len(candidates) > 12:
-        preview += f"\n- `...and {len(candidates) - 12} more`"
-    return (
-        "I found these likely cleanup targets and will leave source code, `.venv`, and project config alone unless you ask otherwise:\n\n"
-        f"{preview}"
-    )
 
 
 def _choose_approval_option(
@@ -2730,192 +1589,18 @@ def _shell_command_name(command: str) -> str:
     return re.sub(r"\.exe$", "", exe, flags=re.IGNORECASE).lower()
 
 
-def _confirm_cleanup_plan(candidates: list[str]) -> bool:
-    preview = "\n".join(f"• {path}" for path in candidates[:10])
-    if len(candidates) > 10:
-        preview += f"\n• ...and {len(candidates) - 10} more"
-    choice = _choose_approval_option(
-        "Cleanup plan",
-        "Mitra prepared a cleanup plan for obvious disposable folders/files.\n\n"
-        f"{preview}\n\nChoose what to do next.",
-        [
-            ("deny", "No, keep these files/folders"),
-            ("approve", "Yes, apply this cleanup plan"),
-        ],
-        fallback_default="deny",
-    )
-    approved = choice == "approve"
-    _print_approval_result("Approved" if approved else "Skipped", approved=approved)
-    return approved
 
 
-def _handle_cleanup_request(user_input: str, workspace: str) -> str:
-    cleanup_root = _resolve_cleanup_root(workspace, user_input)
-    if cleanup_root is None:
-        return (
-            "I need a specific folder before I clean anything here because this workspace contains multiple projects.\n\n"
-            "Tell me the exact folder name you want cleaned, for example `snake-game`."
-        )
-
-    root_display = cleanup_root.name if cleanup_root != pathlib.Path(workspace) else "."
-    relative_root = cleanup_root.relative_to(pathlib.Path(workspace)) if cleanup_root != pathlib.Path(workspace) else pathlib.Path(".")
-    candidates = _find_cleanup_candidates(str(cleanup_root))
-    candidates = [str(relative_root / candidate) if str(relative_root) != "." else candidate for candidate in candidates]
-    preview = _build_cleanup_preview(workspace, candidates)
-    _print_progress_message("Reviewing cleanup candidates", f"Target: `{root_display}`")
-    console.print()
-    console.print(Rule(style="dim"))
-    _say(f"**Cleanup target:** `{root_display}`\n\n{preview}")
-    if not candidates:
-        return f"Cleanup target: {root_display}\n\n{preview}"
-    if not _confirm_cleanup_plan(candidates):
-        return f"Proposed a cleanup plan for {root_display}, but did not remove anything."
-
-    console.print()
-    result = filesystem.execute_cleanup(candidates, request=user_input)
-    console.print(render(result))
-    return result.summary
 
 
-def _build_run_command_reply(workspace: str) -> str:
-    root = pathlib.Path(workspace)
-    state = _detect_project_state(workspace)
-    activate = ".\\.venv\\Scripts\\Activate.ps1"
-    target = state["entrypoint"]
-
-    run_cmd = f"python {target}" if target else "python <entrypoint>.py"
-
-    lines = ["From PowerShell in this folder, run:", ""]
-    step = 1
-    if not state["venv_exists"]:
-        lines.append(f"{step}. `python -m venv .venv`")
-        step += 1
-    lines.append(f"{step}. `{activate}`")
-    step += 1
-
-    if state["dependency_source"] == "requirements.txt":
-        lines.append(f"{step}. `pip install -r .\\requirements.txt`")
-        step += 1
-    elif state["dependency_source"] == "pyproject.toml":
-        lines.append(f"{step}. `pip install -e .`")
-        step += 1
-    elif state["dependency_source"] == "package.json":
-        lines.append(f"{step}. `npm install`")
-        step += 1
-
-    lines.append(f"{step}. `{run_cmd}`")
-
-    return "\n".join(lines)
 
 
-def _confirm_plan_start() -> bool:
-    """Ask whether the newly generated plan should start executing immediately."""
-    choice = _choose_approval_option(
-        "Start execution",
-        "Plan ready.\n\nStart with step 1 now?",
-        [
-            ("approve", "Yes, start with step 1 now"),
-            ("deny", "No, pause after planning"),
-        ],
-        fallback_default="approve",
-    )
-    approved = choice == "approve"
-    _print_approval_result(
-        "Starting step 1" if approved else "Paused after planning",
-        approved=approved,
-    )
-    return approved
 
 
-def _execute_approved_plan(
-    *,
-    workspace: str,
-    llm,
-    max_steps: int | None,
-    session_mode: str = "approve",
-    work_mode: str = "builder",
-    codegen_llm=None,
-    reader_llm=None,
-    shell_llm=None,
-    direct_llm=None,
-) -> str:
-    if _normalize_session_mode(session_mode) in {"read-only", "plan"}:
-        return _build_plan_execution_blocked_reply(session_mode, active_plan=True)
-    if not planner_agent.is_plan_approved(workspace):
-        return _build_plan_unapproved_reply()
-    return planner_agent.run_plan(
-        llm,
-        workspace,
-        console=console,
-        max_steps=max_steps,
-        codegen_llm=codegen_llm,
-        reader_llm=reader_llm,
-        shell_llm=shell_llm,
-        direct_llm=direct_llm,
-        work_mode=work_mode,
-    )
 
 
-def _auto_plan_request(
-    raw: str,
-    workspace: str,
-    llm,
-    *,
-    session_mode: str = "approve",
-    work_mode: str = "builder",
-    playbook_context: str = "",
-    codegen_llm=None,
-    reader_llm=None,
-    shell_llm=None,
-    direct_llm=None,
-) -> str:
-    """Run brainstorm + plan for a substantial request, then optionally start execution."""
-    from app.agents import brainstorm as brainstorm_agent
-
-    goal = raw.strip()
-    plan_context = _build_plan_context(
-        workspace,
-        goal,
-        include_context=True,
-        include_brainstorm=True,
-        include_understand=True,
-        include_prd=True,
-    )
-    _print_progress_message("Brainstorming the request", "I’m shaping the goal before writing a plan.", color="yellow")
-    context = brainstorm_agent.run(llm, goal, console, project_context=plan_context)
-    if plan_context:
-        context = f"{plan_context}\n\n## Brainstorm Q&A\n{context}".strip()
-    if playbook_context:
-        context = f"{context}\n\n{playbook_context}".strip()
-    _print_progress_message("Writing the plan", "Saving the next steps to `.mitra/plan.md`.", color="yellow")
-    with console.status("[m.dim]Generating plan...[/m.dim]", spinner_style="m.accent"):
-        plan = planner_agent.create_plan(llm, goal, workspace, context=context, work_mode=work_mode)
-    console.print(f"[m.faint]  · Plan written to .mitra/plan.md[/m.faint]")
-    console.print(planner_agent.render(plan))
-
-    if _normalize_session_mode(session_mode) in {"read-only", "plan"}:
-        console.print("[dim]Plan mode is active, so Mitra saved the plan without starting execution.[/dim]")
-        return f"Created a plan for: {goal}"
-
-    if _confirm_plan_start():
-        planner_agent.approve_plan(workspace)
-        return _execute_approved_plan(
-            workspace=workspace,
-            llm=llm,
-            max_steps=1,
-            session_mode=session_mode,
-            codegen_llm=codegen_llm,
-            reader_llm=reader_llm,
-            shell_llm=shell_llm,
-            direct_llm=direct_llm,
-        )
-
-    console.print("[m.faint]  Ask Mitra to run the plan when you're ready; it asks before each step.[/m.faint]")
-    return f"Created a plan for: {goal}"
 
 
-def _placement_badge(placement: str) -> str:
-    return {"gpu": "[m.ok]GPU[/m.ok]", "split": "[m.dim]GPU+CPU[/m.dim]", "cpu": "[m.err]CPU[/m.err]"}.get(placement, "")
 
 
 def _startup_model(cfg: dict) -> str:
@@ -2965,7 +1650,6 @@ def _pick_model(cfg: dict) -> str:
         visible_models = recommended_models or inventory
         gpu_info = config.get_gpu_memory_info()
         vram_gib = gpu_info.total_gib if gpu_info else None
-        cpu_pct = config.get_cpu_usage_pct()
         total_ram_gib = config.get_total_system_memory_gib()
         free_ram_gib = config.get_available_system_memory_gib()
         budget_gib = config.get_recommended_model_budget_gib()
@@ -3041,19 +1725,6 @@ def _resolve_codegen_model(cfg: dict) -> str:
     return (cfg.get("codegen_model") or _DEFAULT_CLOUD_CODEGEN_MODEL).strip()
 
 
-def _resolve_cloud_api_key(cfg: dict, prompt_fn=None) -> str:
-    """Return API key from config/env or prompt once for optional cloud codegen."""
-    configured = (cfg.get("ollama_api_key") or "").strip()
-    if configured:
-        return configured
-
-    # Mitra is local-only (D-025): no startup prompt. A key set in config is still honoured.
-    if prompt_fn is not None:
-        try:
-            return (prompt_fn("Ollama API key (optional): ") or "").strip()
-        except (EOFError, KeyboardInterrupt):
-            return ""
-    return ""
 
 
 def _apply_session_mode(cfg: dict, session_mode: str) -> None:
@@ -3096,7 +1767,6 @@ def _apply_session_mode(cfg: dict, session_mode: str) -> None:
         require_diff_approval=require_diff,
         policy=policy,
     )
-    reader_agent.configure(workspace=cfg["workspace"], allowed_roots=allowed_roots)
     shell_agent.configure(
         workspace=cfg["workspace"],
         allowed_roots=allowed_roots,
@@ -3119,7 +1789,6 @@ def _chat():
     codegen_model = _resolve_codegen_model(cfg)
     temperature = cfg.get("temperature", 0.2)
     session_mode = _normalize_session_mode(cfg.get("session_mode"))
-    work_mode = _normalize_work_mode(cfg.get("work_mode"))
     show_reasoning = bool(cfg.get("show_reasoning", False))
     num_ctx = int(cfg.get("num_ctx") or 0) or config.context_for_model(model)
     gpu_layers_cfg = cfg.get("gpu_layers", "auto")
@@ -3157,13 +1826,7 @@ def _chat():
         count = len(available_skills)
         loaded.append(f"{count} skill{'s' if count != 1 else ''}")
 
-    plugin_commands = plugin_registry.discover(cfg["workspace"], cfg.get("plugin_dirs"))
-    if plugin_commands.commands:
-        loaded.append(f"{len(plugin_commands.commands)} plugin command{'s' if len(plugin_commands.commands) != 1 else ''}")
-    if plugin_commands.errors:
-        console.print(
-            f"[m.err]  · Plugin load issue{'s' if len(plugin_commands.errors) != 1 else ''}: {len(plugin_commands.errors)} (see /plugins)[/m.err]"
-        )
+    # (workspace plugins were removed with the old engine, M1 stage 2)
 
     ctx_text = memory.load_context(cfg["workspace"])
     if ctx_text:
@@ -3181,47 +1844,10 @@ def _chat():
         loaded.append("plan")
 
 
-    cloud_api_key = _resolve_cloud_api_key(cfg)
-    local_llm = _build_role_llm(
-        cfg,
-        "planner",
-        temperature=temperature,
-        num_ctx=num_ctx,
-        num_gpu=num_gpu,
-        base_url=cfg.get("ollama_local_base_url"),
-        cloud_api_key=None,
-        cloud_base_url=cfg.get("ollama_cloud_base_url"),
-        fallback_model=model,
-    )
-    review_llm = _build_role_llm(
-        cfg,
-        "reviewer",
-        temperature=temperature,
-        num_ctx=num_ctx,
-        num_gpu=num_gpu,
-        base_url=cfg.get("ollama_local_base_url"),
-        cloud_api_key=None,
-        cloud_base_url=cfg.get("ollama_cloud_base_url"),
-        fallback_model=model,
-    )
-    codegen_llm = _build_role_llm(
-        cfg,
-        "coder",
-        temperature=temperature,
-        num_ctx=num_ctx,
-        num_gpu=num_gpu,
-        base_url=cfg.get("ollama_local_base_url"),
-        cloud_api_key=cloud_api_key,
-        cloud_base_url=cfg.get("ollama_cloud_base_url"),
-        fallback_model=model,
-    )
-    idea_llm = _build_idea_llm(cfg)
-    agent_models = agent_registry.resolve_agent_models(
-        cfg,
-        chat_model=model,
-        codegen_model=codegen_model,
-        cloud_codegen_enabled=bool(cloud_api_key),
-    )
+    cloud_api_key = ""  # Mitra is local-only (D-025)
+    local_llm = get_local_llm(model, temperature, base_url=cfg.get("ollama_local_base_url"),
+                              num_ctx=num_ctx, num_gpu=num_gpu)
+    review_llm = codegen_llm = local_llm  # one model for everything (M1)
 
     # Compact before the model's context is full: at most 80% of num_ctx (D-033).
     auto_compact_threshold = min(int(cfg.get("auto_compact_threshold", _AUTO_COMPACT_THRESHOLD)), int(num_ctx * 0.8))
@@ -3292,7 +1918,7 @@ def _chat():
     hook_ctx = event_bus.HookContext(
         workspace=cfg["workspace"],
         session_mode=session_mode,
-        metadata={"model": model, "work_mode": work_mode},
+        metadata={"model": model},
     )
     event_bus.emit(event_bus.SessionStartEvent(
         workspace=cfg["workspace"],
@@ -3316,7 +1942,6 @@ def _chat():
         loaded=loaded,
     ))
     console.print(ui.header.tips())
-    prompt_str = _build_prompt_label(model, session_mode, work_mode)
     current_task = "Ready"
 
     def _set_current_task(label: str) -> None:
@@ -3332,7 +1957,7 @@ def _chat():
 
     input_box = ui.InputBox(
         workspace=cfg["workspace"],
-        commands=_COMMAND_HELP + [(c.name, "plugin command") for c in plugin_commands.commands],
+        commands=list(_COMMAND_HELP),
         state=ui_state,
         message=ui.prompt_message,
         toolbar=lambda: ui.framed_status(
@@ -3421,12 +2046,10 @@ def _chat():
                 codegen_model,
                 cloud_codegen_enabled=bool(cloud_api_key),
                 session_mode=session_mode,
-                work_mode=work_mode,
                 show_reasoning=show_reasoning,
                 total_tokens=ctx_used,
                 auto_compact_threshold=auto_compact_threshold,
                 num_ctx=num_ctx,
-                agent_models=agent_models,
             )
             _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
@@ -3465,7 +2088,6 @@ def _chat():
                 else:
                     session_mode = normalized
                     _apply_session_mode(cfg, session_mode)
-                    prompt_str = _build_prompt_label(model, session_mode, work_mode)
                     ai_reply = _build_mode_reply(session_mode)
             _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
@@ -3759,13 +2381,21 @@ def _cmd_fix(command: str, workspace: str, codegen_llm) -> str:
     if not command:
         return _build_fix_usage(_LAST_SHELL_COMMAND)
     _LAST_SHELL_COMMAND = command
-    return langgraph_workflows.run_fix_workflow(
-        command,
-        workspace,
-        codegen_llm,
-        console=console,
-        max_attempts=_FIX_MAX_ATTEMPTS,
-    )
+    from app.core.cli import EventPrinter
+    from app.core.loop import solve
+    from app.core.tools import Workspace
+
+    ws = Workspace(pathlib.Path(workspace), test_command=command, read_only=())
+    ws.spill_dir = ws.root / ".mitra" / "output"
+    journal: list = []
+    ws.journal = journal
+    res = solve(f"Make this command succeed: `{command}`. Find the cause of the failure and fix the code.",
+                ws, codegen_llm, on_event=EventPrinter(console),
+                record_path=ws.root / ".mitra" / "runs" / time.strftime("fix-%Y%m%d-%H%M%S.jsonl"))
+    if journal:
+        memory.record_last_change_set(workspace, {"entries": journal})
+    status = "fixed" if res.status == "passed" else f"not fixed ({res.status})"
+    return f"`{command}`: {status}. {res.summary}"
 
 
 def _extract_command(request: str) -> str:
@@ -3897,60 +2527,10 @@ def _build_move_preview(src: str, dest: str) -> str:
     return "\n".join(lines)
 
 
-def _parse_rename_request(user_input: str) -> tuple[str, str] | None:
-    normalized = re.sub(r"\s+", " ", user_input.strip().lower())
-    patterns = [
-        r"rename (?:the )?(?:folder |directory |project )?from ([\w\-. ]+) to ([\w\-. ]+)",
-        r"change (?:the )?([\w\-. ]+) name to ([\w\-. ]+)",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, normalized)
-        if match:
-            src = match.group(1).strip(" .")
-            dest = match.group(2).strip(" .")
-            if src and dest:
-                return src, dest
-    return None
 
 
-def _build_root_rename_reply(user_input: str, workspace: str) -> str | None:
-    parsed = _parse_rename_request(user_input)
-    if not parsed:
-        return None
-
-    src, dest = parsed
-    root = pathlib.Path(workspace)
-    workspace_name = root.name.lower()
-    if src != workspace_name:
-        return None
-
-    parent = root.parent
-    destination_path = parent / dest
-    extra = ""
-    if (root / dest).exists():
-        extra = (
-            f"\n\nAlso, `{dest}` already exists inside the current workspace, so a nested rename is not what you want here."
-        )
-
-    return (
-        f"The current project root is already `{root.name}`, and Mitra is locked inside that workspace, so it cannot rename the root folder from within itself.{extra}\n\n"
-        "If you want to rename the project folder, run this from the parent folder in PowerShell:\n\n"
-        f"1. `Set-Location '{parent}'`\n"
-        f"2. `Rename-Item '{root.name}' '{dest}'`\n\n"
-        f"That would rename:\n`{root}`\n→ `{destination_path}`"
-    )
 
 
-def _build_root_delete_reply(workspace: str) -> str:
-    root = pathlib.Path(workspace)
-    parent = root.parent
-    return (
-        f"Mitra is locked inside `{root.name}`, so it cannot delete the current project root from within itself.\n\n"
-        "If you want to remove the whole project and start fresh, run this from the parent folder in PowerShell:\n\n"
-        f"1. `Set-Location '{parent}'`\n"
-        f"2. `Remove-Item '{root.name}' -Recurse -Force`\n\n"
-        f"That would delete:\n`{root}`"
-    )
 
 
 # ── Tokens at which auto-compact kicks in ────────────────────────────────────

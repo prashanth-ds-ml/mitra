@@ -42,31 +42,33 @@ Plan v2 (2026-11-05, D-017); v1 is in [archive/PLAN-v1-2026-10-24.md](archive/PL
 
 ## M1 Core agent loop + `mitra solve` (one task, built for small models)
 The same loop runs the terminal assistant (M2), the plan runner (M3) and the benchmark.
-- [ ] Built on LangGraph (already in local-codex); LangChain / Deep Agents middleware used only where it fits the prompt budget, with our own short prompts
-- [ ] Headless command `mitra solve "task" --test "pytest ..." --json` (exit 0/1)
+- [x] ~~Built on LangGraph~~ A plain Python loop with LangChain chat models (D-037: simpler, testable with a scripted model); our own short prompts
+- [x] Headless command `mitra solve "task" --test "pytest ..." --json` (exit 0/1) (2026-11-06; also `--plan` runs a plan task by task)
 - [ ] Prompt + tool descriptions under ~3K tokens, checked in CI
 - [ ] Procedure vs knowledge split: system prompt says only how to work; SDK quirks and project facts are skills loaded on demand (I-3, Harness² INV/DOM)
 - [ ] AGENTS.md loaded with a byte budget; most specific file kept, broader files dropped first (dsh `agent-instructions`)
 - [ ] `docs/MODEL_VIEW.md`: for every feature, the exact text the model sees and its token cost (dsh "Model Experience" convention)
-- [ ] 5 tools: read, search, `str_replace` (forgiving match), run_tests, finish
-- [ ] Read before edit, and reject an edit if the file changed since it was read; the error tells the model to re-read (dsh `fs-observation-policy`)
+- [x] 7 tools: list, read, search, write, edit (forgiving match), run_tests, finish (2026-11-06)
+- [x] Read before edit, and reject an edit if the file changed since it was read; the error tells the model to re-read (dsh `fs-observation-policy`)
 - [ ] Tolerant tool-call parsing (native or JSON in text) + one retry with the error message
-- [ ] Model-call retry on transport errors (bounded, logged); empty reply = error (dsh `llm-retry`, L-002)
-- [ ] Step limit and repeat-call guard with a reminder at 3 repeats, stop at the limit (dsh `repeat-tool-reminder`; fixes E-002)
-- [ ] Fix E-001: `edit_file` added to mutating tools; test covers every tool in the set
-- [ ] Fix E-003: commands and edits confined to the task workspace; path checks fail closed
-- [ ] Fix E-005: paths via `pathlib` and stored relative with `/`; no PowerShell assumptions; Linux CI job blocking again
-- [ ] Tests run in a temp copy with a timeout; full output saved to a file, model sees head/tail + the path (dsh `spill-policy`)
+- [x] Model-call retry on transport errors (bounded, logged); empty reply = error (dsh `llm-retry`, L-002)
+- [x] Step limit and repeat-call guard with a reminder at 3 repeats, stop at the limit (dsh `repeat-tool-reminder`; fixes E-002) (E-002, E-023)
+- [x] Fix E-001: `edit_file` added to mutating tools; test covers every tool in the set (fixed, then the old fix workflow was removed with the old engine)
+- [x] Fix E-003: commands and edits confined to the task workspace; path checks fail closed
+- [x] Fix E-005: paths via `pathlib` and stored relative with `/`; no PowerShell assumptions; Linux CI job blocking again
+- [x] Tests run with a timeout; full output saved to a file, model sees head/tail (dsh `spill-policy`); runs on a level use a fresh temp workspace (run_level.py)
 - [ ] Stable prompt prefix, append-only history inside a round, so Ollama reuses its prompt cache; prompt-eval time logged (dsh "KV cache effect")
 - [ ] Prompt tokens and context use logged on every call; warning before the context limit (L-001)
 - [ ] Model settings in config: context length, KV-cache type (`q8_0` option on the bench server), thinking on/off and thinking budget (D-020)
 - [ ] Fresh round after a failed test run, with a short handoff note (status, evidence, next step) (dsh `tool-ralph`)
 - [ ] Rollback when rounds run out
-- [ ] Every run saved with authorship per part (Mitra / Claude / me) and secrets scrubbed, so it can become training data later (D-022)
+- [ ] Every run saved with authorship per part (Mitra / Claude / me) and secrets scrubbed, so it can become training data later (D-022) (JSONL record with author "mitra" done 2026-11-06; secret scrubbing still to do)
 - [ ] Record/replay: recorded model replies replay in tests without Ollama (I-1, dsh `llm-replay`)
-- [ ] Fault tests: a scripted fake model returns malformed tool calls, empty replies, stalls and errors; harness must recover or fail cleanly (dsh `llm-mock-server`)
+- [ ] Fault tests: a scripted fake model returns malformed tool calls, empty replies, stalls and errors; harness must recover or fail cleanly (dsh `llm-mock-server`) (empty replies, errors, repeats, bad tool calls done in tests/test_core.py and test_chat_core.py; stalls to do)
 - [ ] Unit tests for every part above
 - [ ] Release v0.1 + post: "Cutting the agent prompt from ~12K to ~3K tokens"
+
+- [x] The terminal chat runs on the core loop; keyword router, planner / brainstorm / file / shell / reader / web agent loops, work modes and plugins removed (D-037, 2026-11-06: -5,212 lines app, -2,805 lines tests)
 
 ## M2 Terminal assistant (`mitra`)
 - [x] Code renamed CodeMitra -> Mitra (files, config, `.mitra/`, banner); 615 tests pass (2026-11-05)
