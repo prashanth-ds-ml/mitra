@@ -390,7 +390,7 @@ def needs_help(task: "PlanTask", res: RunResult, files: list[str]) -> str:
             f"- Test command: `{task.test_command}`\n" + (f"- Last test output:\n```\n{tail}\n```\n" if tail else ""))
 
 
-def run_plan(plan_text: str, ws: T.Workspace, llm, *, full_test_command: str, max_steps: int = 30,
+def run_plan(plan_text: str, ws: T.Workspace, llm, *, full_test_command: str, max_steps: int | None = None,
              on_event: Callable[[Event], None] | None = None, record_dir: Path | None = None,
              num_ctx: int = 65536, git: bool = True, rollback: bool = True, harness=None) -> dict:
     """For each task: implement until its 'Done when' command passes; then run the full tests."""

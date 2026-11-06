@@ -27,6 +27,7 @@ DEFAULT_LIMITS = {
 }
 MAX_RULES = 12              # keeps the prompt small (the 3K budget)
 MAX_RULE_CHARS = 240
+MAX_TOOL_CHARS = 300          # with MAX_RULES full rules, the worst case stays in the budget (CI)
 
 
 @dataclass
@@ -55,7 +56,7 @@ def active_path() -> Path:
 
 def _clean(h: Harness) -> Harness:
     h.rules = [" ".join(str(r).split())[:MAX_RULE_CHARS] for r in h.rules if str(r).strip()][:MAX_RULES]
-    h.tools = {str(k): " ".join(str(v).split())[:400] for k, v in h.tools.items() if str(v).strip()}
+    h.tools = {str(k): " ".join(str(v).split())[:MAX_TOOL_CHARS] for k, v in h.tools.items() if str(v).strip()}
     limits = dict(DEFAULT_LIMITS)
     for k, v in (h.limits or {}).items():
         if k in DEFAULT_LIMITS:

@@ -89,3 +89,46 @@ def test_dashboard_page_shows_results_patterns_and_escapes(tmp_path, monkeypatch
     assert "71/72" in page and "not passed" in page and "repeated_failing_command" in page
     assert "<script>x" not in page and "&lt;script&gt;" in page
     assert "<title>Mitra Dashboard</title>" in page
+
+
+def test_overlapping_roots_count_each_record_once_and_examples_name_the_project(tmp_path):
+    _write(tmp_path / "games" / "snake" / ".mitra" / "runs" / "chat-1.jsonl", chat_session())
+    files = A.find_run_files([tmp_path, tmp_path / "games"])
+    assert len(files) == 1
+    rep = A.analyze(files)
+    assert rep.patterns["refused_repeat"].examples[0].startswith("snake/chat-1.jsonl")
+    assert rep.patterns["tests_never_passed"].examples[0].startswith("snake/")
+
+
+def test_pytest_through_run_command_is_a_test_run_not_a_tool_error(tmp_path):
+    _write(tmp_path / ".mitra" / "runs" / "c.jsonl", [
+        {"kind": "turn_start", "turn": 1},
+        {"kind": "tool", "turn": 1, "name": "run_command", "args": {"command": "python -m pytest -q"}, "ok": False,
+         "output": "1 failed"},
+        {"kind": "tool", "turn": 1, "name": "run_command", "args": {"command": "npm start"}, "ok": False,
+         "output": "npm: not found"},
+        {"kind": "turn_end", "turn": 1, "text": "ok"}])
+    rep = A.analyze(A.find_run_files([tmp_path]))
+    assert rep.patterns["tool_error"].count == 1 and "npm" in rep.patterns["tool_error"].examples[0]
+
+
+def test_analyze_can_keep_only_records_of_one_harness_version(tmp_path):
+    old = chat_session()                      # no harness_version: made before step 1 = defaults (v0)
+    old[0].pop("harness_version")
+    new = [dict(r) for r in chat_session()]
+    new[0]["harness_version"] = 1
+    _write(tmp_path / "a" / ".mitra" / "runs" / "old.jsonl", old)
+    _write(tmp_path / "b" / ".mitra" / "runs" / "new.jsonl", new)
+    files = A.find_run_files([tmp_path])
+    assert [A.file_version(f) for f in files] == [0, 1]
+    assert A.analyze(files, harness_version=1).files == 1
+    assert A.analyze(files, harness_version=0).files == 1
+    assert A.analyze(files).files == 2
+
+
+def test_run_files_include_the_improve_benchmark_records(tmp_path, monkeypatch):
+    monkeypatch.setenv("MITRA_HOME", str(tmp_path / "home"))
+    _write(tmp_path / "home" / "harness" / "runs" / "20261106" / "candidate" / "T01.jsonl", [{"kind": "start"}])
+    _write(tmp_path / "proj" / ".mitra" / "runs" / "chat.jsonl", [{"kind": "turn_start", "turn": 1}])
+    names = [p.name for p in D.run_files([tmp_path / "proj"])]
+    assert sorted(names) == ["T01.jsonl", "chat.jsonl"]

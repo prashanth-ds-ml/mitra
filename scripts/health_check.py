@@ -171,6 +171,49 @@ def step_live_solve():
         return ok, f"{res.get('status')} in {res.get('steps')} steps, {secs:.0f}s ({res.get('tests', '')})"
 
 
+GRADE_REFERENCE = """
+import sys, tempfile
+from pathlib import Path
+sys.path.insert(0, '.')
+from app.core import improve as I, tools as T
+b = I.load_bench()
+t = next(x for x in b.load_tasks() if x.split == 'tune')
+d = Path(tempfile.mkdtemp()) / 'ws'
+b.prepare_solved(t, d)
+g = b.grade(t, d, python=T.project_python(d))
+print(t.id, 'passed' if g.passed else 'FAILED', g.infra_error or '', g.output_tail[-200:] if not g.passed else '')
+sys.exit(0 if g.passed else 1)
+"""
+
+
+def step_self_improve():
+    exe = shutil.which("mitra")
+    if not exe:
+        return False, "`mitra` not on PATH"
+    with tempfile.TemporaryDirectory() as tmp:
+        code, out = run([exe, "harness"], cwd=Path(tmp), timeout=60)
+        if code != 0 or "Harness v" not in out:
+            return False, f"mitra harness failed: {last_line(out)}"
+        version = next(ln.strip() for ln in out.splitlines() if "Harness v" in ln)
+        code, out = run([exe, "report", "--json"], cwd=Path(tmp), timeout=300)
+        try:
+            rep = json.loads(out[out.index("{"):])
+        except ValueError:
+            return False, f"mitra report --json gave no JSON (exit {code}): {last_line(out)}"
+    # grading runs in the installed tool's Python, not this venv (E-035)
+    code, tool_dir = run(["uv", "tool", "dir"], cwd=ROOT, timeout=60)
+    tool_root = Path(tool_dir.strip().splitlines()[-1]) / "mitra" if code == 0 else None
+    tool_py = next((p for p in (tool_root / "Scripts" / "python.exe", tool_root / "bin" / "python")
+                    if tool_root and p.is_file()), None)
+    if not tool_py:
+        return False, f"could not find the mitra tool's Python ({last_line(tool_dir)})"
+    code, out = run([str(tool_py), "-c", GRADE_REFERENCE], cwd=ROOT, timeout=300)
+    if code != 0:
+        return False, f"benchmark reference does not grade as passed from the tool's Python: {last_line(out)}"
+    return True, (f"{version.split(' ·')[0]}; report: {rep.get('files')} record files, "
+                  f"{len(rep.get('patterns', []))} patterns; bench grading ok ({last_line(out)})")
+
+
 def step_playground():
     if not PLAYGROUND.exists():
         return True, "skipped (no ../mitra-playground)"
@@ -188,6 +231,7 @@ STEPS = [
     ("`mitra` from any folder", step_cli_anywhere, ""),
     ("MCP config", step_mcp_config, ""),
     ("Live run (real model)", step_live_solve, "slow"),
+    ("Self-improve tools (harness, report, bench grading)", step_self_improve, ""),
     ("Playground levels", step_playground, ""),
 ]
 

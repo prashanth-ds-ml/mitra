@@ -305,14 +305,15 @@ def cmd_solve(
     plan: str = typer.Option("", "--plan", help="A plan file: do its tasks one at a time (plan, implement, test, fix)."),
     workspace: str = typer.Option(".", "--workspace", "-w", help="Project folder."),
     model: str = typer.Option("", "--model", help="Local model (default: the last one used, else qwen3.5:4b)."),
-    max_steps: int = typer.Option(40, "--max-steps", help="Model calls per task before stopping."),
+    max_steps: int = typer.Option(0, "--max-steps", help="Model calls per task before stopping (0 = the harness "
+                                  "setting, 40 by default)."),
     as_json: bool = typer.Option(False, "--json", help="Print a JSON result instead of progress."),
 ) -> None:
     """Work on a task until its tests pass (the core loop, M1). Exit 0 = tests pass."""
     from app.core.cli import cmd_solve as _solve
 
     raise typer.Exit(_solve(task, test=test, plan=plan, workspace=workspace, model=model,
-                            max_steps=max_steps, as_json=as_json))
+                            max_steps=max_steps or None, as_json=as_json))
 
 
 cli.command("solve")(cmd_solve)
@@ -369,7 +370,7 @@ def cmd_report(
     if html_page:
         out, rep = D.build()
     else:
-        rep = A.analyze(A.find_run_files(D.default_roots()))
+        rep = A.analyze(D.run_files())
     if as_json:
         print(json.dumps(rep.to_json(), indent=2))
     else:
@@ -387,19 +388,44 @@ def cmd_improve(
     dry_run: bool = typer.Option(False, "--dry-run", help="Only show the proposal; no benchmark, nothing saved."),
     tasks: str = typer.Option("", "--tasks", help="Comma-separated tune task ids (default: the whole tune half)."),
     max_steps: int = typer.Option(30, "--max-steps", help="Model calls per benchmark task."),
+    force: bool = typer.Option(False, "--force", help="Run even if the free-RAM check fails."),
 ) -> None:
     """Self-improve: a local model proposes one settings change for the top problem; the benchmark decides."""
+    import json as _json
+    import urllib.request
+
+    import psutil
+
     from app import config as cfg_mod
     from app.core import analyze as A
     from app.core import dashboard as D
+    from app.core import harness as H
     from app.core import improve as I
     from app.llm import get_local_llm, thinking_setting
 
     cfg = cfg_mod.load()
     builder_name = model or cfg.get("local_model") or cfg_mod.load_last_model() or "qwen3.5:4b"
-    installed = {m.name for m in cfg_mod.get_local_model_inventory()}
-    proposer_name = proposer or next((m for m in ("qwen3.5:9b", "qwen3.5:latest") if m in installed), builder_name)
-    rep = A.analyze(A.find_run_files(D.default_roots()))
+    inventory = {m.name: (m.size_gib or 0.0) for m in cfg_mod.get_local_model_inventory()}
+    proposer_name = proposer or next((m for m in ("qwen3.5:9b", "qwen3.5:latest") if m in inventory), builder_name)
+    try:
+        with urllib.request.urlopen("http://localhost:11434/api/ps", timeout=10) as r:
+            loaded = [m.get("name", "") for m in _json.loads(r.read()).get("models", [])]
+    except (OSError, ValueError):
+        loaded = []
+    problems = I.machine_problems([proposer_name] if dry_run else [proposer_name, builder_name], sizes=inventory,
+                                  loaded=loaded, free_gb=psutil.virtual_memory().available / 2**30)
+    if problems and not force:
+        for p in problems:
+            console.print(f"[m.err]✗ {p}[/m.err]")
+        console.print(Text("Nothing was run. --force runs anyway.", style="m.dim"))
+        raise typer.Exit(1)
+    files = D.run_files()
+    version = H.load().version
+    rep = A.analyze(files, harness_version=version)  # problems left with the current settings
+    if not rep.files:
+        console.print(Text(f"No records made with harness v{version} yet: using all {len(files)} record files.",
+                           style="m.dim"))
+        rep = A.analyze(files)
     num_ctx = int(cfg.get("num_ctx") or 0) or cfg_mod.context_for_model(builder_name)
     proposer_llm = get_local_llm(proposer_name, num_ctx=32768, reasoning=False)
     builder_llm = get_local_llm(builder_name, num_ctx=num_ctx, reasoning=thinking_setting(cfg.get("thinking")))
@@ -1260,22 +1286,19 @@ def _handle_model_command(
 
 
 def _is_git_repo(workspace: str) -> bool:
-    result = subprocess.run(
-        ["git", "rev-parse", "--is-inside-work-tree"],
-        cwd=workspace,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=workspace, capture_output=True,
+                                text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):  # no git, or git hung: treat as not a repo
+        return False
     return result.returncode == 0 and result.stdout.strip() == "true"
 
 
 def _git_output(workspace: str, args: list[str]) -> str:
-    result = subprocess.run(
-        ["git", *args],
-        cwd=workspace,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(["git", *args], cwd=workspace, capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
     if result.returncode != 0:
         return ""
     return (result.stdout or "").strip()

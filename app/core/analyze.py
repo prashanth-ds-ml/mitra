@@ -70,7 +70,7 @@ class Report:
 
 
 def find_run_files(roots: list[Path], max_depth: int = 7) -> list[Path]:
-    out = []
+    out: set[Path] = set()  # a set: overlapping roots must not count a record twice
     for root in roots:
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames[:] = [d for d in dirnames if d not in SKIP and (d == ".mitra" or not d.startswith("."))]
@@ -79,7 +79,7 @@ def find_run_files(roots: list[Path], max_depth: int = 7) -> list[Path]:
                 dirnames[:] = []
                 continue
             if ".mitra" in parts and "runs" in parts:
-                out += [Path(dirpath) / f for f in filenames if f.endswith(".jsonl")]
+                out |= {(Path(dirpath) / f).resolve() for f in filenames if f.endswith(".jsonl")}
     return sorted(out)
 
 
@@ -90,11 +90,33 @@ def _norm_error(text: str) -> str:
     return first[:120]
 
 
+def _project(path: Path) -> str:
+    """The project folder a record belongs to (the folder holding `.mitra`)."""
+    parts = path.parts
+    return parts[parts.index(".mitra") - 1] if ".mitra" in parts[1:] else path.parent.name
+
+
+def file_version(path: Path) -> int | None:
+    """The harness version a record file ran with (records from before step 1 ran with the defaults, v0)."""
+    try:
+        with path.open(encoding="utf-8") as f:
+            for line in f:
+                r = json.loads(line)
+                if r.get("kind") in ("start", "turn_start"):
+                    return int(r.get("harness_version") or 0)
+    except (OSError, ValueError):
+        return None
+    return None
+
+
 def _unit_key(row: dict) -> str:
     return f"turn {row['turn']}" if "turn" in row else "task"
 
 
-def analyze(files: list[Path]) -> Report:
+def analyze(files: list[Path], harness_version: int | None = None) -> Report:
+    """Patterns in `files`; with `harness_version`, only records made with that version (the problems left now)."""
+    if harness_version is not None:
+        files = [f for f in files if file_version(f) == harness_version]
     rep = Report(files=len(files))
     for path in files:
         try:
@@ -106,7 +128,7 @@ def analyze(files: list[Path]) -> Report:
         for r in rows:
             kind = r.get("kind")
             u = units[_unit_key(r)]
-            where = f"{path.parent.parent.parent.name}/{path.name}"
+            where = f"{_project(path)}/{path.name}"
             if kind in ("start", "turn_start"):
                 rep.harness_versions[str(r.get("harness_version", "?"))] += 1
             elif kind == "model":
@@ -119,6 +141,7 @@ def analyze(files: list[Path]) -> Report:
                 rep.pattern("text_tool_call").add(f"{where}: {'broken' if r.get('error') else 'recovered'}")
             elif kind == "tool":
                 name, out, ok = r.get("name", ""), str(r.get("output", "")), r.get("ok", True)
+                cmd = str((r.get("args") or {}).get("command", ""))
                 if name in ("write_file", "edit_file") and str((r.get("args") or {}).get("path", "")).endswith(CODE_SUFFIXES):
                     u["code"] = True
                 if "⚠" in out and "not valid" in out:
@@ -126,15 +149,17 @@ def analyze(files: list[Path]) -> Report:
                 if name == "run_tests":
                     u["tests"] += 1
                     u["tests_ok"] = u["tests_ok"] or bool(ok)
-                if name == "run_command" and "pytest" in str((r.get("args") or {}).get("command", "")):
+                if name == "run_command" and "pytest" in cmd:
                     u["tests"] += 1
                     u["tests_ok"] = u["tests_ok"] or bool(ok)
                 if out.startswith("✗ Not run:"):
                     rep.pattern("refused_repeat").add(f"{where}: {name} {json.dumps(r.get('args', {}))[:100]}")
                 elif "declined" in out and "user" in out.lower():
                     rep.pattern("declined_edit").add(f"{where}: {_norm_error(out)}")
-                elif not ok and name != "run_tests":  # failing tests are normal while building
-                    rep.pattern("tool_error").add(f"{name}: {_norm_error(out)}")
+                elif not ok:
+                    is_test = name == "run_tests" or (name == "run_command" and "pytest" in cmd)
+                    if not is_test:  # failing tests are normal while building
+                        rep.pattern("tool_error").add(f"{name}: {_norm_error(out)}")
                     if name == "run_command":
                         u["cmd_fail"][json.dumps(r.get("args", {}), sort_keys=True)] += 1
             elif kind == "tests":
@@ -159,9 +184,9 @@ def analyze(files: list[Path]) -> Report:
                 if n >= 3:
                     rep.pattern("repeated_failing_command").add(f"{n}× {json.loads(cmd).get('command', '')[:120]}")
             if u["code"] and u["tests"] == 0:
-                rep.pattern("no_tests_after_code").add(f"{path.name} {key}")
+                rep.pattern("no_tests_after_code").add(f"{_project(path)}/{path.name} {key}")
             if u["tests"] and not u["tests_ok"]:
-                rep.pattern("tests_never_passed").add(f"{path.name} {key}")
+                rep.pattern("tests_never_passed").add(f"{_project(path)}/{path.name} {key}")
     return rep
 
 

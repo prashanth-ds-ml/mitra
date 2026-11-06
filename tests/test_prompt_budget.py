@@ -34,3 +34,18 @@ def test_render_lists_every_part():
     for parts in model_view.views().values():
         for part, _ in parts:
             assert part in text
+
+
+def test_a_full_harness_stays_under_budget():
+    """Learned rules and tool texts are added to the fixed prompt: the most the harness allows must still fit."""
+    from app.core import chat, loop, tools
+    from app.core import harness as H
+
+    h = H.Harness(rules=["x" * H.MAX_RULE_CHARS] * H.MAX_RULES)
+    for name, specs, prompt in [("chat", chat.tool_specs("approve"), chat.CHAT_PROMPT),
+                                ("solve", tools.TOOL_SPECS, loop.SYSTEM_PROMPT)]:
+        h.tools = {s["name"]: "y" * H.MAX_TOOL_CHARS for s in specs}
+        h = H._clean(h)
+        total = (model_view.estimate_tokens(H.apply_prompt(prompt, h))
+                 + model_view.estimate_tokens(model_view._specs_text(H.apply_tools(specs, h))))
+        assert total <= model_view.BUDGET_TOKENS, f"{name}: {total} tokens with a full harness"

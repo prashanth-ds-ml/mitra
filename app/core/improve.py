@@ -107,7 +107,7 @@ def parse_change(text: str, h: H.Harness, tool_names: set[str]) -> tuple[Change 
         name, desc = str(d.get("name", "")), " ".join(str(d.get("text", "")).split())
         if name not in tool_names:
             return None, f"unknown tool {name!r}"
-        if not desc or len(desc) > 600:
+        if not desc or len(desc) > H.MAX_TOOL_CHARS:
             return None, "tool text empty or too long"
         return Change("tool", why, text=desc, name=name), ""
     if kind == "limit":
@@ -143,6 +143,32 @@ def propose(rep: A.Report, h: H.Harness, llm, tool_names: set[str], tries: int =
     return None, why
 
 
+def unload(llm) -> None:
+    """Free the proposer's memory before the builder loads (one model at a time on this machine)."""
+    import urllib.request
+
+    base = (getattr(llm, "base_url", None) or "http://localhost:11434").rstrip("/")
+    body = json.dumps({"model": getattr(llm, "model", ""), "keep_alive": 0}).encode()
+    try:
+        urllib.request.urlopen(urllib.request.Request(f"{base}/api/generate", data=body,
+                                                      headers={"Content-Type": "application/json"}), timeout=60)
+    except OSError:
+        pass
+
+
+HEADROOM_GB = 3.0  # as bench/preflight.py: Ollama maps the model file into RAM on Windows, plus buffers (L-008)
+
+
+def machine_problems(models: list[str], *, sizes: dict[str, float], loaded: list[str], free_gb: float) -> list[str]:
+    """What blocks running these models one at a time: not installed, or not enough free RAM for the biggest."""
+    problems = [f"{m} is not installed (ollama pull {m})" for m in models if m not in sizes]
+    need = max([sizes[m] for m in models if m in sizes and m not in loaded] or [0.0])
+    if need and free_gb < need + HEADROOM_GB:
+        problems.append(f"free RAM {free_gb:.1f} GB < {need + HEADROOM_GB:.1f} GB needed; close heavy apps, "
+                        "or use the 4B as proposer (--proposer qwen3.5:4b)")
+    return problems
+
+
 def load_bench():
     spec = importlib.util.spec_from_file_location("mitra_bench", MITRA_ROOT / "bench" / "bench.py")
     mod = importlib.util.module_from_spec(spec)
@@ -166,6 +192,8 @@ def evaluate(h: H.Harness, llm, *, tasks=None, bench=None, num_ctx: int = 131072
             rec = (record_root / f"{task.id}.jsonl") if record_root else None
             res = solve(task.prompt.strip(), ws, llm, harness=h, num_ctx=num_ctx, max_steps=max_steps,
                         record_path=rec)
+            if res.status == "error":  # the model call failed (Ollama down, timeout): not the harness's fault
+                raise BenchError(f"{task.id}: {res.summary}")
             g = bench.grade(task, ws_dir, python=T.project_python(ws_dir))  # the Python the tests ran with
             if getattr(g, "infra_error", None):
                 raise BenchError(f"grading {task.id} broke ({g.infra_error}): {g.output_tail[-300:]}")
@@ -231,7 +259,11 @@ def improve(rep: A.Report, *, proposer, builder, builder_name: str = "", propose
         say("No problems in the run records: nothing to improve yet.")
         return entry
     say(f"Top problem: {entry['top_pattern']} ({rep.top(1)[0].count}x). Asking {proposer_name or 'the proposer'}...")
-    change, why = propose(rep, current, proposer, tool_names)
+    try:
+        change, why = propose(rep, current, proposer, tool_names)
+    finally:
+        if proposer is not builder:
+            unload(proposer)
     if not change:
         entry.update(result="no_proposal", reason=why)
         log_attempt(entry)
@@ -251,12 +283,14 @@ def improve(rep: A.Report, *, proposer, builder, builder_name: str = "", propose
                                         f"{res.tokens_in:,} tokens")
 
     cand_h = change.apply(current)
+    cand_run = cand_h.copy()
+    cand_run.version = current.version + 1  # its records count as the next version if it is kept
     try:
         say("Benchmark with the current settings:")
         base = evaluate(current, builder, tasks=tasks, bench=bench, num_ctx=num_ctx, max_steps=max_steps,
                         record_root=runs / "base", on_task=on_task("current"))
         say("Benchmark with the proposal:")
-        cand = evaluate(cand_h, builder, tasks=tasks, bench=bench, num_ctx=num_ctx, max_steps=max_steps,
+        cand = evaluate(cand_run, builder, tasks=tasks, bench=bench, num_ctx=num_ctx, max_steps=max_steps,
                         record_root=runs / "candidate", on_task=on_task("proposal"))
     except BenchError as exc:
         entry.update(result="bench_error", reason=str(exc)[:500])

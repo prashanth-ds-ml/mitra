@@ -87,3 +87,17 @@ def test_chat_uses_the_harness_limits_and_tool_texts(tmp_path):
     res = C.ChatSession(workspace=tmp_path, llm=Model(), hooks=hooks, harness=h).turn(
         [SystemMessage(content="s"), HumanMessage(content="go")])
     assert seen["desc"] == "Read it." and res.stopped and "step limit (3" in res.stop_reason
+
+
+def test_solve_uses_the_harness_step_limit_when_none_is_given(tmp_path):
+    class Model:
+        def bind_tools(self, specs):
+            return self
+
+        def invoke(self, messages):
+            return AIMessage(content="", tool_calls=[{"name": "list_files", "args": {"path": f"d{len(messages)}"},
+                                                      "id": str(len(messages))}])
+
+    h = H.Harness(limits={"solve_max_steps": 2, "max_failures": 50, "max_repeats": 50})
+    res = L.solve("x", T.Workspace(tmp_path, test_command="python -m pytest -q"), Model(), harness=h)
+    assert res.status == "stopped" and res.steps == 2

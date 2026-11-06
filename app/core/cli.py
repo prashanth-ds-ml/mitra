@@ -58,7 +58,7 @@ def _tool_name(name: str) -> str:
 
 
 def cmd_solve(task: str = "", *, test: str = "python -m pytest -q", plan: str = "", workspace: str = ".",
-              model: str = "", max_steps: int = 40, as_json: bool = False) -> int:
+              model: str = "", max_steps: int | None = None, as_json: bool = False) -> int:
     console = ui.apply(Console())
     cfg = config.load()
     model = model or cfg.get("local_model") or config.load_last_model() or "qwen3.5:4b"

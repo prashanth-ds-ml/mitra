@@ -128,3 +128,31 @@ def test_status_line_folder_from_windows_or_posix_path():
     for cwd in (r"C:\dev\snake_game", "/home/me/snake_game", "/home/me/snake_game/"):
         text = "".join(t for _, t in status_line(model="m", mode="ask", total_tokens=0, context_limit=1, cwd=cwd, branch=""))
         assert "· snake_game" in text, cwd
+
+
+def test_every_subprocess_call_in_app_has_a_timeout():
+    """CLAUDE.md non-negotiable: every subprocess has a timeout (git calls had none)."""
+    import ast
+
+    root = pathlib.Path(__file__).resolve().parents[1] / "app"
+    missing = []
+    for p in root.rglob("*.py"):
+        for n in ast.walk(ast.parse(p.read_text(encoding="utf-8"))):
+            if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                    and getattr(n.func.value, "id", "") == "subprocess"
+                    and n.func.attr in ("run", "check_output", "call", "check_call")
+                    and not any(k.arg == "timeout" for k in n.keywords)):
+                missing.append(f"{p.relative_to(root)}:{n.lineno}")
+    assert not missing, missing
+
+
+def test_git_helpers_survive_a_hung_git(monkeypatch, tmp_path):
+    import subprocess
+
+    from app import main
+
+    def hang(*a, **k):
+        raise subprocess.TimeoutExpired(cmd="git", timeout=60)
+    monkeypatch.setattr(main.subprocess, "run", hang)
+    assert main._is_git_repo(str(tmp_path)) is False
+    assert main._git_output(str(tmp_path), ["status"]) == ""

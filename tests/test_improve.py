@@ -155,3 +155,51 @@ def test_a_broken_grader_stops_the_ab_and_changes_nothing(tmp_path, monkeypatch)
 def test_failed_hidden_tests_are_named_in_the_score():
     tail = "x\nFAILED tests/test_hidden_t01.py::test_more_than_two_decimals_rejected - ValueError\n1 failed"
     assert I._failed_tests(tail) == "FAILED tests/test_hidden_t01.py::test_more_than_two_decimals_rejected - ValueError"
+
+
+def test_a_failed_model_call_is_a_bench_error_not_a_model_fail(tmp_path, monkeypatch):
+    class Bench:
+        def prepare(self, task, dest):
+            (dest / "tests").mkdir(parents=True)
+
+        def grade(self, task, ws, python=None):
+            raise AssertionError("must not grade after a model error")
+
+    monkeypatch.setattr(I, "solve", lambda *a, **k: SimpleNamespace(
+        status="error", summary="The model call failed twice. Is Ollama running?", tokens_in=0, seconds=0, steps=0))
+    try:
+        I.evaluate(H.Harness(), None, tasks=[SimpleNamespace(id="T01", prompt="x")], bench=Bench())
+    except I.BenchError as exc:
+        assert "Ollama" in str(exc)
+    else:
+        raise AssertionError("expected BenchError")
+
+
+def test_the_proposer_is_unloaded_and_candidate_records_carry_the_next_version(tmp_path, monkeypatch):
+    monkeypatch.setenv("MITRA_HOME", str(tmp_path))
+    monkeypatch.setenv("MITRA_HARNESS", str(tmp_path / "harness.toml"))
+    unloaded, versions = [], []
+    monkeypatch.setattr(I, "unload", lambda llm: unloaded.append(llm))
+
+    def ev(h, llm, **kw):
+        versions.append(h.version)
+        return I.Score(1, 5, 100)
+    monkeypatch.setattr(I, "evaluate", ev)
+    prop = Proposer('{"kind": "rule", "text": "Run tests after writing code.", "why": "x"}')
+    I.improve(_report(), proposer=prop, builder=object(), bench=object(), say=lambda t: None)
+    assert unloaded == [prop] and versions == [0, 1]
+
+
+def test_machine_check_needs_ram_for_the_biggest_model_only():
+    sizes = {"qwen3.5:4b": 3.4, "qwen3.5:latest": 6.6}
+    assert I.machine_problems(["qwen3.5:latest", "qwen3.5:4b"], sizes=sizes, loaded=[], free_gb=10.0) == []
+    low = I.machine_problems(["qwen3.5:latest", "qwen3.5:4b"], sizes=sizes, loaded=[], free_gb=7.8)
+    assert len(low) == 1 and "9.6 GB needed" in low[0] and "--proposer qwen3.5:4b" in low[0]
+    assert I.machine_problems(["qwen3.5:latest"], sizes=sizes, loaded=["qwen3.5:latest"], free_gb=1.0) == []
+    assert "not installed" in I.machine_problems(["qwen3.5:9b"], sizes=sizes, loaded=[], free_gb=50)[0]
+
+
+def test_a_tool_text_longer_than_the_harness_keeps_is_rejected():
+    long = "z" * (H.MAX_TOOL_CHARS + 1)
+    assert "too long" in I.parse_change(json.dumps({"kind": "tool", "name": "read_file", "text": long}),
+                                        H.Harness(), TOOLS)[1]

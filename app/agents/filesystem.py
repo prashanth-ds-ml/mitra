@@ -480,7 +480,7 @@ def create_venv(project_path: str) -> str:
             ["python", "-m", "venv", ".venv"],
             cwd=project_dir,
             capture_output=True,
-            text=True,
+            text=True, timeout=300
         )
         if result.returncode != 0:
             return f"✗ create_venv failed: {result.stderr.strip()}"
@@ -505,11 +505,11 @@ def install_packages(project_path: str, packages: list[str] | None = None) -> st
             result = subprocess.run(
                 [pip, "install", *packages],
                 capture_output=True,
-                text=True,
+                text=True, timeout=900
             )
             if result.returncode != 0:
                 return f"✗ install failed: {result.stderr.strip()}"
-            freeze = subprocess.run([pip, "freeze"], capture_output=True, text=True)
+            freeze = subprocess.run([pip, "freeze"], capture_output=True, text=True, timeout=120)
             (project_dir / "requirements.txt").write_text(
                 freeze.stdout, encoding="utf-8"
             )
@@ -521,7 +521,7 @@ def install_packages(project_path: str, packages: list[str] | None = None) -> st
             result = subprocess.run(
                 [pip, "install", "-r", str(req)],
                 capture_output=True,
-                text=True,
+                text=True, timeout=900
             )
             if result.returncode != 0:
                 return f"✗ install failed: {result.stderr.strip()}"
@@ -569,7 +569,7 @@ def git_status(cwd: str = ".") -> str:
         resolved_cwd = _resolve_path(cwd)
         result = subprocess.run(
             ["git", "status", "--short", "--branch"],
-            cwd=resolved_cwd, capture_output=True, text=True,
+            cwd=resolved_cwd, capture_output=True, text=True, timeout=60
         )
         output = result.stdout.strip() or "(nothing to report)"
         return f"✓ git status\n{output}" if result.returncode == 0 else f"✗ {result.stderr.strip()}"
@@ -587,7 +587,7 @@ def git_diff(cwd: str = ".", staged: bool = False) -> str:
         args = ["git", "diff"]
         if staged:
             args.append("--staged")
-        result = subprocess.run(args, cwd=resolved_cwd, capture_output=True, text=True)
+        result = subprocess.run(args, cwd=resolved_cwd, capture_output=True, text=True, timeout=60)
         output = result.stdout.strip() or "(no diff)"
         return f"✓ git diff\n{output}" if result.returncode == 0 else f"✗ {result.stderr.strip()}"
     except Exception as exc:
@@ -601,12 +601,12 @@ def git_commit(cwd: str, message: str) -> str:
         return err
     try:
         resolved_cwd = _resolve_path(cwd)
-        add = subprocess.run(["git", "add", "-A"], cwd=resolved_cwd, capture_output=True, text=True)
+        add = subprocess.run(["git", "add", "-A"], cwd=resolved_cwd, capture_output=True, text=True, timeout=60)
         if add.returncode != 0:
             return f"✗ git add failed: {add.stderr.strip()}"
         commit = subprocess.run(
             ["git", "commit", "-m", message],
-            cwd=resolved_cwd, capture_output=True, text=True,
+            cwd=resolved_cwd, capture_output=True, text=True, timeout=60
         )
         output = commit.stdout.strip() or commit.stderr.strip()
         return f"✓ Committed: {message}\n{output}" if commit.returncode == 0 else f"✗ {output}"

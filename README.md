@@ -34,7 +34,9 @@ mitra harness           # what Mitra has learned so far; `mitra harness revert N
 ```
 
 A change is kept only if more benchmark tasks pass (hidden tests) and prompt tokens grow at most 20%; every attempt
-is logged in `~/.mitra/harness/attempts.jsonl`.
+is logged in `~/.mitra/harness/attempts.jsonl`. It looks only at records made with the current settings, checks free
+RAM first (the 9B proposer needs about 10 GB; `--proposer qwen3.5:4b` otherwise), and with 5 tasks one run is noisy:
+treat a single kept change as a candidate, not proof.
 
 ## Why
 Coding agents like Claude Code, Codex and OpenCode can connect to local models through Ollama, but they are built for

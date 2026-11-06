@@ -17,6 +17,9 @@
   half with the current and the proposed harness; kept only if more pass (hidden tests) at <=120% prompt tokens.
   Attempts in `~/.mitra/harness/attempts.jsonl` and on the dashboard. Live dry run (4B proposer): "verify file
   existence with list_files before reading or editing" for the tool_error pattern, 10 s.
+- Deep dive (E-036..E-039): improve looks only at the current harness version's records, model errors and broken
+  grading stop the A/B, proposer unloaded + free-RAM check, worst-case harness within the prompt budget, harness
+  step limit applies to `mitra solve`, every subprocess has a timeout; health check has a self-improve step.
 - Next: step 4 overnight runs (needs the user's ok to create a scheduled task); more run records from real sessions.
 
 2026-11-06 evening (all pushed; 431 tests; Windows + Linux CI green):

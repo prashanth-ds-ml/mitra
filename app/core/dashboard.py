@@ -21,6 +21,15 @@ def default_roots() -> list[Path]:
     return [home, cwd]
 
 
+def run_files(roots: list[Path] | None = None) -> list[Path]:
+    """Every run record: project sessions under `roots` + the `mitra improve` benchmark runs in ~/.mitra."""
+    files = set(A.find_run_files(roots or default_roots()))
+    bench_runs = H.home() / "harness" / "runs"
+    if bench_runs.is_dir():
+        files |= {p.resolve() for p in bench_runs.rglob("*.jsonl")}
+    return sorted(files)
+
+
 def load_results(roots: list[Path]) -> list[dict]:
     rows = []
     seen = set()
@@ -120,7 +129,7 @@ def render(results: list[dict], rep: A.Report, history: list[tuple[str, str]], c
 
 def build(roots: list[Path] | None = None, out: Path | None = None) -> tuple[Path, A.Report]:
     roots = roots or default_roots()
-    rep = A.analyze(A.find_run_files(roots))
+    rep = A.analyze(run_files(roots))
     out = out or (H.home() / "dashboard.html")
     out.parent.mkdir(parents=True, exist_ok=True)
     from app.core.improve import attempts
