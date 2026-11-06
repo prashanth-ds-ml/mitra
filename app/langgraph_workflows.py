@@ -52,7 +52,9 @@ def _build_fix_prompt(command: str, result: shell_agent.ShellResult, attempt: in
 
 
 def _response_has_code_changes(agent_response) -> bool:
-    mutating_tools = {"create_file", "move_file", "delete_file", "delete_folder", "create_folder"}
+    # E-001: edit_file (and the markdown writers) are code changes too; a repair that only edits files counts.
+    mutating_tools = {"create_file", "edit_file", "create_markdown_file", "update_markdown_file",
+                      "move_file", "delete_file", "delete_folder", "create_folder"}
     return any(step.tool in mutating_tools and step.ok for step in agent_response.steps)
 
 

@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-021 | 2026-11-06 | M2 | Medium | Claude (E-003 test) | On Windows the command splitter kept quote marks: `python -c "print(42)"` ran the literal string and printed nothing; quoted program paths failed the allow-list | closed | F-020 |
 | E-020 | 2026-11-06 | M2 | High | user (terminal test) | "make a clean plan for Level 01 ... plan, implement, test, fix, repeat" showed two thinking lines and nothing else: the model called `execute_plan`, got "not approved, use `/plan approve`" (a removed command), then wrote an empty follow-up, which Mitra did not report | closed | F-016 |
 | E-019 | 2026-11-06 | M2 | High | user (errors.log review) | Questions and "no coding" requests started builds: "whats the plan now" became a plan goal and ran twice; "plan ... no coding" wrote code; files went to a nested `mitra-playground/mitra-playground/` | closed | F-015 |
 | E-018 | 2026-11-06 | M2 | High | user (errors.log) | A plan step crashed the whole turn: qwen3.5:4b called `create_file` with `content` as a JSON object (a game config), pydantic rejected it, and the exception escaped the tool loop | closed | F-014 |
@@ -25,9 +26,9 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 | E-006 | 2026-10-24 | M0 | High | config review | In agent workspaces `python` was the system Python 3.10 without pytest/FastAPI: every agent would have failed to run tests | closed | F-002 |
 | E-005 | 2026-10-24 | M0 | Medium | CI (Linux) | local-codex is Windows-only: 8 tests fail on Linux (backslash paths, PowerShell commands, skill paths) | open (fix in M1); Linux CI non-blocking | - |
 | E-004 | 2026-10-24 | M0 | Medium | lint (F821) on import | Model-advisor command crashes after finishing: stray copy of brainstorm code with undefined `raw`, `llm` | closed | F-001 |
-| E-003 | 2026-10-24 | review | Medium | local-codex review | Shell allowlist checks only the program name; path checks pass when no workspace is set | open (fix in M1) | - |
-| E-002 | 2026-10-24 | review | Medium | local-codex review | Agent loops run `while True` with no step limit | open (fix in M1) | - |
-| E-001 | 2026-10-24 | review | High | local-codex review | Repair loop stops early: `edit_file` missing from `mutating_tools` | open (fix in M1) | - |
+| E-003 | 2026-10-24 | review | Medium | local-codex review | Shell allowlist checks only the program name; path checks pass when no workspace is set | closed | F-019 |
+| E-002 | 2026-10-24 | review | Medium | local-codex review | Agent loops run `while True` with no step limit | closed | F-018 |
+| E-001 | 2026-10-24 | review | High | local-codex review | Repair loop stops early: `edit_file` missing from `mutating_tools` | closed | F-017 |
 
 ## Entry template
 
@@ -46,6 +47,19 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-021: Windows command splitting kept the quotes
+
+- **Date found:** 2026-11-06 · **Milestone:** M2 · **Severity:** Medium · **Found by:** Claude, writing the E-003 test
+- **Status:** closed
+
+**What happened:** `shell.execute('python -c "print(42)"')` exited 0 with no output; `"C:/x y/python.exe" -m pytest`
+was refused as `'python.exe"' is not in the allowed commands list`.
+**Root cause:** `shlex.split(posix=False)` (used on Windows so backslashes survive) keeps quote characters in the
+arguments.
+**Fix:** F-020.
+**Regression test:** `test_split_command_strips_outer_quotes_on_windows`.
+**Lesson?** -
 
 ### E-020: A turn ended with nothing on screen
 
@@ -254,34 +268,34 @@ tool.
 
 ### E-003: Shell allowlist checks only the program name; path checks pass when no workspace is set
 
-- **Date found:** 2026-10-24 · **Milestone:** review · **Severity:** Medium · **Found by:** local-codex review · **Status:** open (fix in M1)
+- **Date found:** 2026-10-24 · **Milestone:** review · **Severity:** Medium · **Found by:** local-codex review · **Status:** closed (2026-11-06)
 
 **What happened:** `shell.py:407` allows a command if `pathlib.Path(parts[0]).name` is on the list; `python`, `pip`,
 `node` and `npx` are on it, so `python -c "<anything>"` passes. `shell.py:207` and `filesystem.py:96` skip the path check
 when no workspace is set.
 **Root cause:** allowlist designed for convenience, not containment; fail-open default.
-**Fix:** -
-**Regression test:** -
+**Fix:** F-019.
+**Regression test:** `test_review_fixes.py`: no-workspace refusals, inline code refused / approved, detection.
 **Lesson?** L-014
 
 ### E-002: Agent loops run `while True` with no step limit
 
-- **Date found:** 2026-10-24 · **Milestone:** review · **Severity:** Medium · **Found by:** local-codex review · **Status:** open (fix in M1)
+- **Date found:** 2026-10-24 · **Milestone:** review · **Severity:** Medium · **Found by:** local-codex review · **Status:** closed (2026-11-06)
 
 **What happened:** `filesystem.py:958`, `shell.py:645`, `reader.py:456`, `web.py:244` loop until the model stops calling
 tools. A small model that repeats a call never stops.
 **Root cause:** loops written for models that end on their own.
-**Fix:** -
-**Regression test:** -
+**Fix:** F-018.
+**Regression test:** `test_review_fixes.py`: each of the 4 agents stops after 20 calls.
 **Lesson?** L-013
 
 ### E-001: Repair loop stops early: `edit_file` missing from `mutating_tools`
 
-- **Date found:** 2026-10-24 · **Milestone:** review · **Severity:** High · **Found by:** local-codex review · **Status:** open (fix in M1)
+- **Date found:** 2026-10-24 · **Milestone:** review · **Severity:** High · **Found by:** local-codex review · **Status:** closed (2026-11-06)
 
 **What happened:** `app/langgraph_workflows.py:55` lists `create_file`, `move_file`, `delete_file`, `delete_folder`,
 `create_folder` but not `edit_file`. A repair that only edits files counts as "no code changes", so the loop stops.
 **Root cause:** set maintained by hand; tests (`tests/test_langgraph_workflows.py:34,106`) only use `create_file`.
-**Fix:** -
-**Regression test:** -
+**Fix:** F-017.
+**Regression test:** `test_edit_file_counts_as_a_code_change`.
 **Lesson?** L-012

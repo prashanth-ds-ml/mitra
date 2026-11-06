@@ -244,7 +244,9 @@ def run(llm, user_request: str, console: Console | None = None) -> WebResponse:
         HumanMessage(content=user_request),
     ]
 
-    while True:
+    from app.agents.limits import MAX_AGENT_STEPS, stopped_message
+
+    for _step in range(MAX_AGENT_STEPS):  # E-002: never loop forever
         phase = "Summarizing web findings..." if any(isinstance(m, ToolMessage) for m in messages) else "Planning web steps..."
         response: AIMessage = _invoke_with_status(llm_with_tools, messages, console, phase)
         meta = getattr(response, "usage_metadata", None) or {}
@@ -257,13 +259,6 @@ def run(llm, user_request: str, console: Console | None = None) -> WebResponse:
             return response_obj
 
         for tc in response.tool_calls:
-            if console is not None:
-                args_str = ", ".join(
-                    f"{key}={repr(str(value))[:60]}" for key, value in tc["args"].items()
-                )
-                console.print(
-                    f"  [dim cyan]⋯[/dim cyan] [cyan]{tc['name']}[/cyan][dim]({args_str})[/dim]"
-                )
             fn = tool_map.get(tc["name"])
             if fn is None:
                 output = f"✗ Unknown tool: {tc['name']}"
@@ -272,7 +267,14 @@ def run(llm, user_request: str, console: Console | None = None) -> WebResponse:
                 output = _run_tool_with_status(fn, tc["args"], console, tool_label)
             response_obj.tool_outputs.append(str(output))
             response_obj.findings.append(f"{tc['name']}: {str(output)[:200]}")
+            if console is not None:
+                from app.ui import tool_line
+                target = str(tc["args"].get("url") or tc["args"].get("query") or "")[:80]
+                console.print(tool_line("Fetch" if tc["name"] == "fetch_url" else "Search", target,
+                                        ok=not str(output).lstrip().startswith("✗")))
             messages.append(ToolMessage(content=str(output), tool_call_id=tc["id"]))
+    response_obj.summary = stopped_message()
+    return response_obj
 
 
 def render(response: WebResponse):

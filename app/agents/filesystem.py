@@ -97,7 +97,8 @@ class PermissionGuard:
     def check_path(self, *paths: str) -> str | None:
         """Return an error string if any path escapes the workspace, else None."""
         if self.workspace is None and not self.allowed_roots:
-            return None
+            # E-003: fail closed. Without a workspace there is nothing to keep the model inside.
+            return "✗ Permission denied: no workspace is set, so Mitra does not touch files"
         for p in paths:
             resolved = _resolve_path(p)
             roots = ([self.workspace] if self.workspace else []) + self.allowed_roots
@@ -1004,8 +1005,10 @@ def run(llm, user_request: str, console=None) -> AgentResponse:
 
     global _active_change_set
     _active_change_set = []
+    from app.agents.limits import MAX_AGENT_STEPS, stopped_message
+
     try:
-        while True:
+        for _step in range(MAX_AGENT_STEPS):  # E-002: never loop forever
             phase = "Summarizing file changes..." if any(isinstance(m, ToolMessage) for m in messages) else "Planning file changes..."
             if console is not None:
                 with console.status(f"[m.dim]{phase}[/m.dim]", spinner="dots", spinner_style="m.accent"):
@@ -1033,5 +1036,8 @@ def run(llm, user_request: str, console=None) -> AgentResponse:
                     from app.ui import step_line
                     console.print(step_line(step.tool, step.args, step.output, step.ok))
                 messages.append(ToolMessage(content=str(output), tool_call_id=tc["id"]))
+        agent_response.summary = stopped_message()
+        _persist_active_change_set()
+        return agent_response
     finally:
         _discard_active_change_set()

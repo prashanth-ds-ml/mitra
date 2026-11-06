@@ -210,7 +210,8 @@ def _check_path_in_workspace(path: pathlib.Path) -> str | None:
         pathlib.Path(root) for root in _config.allowed_roots
     ]
     if not roots:
-        return None
+        # E-003: fail closed. Without a workspace there is nothing to keep commands inside.
+        return "no workspace is set, so Mitra does not run commands"
     resolved = path.resolve()
     for root in roots:
         try:
@@ -231,7 +232,34 @@ def _resolve_target_path(raw_path: str | None, cwd: str) -> pathlib.Path:
 
 
 def _split_command(command: str) -> list[str]:
-    return shlex.split(command, posix=(platform.system() != "Windows"))
+    """Split a command line into arguments.
+
+    On Windows shlex runs with posix=False (so backslashes in paths survive), which keeps the quote marks around
+    quoted arguments: `python -c "print(42)"` passed the literal `"print(42)"` and printed nothing, and a quoted
+    program path did not match the allow-list (E-021). Strip one pair of matching outer quotes from each argument.
+    """
+    if platform.system() != "Windows":
+        return shlex.split(command, posix=True)
+    parts = shlex.split(command, posix=False)
+    return [p[1:-1] if len(p) >= 2 and p[0] == p[-1] and p[0] in "\"'" else p for p in parts]
+
+
+_INTERPRETERS = {"python", "python3", "py", "node", "deno", "bun", "ruby", "perl", "php",
+                 "powershell", "pwsh", "bash", "sh", "zsh", "cmd"}
+_INLINE_CODE_FLAGS = {"-c", "-e", "--eval", "-p", "--print", "-command", "-encodedcommand", "/c", "/k", "-r"}
+
+
+def runs_inline_code(command: str) -> bool:
+    """`python -c "..."`, `node -e ...`, `powershell -Command ...`: the allow-list sees only the program name, so code
+    passed inline could do anything (E-003)."""
+    try:
+        parts = _split_command(command)
+    except ValueError:
+        parts = command.split()
+    if not parts:
+        return False
+    exe = re.sub(r"\.exe$", "", pathlib.Path(parts[0]).name, flags=re.IGNORECASE).lower()
+    return exe in _INTERPRETERS and any(arg.lower() in _INLINE_CODE_FLAGS for arg in parts[1:])
 
 
 def _confirm_command(command: str, cwd: str) -> str | None:
@@ -572,6 +600,12 @@ def execute(
     if not typed_by_user and (err := _check_executable(command)):
         return ShellResult(command=command, cwd=resolved_cwd, exit_code=1, output_lines=[f"✗ Permission denied: {err}"])
 
+    # Inline code from the model is never run without the user seeing it (E-003), even in auto mode.
+    if not typed_by_user and _config.confirm_fn is None and runs_inline_code(command):
+        return ShellResult(command=command, cwd=resolved_cwd, exit_code=1, output_lines=[
+            "✗ Permission denied: inline code (`-c` / `-e` / `-Command`) needs your approval. "
+            "Write it to a file and run that, or switch to ask mode (shift+tab)."])
+
     # User confirmation — confirm_fn may return an amended command string or None (denied)
     if _config.confirm_fn is not None and not typed_by_user:
         approved_command = _confirm_command(command, resolved_cwd)
@@ -667,11 +701,13 @@ def run_agent(llm, user_request: str, console: Console | None = None) -> str:
         HumanMessage(content=user_request),
     ]
 
-    summary = ""
-    while True:
+    from app.agents.limits import MAX_AGENT_STEPS, stopped_message
+
+    summary = stopped_message()
+    for _step in range(MAX_AGENT_STEPS):  # E-002: never loop forever
         phase = "Summarizing command results..." if any(isinstance(m, ToolMessage) for m in messages) else "Planning command execution..."
         if console is not None:
-            with console.status(f"[bold blue]{phase}[/bold blue]", spinner="dots"):
+            with console.status(f"[m.dim]{phase}[/m.dim]", spinner="dots", spinner_style="m.accent"):
                 response: AIMessage = llm_with_tools.invoke(messages)
         else:
             response = llm_with_tools.invoke(messages)

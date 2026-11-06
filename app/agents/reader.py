@@ -456,7 +456,9 @@ def run(llm, user_request: str, console: Console | None = None) -> ReaderRespons
         HumanMessage(content=user_request),
     ]
 
-    while True:
+    from app.agents.limits import MAX_AGENT_STEPS, stopped_message
+
+    for _step in range(MAX_AGENT_STEPS):  # E-002: never loop forever
         phase = "Summarizing code findings..." if any(isinstance(m, ToolMessage) for m in messages) else "Planning code inspection..."
         response: AIMessage = _invoke_with_status(llm_with_tools, messages, console, phase)
         meta = getattr(response, "usage_metadata", None) or {}
@@ -480,6 +482,8 @@ def run(llm, user_request: str, console: Console | None = None) -> ReaderRespons
                 console.print(step_line(tc["name"], tc["args"], text, not text.lstrip().startswith("✗")))
             response_obj.findings.append(f"{tc['name']}: {str(output)[:200]}")
             messages.append(ToolMessage(content=str(output), tool_call_id=tc["id"]))
+    response_obj.summary = stopped_message()
+    return response_obj
 
 
 # ─── Render ───────────────────────────────────────────────────────────────────

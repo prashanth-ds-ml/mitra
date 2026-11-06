@@ -28,9 +28,11 @@ class TestCheckPath:
         assert err is not None
         assert "Permission denied" in err
 
-    def test_no_workspace_always_allows(self, tmp_path):
+    def test_no_workspace_denies_instead_of_allowing(self, tmp_path):
+        """E-003: fail closed; without a workspace nothing keeps the model inside the project."""
         guard = filesystem.PermissionGuard(workspace=None)
-        assert guard.check_path("/etc/passwd") is None
+        err = guard.check_path("/etc/passwd")
+        assert err is not None and "no workspace is set" in err
 
     def test_allowed_root_permits_extra_path(self, tmp_path):
         extra = tmp_path.parent / "shared"

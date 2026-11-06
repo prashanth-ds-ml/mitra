@@ -8,6 +8,10 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-020 | 2026-11-06 | E-021 | `_split_command` strips one pair of outer quotes per argument on Windows | `app/agents/shell.py` | `test_split_command_strips_outer_quotes_on_windows` | works |
+| F-019 | 2026-11-06 | E-003 | File and shell path checks refuse when no workspace is set; inline code from the model (`-c`, `-e`, `-Command`) runs only after approval | `app/agents/filesystem.py`, `app/agents/shell.py` | `tests/test_review_fixes.py` | works |
+| F-018 | 2026-11-06 | E-002 | File, reader, web and shell agent loops stop after 20 model calls with a clear message | `app/agents/limits.py` + 4 agents | `tests/test_review_fixes.py` | works |
+| F-017 | 2026-11-06 | E-001 | `edit_file` and the markdown writers count as code changes in the repair loop | `app/langgraph_workflows.py` | `test_edit_file_counts_as_a_code_change` | works |
 | F-016 | 2026-11-06 | E-020 | `execute_plan` prints `● Plan` and its result; an empty follow-up prints "Empty reply" plus the tool's result; every mention of a removed command reworded | `app/main.py`, `app/memory.py`, `app/agents/planner.py`, `app/agents/session.py` | `test_no_text_mentions_removed_commands` | works |
 | F-015 | 2026-11-06 | E-019 | Questions route to explain; "no coding" / "just brainstorm" route to brainstorm (nothing written); router matches "plan" as a whole word; a relative path starting with the workspace's folder name is not nested | `app/main.py`, `app/routing.py`, `app/agents/filesystem.py` | `TestQuestionsAreAnswered`, `TestWorkspaceNameIsNotNested` | works |
 | F-014 | 2026-11-06 | E-018 | `coerce_tool_args` writes object/list `content` as formatted JSON; `safe_invoke` turns any tool exception into a `✗ Invalid call to <tool>: ...` result the model can correct; used by the file, reader and web agents | `app/agents/filesystem.py`, `app/agents/reader.py`, `app/agents/web.py` | `TestBadToolArguments` | works |
