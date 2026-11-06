@@ -17,6 +17,7 @@ from typing import Callable
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.agents.limits import RepeatGuard
+from app.core import harness as H
 from app.core import loop as core_loop
 from app.core import tools as T
 from app.core.parse import text_tool_calls
@@ -133,8 +134,10 @@ class TurnResult:
 
 
 class ChatSession:
-    def __init__(self, *, workspace: str | Path, llm, hooks: Hooks, mode: str = "approve", num_ctx: int = 131072):
+    def __init__(self, *, workspace: str | Path, llm, hooks: Hooks, mode: str = "approve", num_ctx: int = 131072,
+                 harness=None):
         self.llm, self.hooks, self.mode, self.num_ctx = llm, hooks, mode, num_ctx
+        self.harness = harness if harness is not None else H.load()
         self.ws = T.Workspace(Path(workspace), read_only=())  # in the chat the user may ask for test edits
         self.ws.spill_dir = self.ws.root / ".mitra" / "output"
         # every step of every turn, scrubbed, one file per day: follow a session live, replay it later (D-022)
@@ -211,7 +214,8 @@ class ChatSession:
         try:
             out = core_loop.run_plan(path.read_text(encoding="utf-8"), self.ws, self.llm,
                                      full_test_command=test_command, on_event=self.hooks.on_plan_event,
-                                     record_dir=self.ws.root / ".mitra" / "runs" / "plan", num_ctx=self.num_ctx)
+                                     record_dir=self.ws.root / ".mitra" / "runs" / "plan", num_ctx=self.num_ctx,
+                                     harness=self.harness)
         finally:
             self.ws.before_write = saved_hook
         lines = [f"Plan: {out['passed_tasks']}/{out['total_tasks']} tasks passed; all tests: {out['final_tests']}"]
@@ -219,13 +223,15 @@ class ChatSession:
             lines.append(f"- {tid}: {res['status']} ({res['tests']}) {res['summary'][:120]}")
         return "\n".join(lines), out["final_tests_passed"]
 
-    def turn(self, messages: list, *, max_steps: int = MAX_STEPS) -> TurnResult:
+    def turn(self, messages: list, *, max_steps: int | None = None) -> TurnResult:
         """Run the loop on `messages` (the user's message is already the last one). Appends to `messages`."""
         res = TurnResult()
+        max_steps = max_steps or self.harness.limit("chat_max_steps")
         self.turn_no += 1
         t0 = time.monotonic()
         user = next((m.content for m in reversed(messages) if isinstance(m, HumanMessage)), "")
-        self.rec.write("turn_start", turn=self.turn_no, mode=self.mode, user=str(user)[:2000])
+        self.rec.write("turn_start", turn=self.turn_no, mode=self.mode, user=str(user)[:2000],
+                       harness_version=self.harness.version)
         res = self._turn(messages, res, max_steps)
         self.rec.write("turn_end", turn=self.turn_no, steps=res.steps, stopped=res.stopped, reason=res.stop_reason,
                        text=res.text[:2000], tokens_in=res.tokens_in, tokens_out=res.tokens_out,
@@ -237,9 +243,10 @@ class ChatSession:
         self.approve_all = False
         self.ws.journal = res.journal
         self.ws.before_write = self._before_write
-        specs = tool_specs(self.mode)
+        specs = H.apply_tools(tool_specs(self.mode), self.harness)
         bound = self.llm.bind_tools(specs)
-        guard = RepeatGuard(max_repeats=2, max_failures=4)
+        guard = RepeatGuard(max_repeats=self.harness.limit("max_repeats"),
+                            max_failures=self.harness.limit("max_failures"))
         for step in range(1, max_steps + 1):
             res.steps = step
             streamed = self._stream(bound.stream(messages), step)

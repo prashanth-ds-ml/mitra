@@ -19,6 +19,7 @@ from typing import Callable
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from app.agents.limits import RepeatGuard
+from app.core import harness as H
 from app.core import tools as T
 from app.core.parse import text_tool_calls
 from app.core.scrub import scrub_obj
@@ -161,31 +162,38 @@ def solve(
     ws: T.Workspace,
     llm,
     *,
-    max_steps: int = 40,
+    max_steps: int | None = None,
     max_failed_finishes: int = 3,
     num_ctx: int = 65536,
     on_event: Callable[[Event], None] | None = None,
     record_path: Path | None = None,
     context: str = "",
     call_timeout: float = CALL_TIMEOUT_S,
-    fresh_round_after: int = 3,
+    fresh_round_after: int | None = None,
     max_rounds: int = 3,
     rollback: bool = False,
+    harness=None,
 ) -> RunResult:
     """Work on `task` in `ws` until `ws.test_command` passes or a limit is hit."""
     emit = on_event or (lambda e: None)
+    h = harness if harness is not None else H.load()
+    max_steps = max_steps or h.limit("solve_max_steps")
+    fresh_round_after = fresh_round_after or h.limit("fresh_round_after")
+    system_prompt = H.apply_prompt(SYSTEM_PROMPT, h)
+    specs = H.apply_tools(T.TOOL_SPECS, h)
     rec = Recorder(record_path)
     t0 = time.monotonic()
     result = RunResult(status="stopped", summary="", record_path=str(record_path or ""))
-    rec.write("start", task=task, test_command=ws.test_command, workspace=str(ws.root), max_steps=max_steps)
+    rec.write("start", task=task, test_command=ws.test_command, workspace=str(ws.root), max_steps=max_steps,
+              harness_version=h.version)
 
     files = T.list_files(ws)
     user = (f"Task:\n{task}\n\n" + (f"{context}\n\n" if context else "")
             + f"Test command: {ws.test_command}\n\nFiles in the project:\n{files}")
-    messages: list = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=user)]
-    bound = llm.bind_tools(T.TOOL_SPECS)
-    known = {s["name"] for s in T.TOOL_SPECS}
-    guard = RepeatGuard(max_repeats=2, max_failures=4)
+    messages: list = [SystemMessage(content=system_prompt), HumanMessage(content=user)]
+    bound = llm.bind_tools(specs)
+    known = {s["name"] for s in specs}
+    guard = RepeatGuard(max_repeats=h.limit("max_repeats"), max_failures=h.limit("max_failures"))
     failed_finishes = empty_replies = failing_runs = 0
     round_no = 1
     if ws.journal is None:
@@ -196,8 +204,8 @@ def solve(
         nonlocal messages, guard, failing_runs, round_no
         round_no += 1
         note = handoff_note(task, ws, result.tests, round_no, reason)
-        messages = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=note)]
-        guard = RepeatGuard(max_repeats=2, max_failures=4)
+        messages = [SystemMessage(content=system_prompt), HumanMessage(content=note)]
+        guard = RepeatGuard(max_repeats=h.limit("max_repeats"), max_failures=h.limit("max_failures"))
         failing_runs = 0
         rec.write("fresh_round", round=round_no, reason=reason)
         emit(Event("note", {"text": f"fresh round {round_no}: {reason}"}))
@@ -384,7 +392,7 @@ def needs_help(task: "PlanTask", res: RunResult, files: list[str]) -> str:
 
 def run_plan(plan_text: str, ws: T.Workspace, llm, *, full_test_command: str, max_steps: int = 30,
              on_event: Callable[[Event], None] | None = None, record_dir: Path | None = None,
-             num_ctx: int = 65536, git: bool = True, rollback: bool = True) -> dict:
+             num_ctx: int = 65536, git: bool = True, rollback: bool = True, harness=None) -> dict:
     """For each task: implement until its 'Done when' command passes; then run the full tests."""
     emit = on_event or (lambda e: None)
     t0 = time.monotonic()
@@ -408,7 +416,7 @@ def run_plan(plan_text: str, ws: T.Workspace, llm, *, full_test_command: str, ma
         start = len(ws.journal)
         res = solve(f"{task.id}: {task.title}\n{task.body}", ws, llm, max_steps=max_steps,
                     on_event=on_event, record_path=rec, context=f"The plan's shared notes:\n{header}",
-                    num_ctx=num_ctx, rollback=rollback)
+                    num_ctx=num_ctx, rollback=rollback, harness=harness)
         results[task.id] = res
         files = sorted({T.Path(e["path"]).resolve().relative_to(ws.root).as_posix() for e in ws.journal[start:]}
                        | set(res.changed))

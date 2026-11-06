@@ -316,6 +316,46 @@ def cmd_solve(
 
 
 cli.command("solve")(cmd_solve)
+
+
+def cmd_harness(
+    action: str = typer.Argument("show", help="show | revert"),
+    version: int = typer.Argument(0, help="With revert: the version to go back to."),
+) -> None:
+    """Show what Mitra has learned (rules, tool texts, limits) and its history; revert to an earlier version."""
+    from app.core import harness as H
+
+    active = H.active_path()
+    history = sorted((active.parent / "harness" / "history").glob("*-v*.toml"))
+    if action == "revert":
+        match = [p for p in history if p.stem.endswith(f"-v{version}")]
+        if not match:
+            console.print(f"[m.err]No saved version {version}. `mitra harness` lists them.[/m.err]")
+            raise typer.Exit(1)
+        old = H.load(match[-1])
+        current = H.load()
+        old.version = current.version  # save() makes it the next version number
+        H.save(old, f"revert to v{version}")
+        console.print(f"Reverted to the rules of v{version} (saved as v{current.version + 1}).")
+        return
+    h = H.load()
+    console.print(Text(f"Harness v{h.version} · {h.source}", style="m.tool"))
+    if h.note:
+        console.print(Text(f"  why: {h.note}", style="m.dim"))
+    console.print(Text("  rules:" + ("" if h.rules else " none yet"), style="m.dim"))
+    for r in h.rules:
+        console.print(Text(f"    - {r}", style="m.text"))
+    for name, desc in h.tools.items():
+        console.print(Text(f"  tool {name}: {desc}", style="m.text"))
+    console.print(Text("  limits: " + ", ".join(f"{k}={v}" for k, v in h.limits.items()), style="m.dim"))
+    if history:
+        console.print(Text("  history:", style="m.dim"))
+        for p in history[-10:]:
+            note = H.load(p).note
+            console.print(Text(f"    {p.stem}  {note}", style="m.faint"))
+
+
+cli.command("harness")(cmd_harness)
 cli.command("/models", hidden=True)(cmd_models)
 cli.command("test")(cmd_test)
 cli.command("/test", hidden=True)(cmd_test)
@@ -1852,8 +1892,11 @@ def _chat():
     _apply_session_mode(cfg, session_mode)
 
     # Build system prompt, appending project rules + memory context
+    from app.core import harness as harness_mod
     from app.core.chat import CHAT_PROMPT
-    system_prompt = CHAT_PROMPT
+
+    harness = harness_mod.load()
+    system_prompt = harness_mod.apply_prompt(CHAT_PROMPT, harness)  # learned rules (self-improvement, step 1)
     if cfg.get("rules"):
         system_prompt += f"\n\n## Project Rules (from MITRA.md)\n{cfg['rules']}"
         loaded.append("MITRA.md")
@@ -1983,6 +2026,7 @@ def _chat():
         llm=local_llm,
         mode=session_mode,
         num_ctx=num_ctx,
+        harness=harness,
         hooks=Hooks(
             stream=_chat_stream,
             show=_chat_show,
