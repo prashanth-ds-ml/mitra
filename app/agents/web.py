@@ -244,8 +244,9 @@ def run(llm, user_request: str, console: Console | None = None) -> WebResponse:
         HumanMessage(content=user_request),
     ]
 
-    from app.agents.limits import MAX_AGENT_STEPS, stopped_message
+    from app.agents.limits import MAX_AGENT_STEPS, RepeatGuard, stopped_message
 
+    guard = RepeatGuard()  # E-023: no identical repeats; stop after 3 failures in a row
     for _step in range(MAX_AGENT_STEPS):  # E-002: never loop forever
         phase = "Summarizing web findings..." if any(isinstance(m, ToolMessage) for m in messages) else "Planning web steps..."
         response: AIMessage = _invoke_with_status(llm_with_tools, messages, console, phase)
@@ -260,7 +261,10 @@ def run(llm, user_request: str, console: Console | None = None) -> WebResponse:
 
         for tc in response.tool_calls:
             fn = tool_map.get(tc["name"])
-            if fn is None:
+            repeat = guard.before(tc["name"], tc["args"])
+            if repeat is not None:
+                output = repeat
+            elif fn is None:
                 output = f"✗ Unknown tool: {tc['name']}"
             else:
                 tool_label = "Fetching webpage..." if tc["name"] == "fetch_url" else "Searching public web..."
@@ -270,9 +274,15 @@ def run(llm, user_request: str, console: Console | None = None) -> WebResponse:
             if console is not None:
                 from app.ui import tool_line
                 target = str(tc["args"].get("url") or tc["args"].get("query") or "")[:80]
-                console.print(tool_line("Fetch" if tc["name"] == "fetch_url" else "Search", target,
-                                        ok=not str(output).lstrip().startswith("✗")))
+                failed = str(output).lstrip().startswith("✗")
+                console.print(tool_line("Fetch" if tc["name"] == "fetch_url" else "Search", target, ok=not failed,
+                                        detail=str(output).strip().splitlines()[0][:110] if failed else ""))
             messages.append(ToolMessage(content=str(output), tool_call_id=tc["id"]))
+            stop = guard.after(tc["name"], str(output))
+            if stop is not None:
+                response_obj.summary = stop + (" Mitra may be offline, or the search site is blocking requests."
+                                               if tc["name"] == "search_web" else "")
+                return response_obj
     response_obj.summary = stopped_message()
     return response_obj
 

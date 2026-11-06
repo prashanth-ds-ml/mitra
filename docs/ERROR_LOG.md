@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-023 | 2026-11-06 | M2 | High | user (terminal test) | "search about 3.5+ series models": the web agent ran 100+ `search_web` calls, most with the identical query, while every search timed out | closed | F-023 |
 | E-022 | 2026-11-06 | M2 | Medium | user (terminal test) | "can you make a clean plan for Level 01 ... 3. test ..." was routed as a test request; "fix the failing test" too; "latest" counted as "test" | closed | F-021 |
 | E-021 | 2026-11-06 | M2 | Medium | Claude (E-003 test) | On Windows the command splitter kept quote marks: `python -c "print(42)"` ran the literal string and printed nothing; quoted program paths failed the allow-list | closed | F-020 |
 | E-020 | 2026-11-06 | M2 | High | user (terminal test) | "make a clean plan for Level 01 ... plan, implement, test, fix, repeat" showed two thinking lines and nothing else: the model called `execute_plan`, got "not approved, use `/plan approve`" (a removed command), then wrote an empty follow-up, which Mitra did not report | closed | F-016 |
@@ -48,6 +49,22 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-023: The same failing search, over and over
+
+- **Date found:** 2026-11-06 · **Milestone:** M2 · **Severity:** High · **Found by:** user, terminal test
+- **Status:** closed
+
+**What happened:** the web agent called `search_web` more than 100 times; after narrowing the query a few times,
+qwen3.5:4b repeated `Qwen model specifications` about 80 times. Every call returned `✗ Web search failed: <urlopen
+error timed out>` (DuckDuckGo's HTML page is not reachable from this machine right now).
+**Root cause:** E-002 (no step limit; the user's session still ran code from before that fix, so it never stopped);
+and nothing stopped identical repeats or a tool that fails every time, so even with the 20-call limit the model
+could spend all 20 calls on the same failed search.
+**Fix:** F-023 (on top of F-018's 20-call limit).
+**Regression test:** `test_web_agent_stops_when_search_keeps_failing` (the user's session), `test_identical_calls_are_not_rerun_and_then_stop`,
+`test_repeat_guard_resets_failures_after_a_success`.
+**Lesson?** L-031.
 
 ### E-022: The router picked the first keyword it checked, anywhere in the message
 

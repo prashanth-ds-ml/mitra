@@ -1005,7 +1005,9 @@ def run(llm, user_request: str, console=None) -> AgentResponse:
 
     global _active_change_set
     _active_change_set = []
-    from app.agents.limits import MAX_AGENT_STEPS, stopped_message
+    from app.agents.limits import MAX_AGENT_STEPS, RepeatGuard, stopped_message
+
+    guard = RepeatGuard(max_repeats=2, max_failures=4)  # E-023
 
     try:
         for _step in range(MAX_AGENT_STEPS):  # E-002: never loop forever
@@ -1029,13 +1031,19 @@ def run(llm, user_request: str, console=None) -> AgentResponse:
                 return agent_response
 
             for tc in response.tool_calls:
-                output = _invoke_tool_call(tc["name"], tc["args"], tool_map, console=console)
+                repeat = guard.before(tc["name"], tc["args"])
+                output = repeat if repeat is not None else _invoke_tool_call(tc["name"], tc["args"], tool_map, console=console)
                 step = ToolResult(tool=tc["name"], args=tc["args"], output=str(output))
                 agent_response.steps.append(step)
                 if console is not None:
                     from app.ui import step_line
                     console.print(step_line(step.tool, step.args, step.output, step.ok))
                 messages.append(ToolMessage(content=str(output), tool_call_id=tc["id"]))
+                stop = guard.after(tc["name"], str(output))
+                if stop is not None:
+                    agent_response.summary = stop
+                    _persist_active_change_set()
+                    return agent_response
         agent_response.summary = stopped_message()
         _persist_active_change_set()
         return agent_response

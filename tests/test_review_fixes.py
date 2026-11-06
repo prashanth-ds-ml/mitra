@@ -28,9 +28,12 @@ def test_reads_alone_are_not_a_code_change():
 # ── E-002: agent loops stop at the step limit ───────────────────────────────
 
 class AlwaysCallsATool:
-    """A model that never gives a final answer: every reply asks for another tool call."""
+    """A model that never gives a final answer: every reply asks for another tool call.
 
-    def __init__(self, tool_name: str, args: dict):
+    `args` is a dict (the same call every time) or a function of the call number (a new call every time).
+    """
+
+    def __init__(self, tool_name: str, args):
         self.tool_name, self.args, self.calls = tool_name, args, 0
 
     def bind_tools(self, tools):
@@ -38,13 +41,16 @@ class AlwaysCallsATool:
 
     def invoke(self, messages):
         self.calls += 1
-        return AIMessage(content="", tool_calls=[{"name": self.tool_name, "args": self.args, "id": f"c{self.calls}"}])
+        args = self.args(self.calls) if callable(self.args) else self.args
+        return AIMessage(content="", tool_calls=[{"name": self.tool_name, "args": args, "id": f"c{self.calls}"}])
 
 
 def test_file_agent_stops_at_the_step_limit(tmp_path):
+    for n in range(MAX_AGENT_STEPS + 2):
+        (tmp_path / f"d{n}").mkdir()
     filesystem.configure(workspace=str(tmp_path), confirm_fn=None)
     try:
-        llm = AlwaysCallsATool("list_directory", {"path": "."})
+        llm = AlwaysCallsATool("list_directory", lambda n: {"path": f"d{n}"})
         resp = filesystem.run(llm, "keep listing")
         assert llm.calls == MAX_AGENT_STEPS
         assert "step limit" in resp.summary
@@ -54,17 +60,48 @@ def test_file_agent_stops_at_the_step_limit(tmp_path):
 
 def test_reader_agent_stops_at_the_step_limit(tmp_path):
     reader.configure(workspace=str(tmp_path), allowed_roots=[])
-    llm = AlwaysCallsATool("get_file_tree", {"path": "."})
+    llm = AlwaysCallsATool("get_file_tree", lambda n: {"path": ".", "max_depth": n})
     resp = reader.run(llm, "keep reading")
     assert llm.calls == MAX_AGENT_STEPS and "step limit" in resp.summary
 
 
 def test_web_agent_stops_at_the_step_limit(monkeypatch):
-    tool = next(t for t in web._ALL_TOOLS if t.name != "fetch_url")
     monkeypatch.setattr(web, "_run_tool_with_status", lambda fn, args, console, label: "result")
-    llm = AlwaysCallsATool(tool.name, {"query": "x"})
+    llm = AlwaysCallsATool("search_web", lambda n: {"query": f"q{n}"})
     resp = web.run(llm, "keep searching")
     assert llm.calls == MAX_AGENT_STEPS and "step limit" in resp.summary
+
+
+# ── E-023: the same call over and over (100+ identical searches) ────────────
+
+def test_web_agent_stops_when_search_keeps_failing(monkeypatch):
+    """The user's session: search timed out every time; the model kept searching."""
+    runs = []
+    monkeypatch.setattr(web, "_run_tool_with_status",
+                        lambda fn, args, console, label: runs.append(args) or "✗ Web search failed: <urlopen error timed out>")
+    llm = AlwaysCallsATool("search_web", lambda n: {"query": f"Qwen model specifications {n}"})
+    resp = web.run(llm, "search about qwen 3.5")
+    assert len(runs) == 3 and llm.calls == 3
+    assert "failed 3 times in a row" in resp.summary and "offline" in resp.summary
+
+
+def test_identical_calls_are_not_rerun_and_then_stop(monkeypatch):
+    runs = []
+    monkeypatch.setattr(web, "_run_tool_with_status", lambda fn, args, console, label: runs.append(args) or "result")
+    llm = AlwaysCallsATool("search_web", {"query": "Qwen model specifications", "max_results": 5})
+    resp = web.run(llm, "search")
+    assert len(runs) == 1                      # the search ran once
+    assert llm.calls == 4                      # then 3 repeats were refused
+    assert "kept repeating" in resp.summary
+
+
+def test_repeat_guard_resets_failures_after_a_success():
+    from app.agents.limits import RepeatGuard
+    g = RepeatGuard()
+    assert g.after("t", "✗ a") is None and g.after("t", "✗ b") is None
+    assert g.after("t", "ok") is None
+    assert g.after("t", "✗ c") is None and g.after("t", "✗ d") is None
+    assert g.after("t", "✗ e") is not None
 
 
 def test_shell_agent_stops_at_the_step_limit(monkeypatch):

@@ -456,8 +456,9 @@ def run(llm, user_request: str, console: Console | None = None) -> ReaderRespons
         HumanMessage(content=user_request),
     ]
 
-    from app.agents.limits import MAX_AGENT_STEPS, stopped_message
+    from app.agents.limits import MAX_AGENT_STEPS, RepeatGuard, stopped_message
 
+    guard = RepeatGuard(max_repeats=2)  # E-023
     for _step in range(MAX_AGENT_STEPS):  # E-002: never loop forever
         phase = "Summarizing code findings..." if any(isinstance(m, ToolMessage) for m in messages) else "Planning code inspection..."
         response: AIMessage = _invoke_with_status(llm_with_tools, messages, console, phase)
@@ -472,7 +473,10 @@ def run(llm, user_request: str, console: Console | None = None) -> ReaderRespons
 
         for tc in response.tool_calls:
             fn = tool_map.get(tc["name"])
-            if fn is None:
+            repeat = guard.before(tc["name"], tc["args"])
+            if repeat is not None:
+                output = repeat
+            elif fn is None:
                 output = f"✗ Unknown tool: {tc['name']}"
             else:
                 output = _run_tool_with_status(fn, tc["args"], console, f"Running {tc['name']}...")
@@ -482,6 +486,10 @@ def run(llm, user_request: str, console: Console | None = None) -> ReaderRespons
                 console.print(step_line(tc["name"], tc["args"], text, not text.lstrip().startswith("✗")))
             response_obj.findings.append(f"{tc['name']}: {str(output)[:200]}")
             messages.append(ToolMessage(content=str(output), tool_call_id=tc["id"]))
+            stop = guard.after(tc["name"], str(output))
+            if stop is not None:
+                response_obj.summary = stop
+                return response_obj
     response_obj.summary = stopped_message()
     return response_obj
 
