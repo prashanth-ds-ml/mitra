@@ -3137,7 +3137,8 @@ def _chat():
     _apply_session_mode(cfg, session_mode)
 
     # Build system prompt, appending project rules + memory context
-    system_prompt = SYSTEM_PROMPT
+    from app.core.chat import CHAT_PROMPT
+    system_prompt = CHAT_PROMPT
     if cfg.get("rules"):
         system_prompt += f"\n\n## Project Rules (from MITRA.md)\n{cfg['rules']}"
         loaded.append("MITRA.md")
@@ -3224,21 +3225,69 @@ def _chat():
 
     # Compact before the model's context is full: at most 80% of num_ctx (D-033).
     auto_compact_threshold = min(int(cfg.get("auto_compact_threshold", _AUTO_COMPACT_THRESHOLD)), int(num_ctx * 0.8))
-    setup_tool   = filesystem.make_routing_tool(codegen_llm)
-    shell_tool   = shell_agent.make_routing_tool(local_llm, console=console)
-    reader_tool  = reader_agent.make_routing_tool(local_llm, console=console)
-    planner_tool = planner_agent.make_routing_tool(
-        local_llm,
+    from app.core.chat import ChatSession, Hooks, repair_history
+    from app.core.cli import EventPrinter
+
+    def _chat_stream(chunks):
+        with ui.KeyWatcher() as keys:
+            streamed = ui.stream_reply(console, chunks, show_reasoning=show_reasoning, stop=keys.stop,
+                                       folded=ui_state.folded)
+        typed_buffer.append(keys.take_typed())
+        return streamed
+
+    def _chat_show(name, args, out, ok):
+        if name in ("run_command", "run_plan"):
+            return  # shown by their own hooks
+        if name == "run_tests":
+            first = out.splitlines()[0] if out else ""
+            console.print(ui.tool_line("Tests", ok=ok, detail=first))
+            ui_state.folded.remember("Test output", out)
+            return
+        console.print(ui.step_line({"write_file": "create_file", "list_files": "list_directory",
+                                    "search": "search_text", "web_search": "search_web"}.get(name, name),
+                                   args, out, ok))
+
+    def _chat_confirm(title, detail, question):
+        choice = _choose_approval_option(title, f"{detail}\n\n{question}",
+                                         [("approve", "Yes"), ("deny", "No")], fallback_default="approve")
+        return choice == "approve"
+
+    def _chat_shell(command):
+        console.print(ui.shell_start(command))
+        result = shell_agent.execute(command=command, cwd=None, console=console)
+        console.print(ui.shell_done(result))
+        ui_state.folded.remember(f"Output of {command}", result.output)
+        return result.to_llm_summary(), result.ok
+
+    def _chat_mcp_find(query):
+        return mcp_registry.format_search(cfg["workspace"], mcp_registry.search_tools(cfg["workspace"], query))
+
+    def _chat_mcp_call(server, tool, arguments):
+        res = mcp_registry.call_tool(
+            cfg["workspace"], server, tool, arguments,
+            approve=lambda spec, t, a: _chat_confirm(f"MCP {server} / {t}",
+                                                     json.dumps(mcp_registry.mask(a), indent=2)[:1500],
+                                                     f"Call {server} / {t}?"))
+        return res.text if res.ok else f"✗ {res.text}"
+
+    typed_buffer: list[str] = []
+    chat = ChatSession(
         workspace=cfg["workspace"],
-        console=console,
-        codegen_llm=codegen_llm,
-        reader_llm=local_llm,
-        shell_llm=local_llm,
-        direct_llm=local_llm,
-        work_mode=work_mode,
+        llm=local_llm,
+        mode=session_mode,
+        num_ctx=num_ctx,
+        hooks=Hooks(
+            stream=_chat_stream,
+            show=_chat_show,
+            confirm=_chat_confirm,
+            run_shell=_chat_shell,
+            web_search=lambda q: web_agent.search_web.invoke({"query": q}),
+            fetch_url=lambda u: web_agent.fetch_url.invoke({"url": u}),
+            mcp_find=_chat_mcp_find,
+            mcp_call=_chat_mcp_call,
+            on_plan_event=EventPrinter(console),
+        ),
     )
-    web_tool = web_agent.make_routing_tool(local_llm, console=console)
-    main_llm = local_llm.bind_tools([setup_tool, shell_tool, reader_tool, planner_tool, web_tool])
 
     hook_ctx = event_bus.HookContext(
         workspace=cfg["workspace"],
@@ -3333,216 +3382,6 @@ def _chat():
             bang_command = _extract_bang_command(user_input)
             _set_current_task(f"Running {bang_command}")
             _cmd_run(bang_command, folded=ui_state.folded)
-            continue
-
-        navigation_target = (
-            _extract_navigation_target(user_input)
-            or _extract_workspace_selection_target(user_input, shell_agent.get_cwd())
-        )
-        if navigation_target:
-            _cmd_run(f"cd {navigation_target}")
-            if _is_project_summary_request(user_input) or _is_understand_alias_request(user_input):
-                ai_reply = _build_project_summary(shell_agent.get_cwd())
-                console.print()
-                console.print(Rule(style="dim"))
-                _say(ai_reply)
-                memory.append_activity(cfg["workspace"], user_input, ai_reply)
-                memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        normalized_input = re.sub(r"\s+", " ", user_input.strip().lower())
-        if (
-            session_mode in {"read-only", "plan"}
-            and normalized_input in {"continue", "next step", "proceed", "keep going", "execute the plan"}
-        ):
-            ai_reply = _build_plan_execution_blocked_reply(session_mode)
-            console.print()
-            console.print(Rule(style="dim"))
-            _say(ai_reply)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-        if (
-            normalized_input in {"continue", "next step", "proceed", "keep going", "execute the plan"}
-            and memory.load_plan(cfg["workspace"])
-            and not planner_agent.is_plan_approved(cfg["workspace"])
-        ):
-            ai_reply = _build_plan_unapproved_reply()
-            console.print()
-            console.print(Rule(style="dim"))
-            _say(ai_reply)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if _is_next_steps_request(user_input):
-            _set_current_task("Summarizing next steps")
-            _print_progress_message("Summarizing the next steps", "I’ll use the current workspace state and active plan.")
-            ai_reply = _build_next_steps_reply(cfg["workspace"])
-            console.print()
-            console.print(Rule(style="dim"))
-            _say(ai_reply)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        web_query = _extract_web_search_query(user_input)
-        if web_query:
-            _set_current_task("Searching the web")
-            _print_progress_message("Searching the web", web_query[:120], color="cyan")
-            ai_reply = _cmd_search(f"/search {web_query}", local_llm)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        requested_url = _extract_url_from_input(user_input)
-        if requested_url and (
-            normalized_input == requested_url.lower()
-            or any(hint in normalized_input for hint in ("read", "open", "page", "url", "website", "site", "summarize"))
-        ):
-            _set_current_task("Reading webpage")
-            _print_progress_message("Reading the webpage", requested_url[:120], color="cyan")
-            ai_reply = _cmd_open_url(f"/open-url {requested_url}", local_llm)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        intent = _classify_intent(user_input)
-        progress_note = _build_intent_progress_message(intent, user_input)
-        if progress_note:
-            _set_current_task(progress_note[0])
-            _print_progress_message(*progress_note)
-
-        if intent == "chat" and _is_simple_greeting(user_input):
-            console.print()
-            console.print(Rule(style="dim"))
-            _say(_build_greeting_reply())
-            continue
-
-        if intent == "chat" and _is_small_talk(user_input):
-            ai_reply = _build_small_talk_reply(user_input)
-            console.print()
-            console.print(Rule(style="dim"))
-            _say(ai_reply)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if intent == "brainstorm":
-            project_context = _build_workspace_context(
-                cfg["workspace"],
-                include_context=True,
-                include_brainstorm=True,
-                include_understand=True,
-                include_prd=True,
-            )
-            ai_reply = _save_brainstorm_reply(
-                cfg["workspace"],
-                user_input,
-                _run_brainstorm_reply(idea_llm, cfg["workspace"], user_input, project_context=project_context),
-            )
-            console.print()
-            console.print(Rule(style="dim"))
-            _say(ai_reply)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if intent == "explain" and _is_current_folder_request(user_input):
-            ai_reply = _build_current_folder_reply(shell_agent.get_cwd(), workspace=cfg["workspace"])
-            console.print()
-            console.print(Rule(style="dim"))
-            _say(ai_reply)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if intent == "explain" and _is_understand_alias_request(user_input):
-            ai_reply = _build_project_summary(shell_agent.get_cwd())
-            console.print()
-            console.print(Rule(style="dim"))
-            _say(ai_reply)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if intent == "explain" and _is_project_summary_request(user_input):
-            ai_reply = _build_project_summary(shell_agent.get_cwd())
-            console.print()
-            console.print(Rule(style="dim"))
-            _say(ai_reply)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if intent == "change" and _is_cleanup_request(user_input):
-            ai_reply = _handle_cleanup_request(user_input, shell_agent.get_cwd())
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if _is_delete_project_request(user_input):
-            ai_reply = _build_root_delete_reply(cfg["workspace"])
-            console.print()
-            console.print(Rule(style="dim"))
-            _say(ai_reply)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if intent == "change":
-            simple_action = _extract_simple_change_action(user_input)
-            if simple_action:
-                tool_name, tool_args = simple_action
-                progress_title, progress_detail = _build_simple_change_progress(tool_name, tool_args)
-                _set_current_task(progress_title)
-                _print_progress_message(progress_title, progress_detail, color="cyan")
-                agent_resp = filesystem.run_direct(tool_name, tool_args, request=user_input, console=console)
-                console.print(render(agent_resp))
-                ai_reply = agent_resp.summary
-                memory.append_activity(cfg["workspace"], user_input, ai_reply)
-                memory.update_context(cfg["workspace"], user_input)
-                continue
-
-            root_rename_reply = _build_root_rename_reply(user_input, cfg["workspace"])
-            if root_rename_reply:
-                console.print()
-                console.print(Rule(style="dim"))
-                _say(root_rename_reply)
-                memory.append_activity(cfg["workspace"], user_input, root_rename_reply)
-                memory.update_context(cfg["workspace"], user_input)
-                continue
-
-        if intent == "run-help":
-            ai_reply = _build_run_command_reply(cfg["workspace"])
-            console.print()
-            console.print(Rule(style="dim"))
-            _say(ai_reply)
-            memory.append_activity(cfg["workspace"], user_input, ai_reply)
-            memory.update_context(cfg["workspace"], user_input)
-            continue
-
-        if intent == "plan":
-            reply_llm = _resolve_runtime_llm_for_intent(
-                intent,
-                idea_llm=idea_llm,
-                planner_llm=local_llm,
-                review_llm=review_llm,
-                codegen_llm=codegen_llm,
-            )
-            ai_reply = _auto_plan_request(
-                user_input,
-                cfg["workspace"],
-                reply_llm,
-                session_mode=session_mode,
-                codegen_llm=codegen_llm,
-                reader_llm=local_llm,
-                shell_llm=local_llm,
-                direct_llm=local_llm,
-            )
-            if ai_reply:
-                memory.append_activity(cfg["workspace"], user_input, ai_reply)
-                memory.update_context(cfg["workspace"], user_input)
             continue
 
         # ── Slash commands ────────────────────────────────────────────────────
@@ -3726,10 +3565,6 @@ def _chat():
             ctx_used = 0
             continue
 
-        if intent == "run" and _looks_like_explicit_command(user_input):
-            _cmd_run(_extract_command(user_input))
-            continue
-
         if cmd == "/doctor":
             ai_reply = "\n\n".join([
                 _build_resources_reply(),
@@ -3756,164 +3591,21 @@ def _chat():
         ui.notify.working(console)
 
         try:
-            # ── Invoke with streaming ─────────────────────────────────────────
+            # ── One turn of the core loop (M1 stage 2) ────────────────────────
             turn_in = turn_out = 0
-
-            # Stream tokens for direct replies; invoke() for tool-call routing.
-            # Strategy: stream first, collect; if tool_calls in final chunk switch mode.
-            streamed_chunks: list = []
-            streamed_text = ""
-            has_tool_calls = False
-
-            with ui.KeyWatcher() as keys:
-                streamed = ui.stream_reply(console, main_llm.stream(messages), show_reasoning=show_reasoning,
-                                           stop=keys.stop, folded=ui_state.folded)
-            typed_ahead += keys.take_typed()
-            streamed_chunks = streamed.chunks
-            streamed_text = streamed.text
-            has_tool_calls = not streamed.stopped and any(getattr(c, "tool_call_chunks", None) for c in streamed_chunks)
-            if streamed.stopped:
-                response = AIMessage(content=streamed.text)   # keep the partial answer; run no tools
-            elif streamed.message is None:
-                raise RuntimeError("The model returned an empty reply.")
-            else:
-                response = streamed.message
-
-            # Fall back to invoke if streaming didn't give tool calls properly
-            if not response.tool_calls and has_tool_calls:
-                with console.status("[m.dim]Thinking...[/m.dim]", spinner_style="m.accent"):
-                    response = main_llm.invoke(messages)
-
-            t_in, t_out = _get_tokens(response)
-            ctx_used = t_in or ctx_used
-            turn_in += t_in; turn_out += t_out
-            messages.append(response)
-
-            # Thinking was shown (or summarised in one line) while streaming.
-            thinking, clean_content = _extract_thinking(response.content or "")
-
-            ai_reply = ""
-            skip_follow_up = False
-
-            if response.tool_calls:
-                for tc in response.tool_calls:
-                    request = tc["args"].get("request", user_input)
-                    tool_name = tc["name"]
-                    tool_args = {k: v for k, v in tc["args"].items() if k != "request"}
-
-                    event_bus.emit(event_bus.PreToolEvent(
-                        tool_name=tool_name,
-                        tool_args=tool_args,
-                        request=request,
-                        context=hook_ctx,
-                    ))
-
-                    tool_error = None
-                    tool_result = None
-
-                    if tc["name"] == "run_command":
-                        # ── Shell Agent ───────────────────────────────────────
-                        _LAST_SHELL_COMMAND = _extract_command(request)
-                        console.print(ui.shell_start(_LAST_SHELL_COMMAND))
-                        shell_result = shell_agent.execute(
-                            command=_LAST_SHELL_COMMAND,
-                            cwd=None,
-                            console=console,
-                        )
-                        console.print(ui.shell_done(shell_result))
-                        ui_state.folded.remember(f"Output of {_LAST_SHELL_COMMAND}", shell_result.output)
-                        messages.append(ToolMessage(content=shell_result.to_llm_summary(), tool_call_id=tc["id"]))
-                        ai_reply = shell_result.to_llm_summary()
-                        tool_result = shell_result
-                    elif tc["name"] == "read_codebase":
-                        # ── Code Reader Agent ─────────────────────────────────
-                        reader_resp = reader_agent.run(local_llm, request, console=console)
-                        turn_in  += reader_resp.tokens_in
-                        turn_out += reader_resp.tokens_out
-                        messages.append(ToolMessage(content=reader_resp.summary, tool_call_id=tc["id"]))
-                        console.print()
-                        console.print(Markdown(reader_resp.summary or "(no findings)"))
-                        ai_reply = reader_resp.summary
-                        skip_follow_up = True
-                        tool_result = reader_resp
-                    elif tc["name"] == "browse_web":
-                        web_resp = web_agent.run(local_llm, request, console=console)
-                        turn_in += web_resp.tokens_in
-                        turn_out += web_resp.tokens_out
-                        messages.append(ToolMessage(content=web_resp.summary, tool_call_id=tc["id"]))
-                        console.print(web_agent.render(web_resp))
-                        ai_reply = web_resp.summary
-                        skip_follow_up = True
-                        tool_result = web_resp
-                    elif tc["name"] == "execute_plan":
-                        # ── Planner Agent ─────────────────────────────────────
-                        console.print(ui.tool_line("Plan", "run the next step"))
-                        plan_summary = _execute_approved_plan(
-                            workspace=cfg["workspace"],
-                            llm=local_llm,
-                            max_steps=1,
-                            session_mode=session_mode,
-                            codegen_llm=codegen_llm,
-                            reader_llm=local_llm,
-                            shell_llm=local_llm,
-                            direct_llm=local_llm,
-                        )
-                        console.print(Text("  ⎿  " + _shorten_display(plan_summary, 160), style="m.dim"))
-                        messages.append(ToolMessage(content=plan_summary, tool_call_id=tc["id"]))
-                        ai_reply = plan_summary
-                        tool_result = plan_summary
-                    else:
-                        # ── Filesystem Agent ──────────────────────────────────
-                        agent_resp = filesystem.run(codegen_llm, request, console=console)
-                        turn_in += agent_resp.tokens_in
-                        turn_out += agent_resp.tokens_out
-                        messages.append(ToolMessage(content=agent_resp.summary, tool_call_id=tc["id"]))
-                        ai_reply = agent_resp.summary
-                        tool_result = agent_resp
-
-                    event_bus.emit(event_bus.PostToolEvent(
-                        tool_name=tool_name,
-                        tool_args=tool_args,
-                        result=tool_result,
-                        context=hook_ctx,
-                        error=tool_error,
-                    ))
-
-                if not skip_follow_up:
-                    console.print()
-                    with ui.KeyWatcher() as keys:
-                        fu = ui.stream_reply(console, main_llm.stream(messages), show_reasoning=show_reasoning,
-                                             label="Writing", stop=keys.stop, folded=ui_state.folded)
-                    typed_ahead += keys.take_typed()
-                    if fu.stopped or fu.message is None:
-                        follow_up = AIMessage(content=fu.text)
-                    else:
-                        follow_up = fu.message
-                    f_in, f_out = _get_tokens(follow_up)
-                    ctx_used = f_in or ctx_used
-                    turn_in += f_in; turn_out += f_out
-                    messages.append(follow_up)
-                    if fu.text:
-                        ai_reply = fu.text
-                    elif not fu.stopped:
-                        # E-020: the model wrote nothing after the tool; never end a turn silently.
-                        console.print(ui.tool_line("Empty reply", ok=False,
-                                                   detail="the model wrote no answer after the tool; its result is below"))
-                        if ai_reply:
-                            _say(ai_reply)
-
-            elif clean_content.strip():
-                ai_reply = clean_content.strip()
-                if not streamed.printed:
-                    console.print(Markdown(ai_reply))
-            elif not streamed.stopped:
-                # A failed or empty model reply is an error, never a silent pass.
-                console.print(ui.tool_line(
-                    "Empty reply", ok=False,
-                    detail="the model returned no answer"
-                    + (f" after {streamed.thinking_tokens} thinking tokens" if streamed.thinking_tokens else "")
-                    + ". Try again, or /compact if the context is full.",
-                ))
+            chat.mode = session_mode
+            typed_buffer.clear()
+            turn = chat.turn(messages)
+            typed_ahead += "".join(typed_buffer)
+            turn_in, turn_out = turn.tokens_in, turn.tokens_out
+            ctx_used = turn.ctx_used or ctx_used
+            ai_reply = turn.text.strip()
+            if turn.journal:
+                memory.record_last_change_set(cfg["workspace"], {"entries": turn.journal})
+            if turn.stopped and turn.stop_reason:
+                console.print(ui.tool_line("Stopped", ok=False, detail=turn.stop_reason))
+            elif not ai_reply:
+                console.print(ui.tool_line("Empty reply", ok=False, detail="the model wrote no answer. Try again."))
 
             # ── Token bar ─────────────────────────────────────────────────────
             sess_in += turn_in; sess_out += turn_out
@@ -3954,9 +3646,11 @@ def _chat():
 
         except KeyboardInterrupt:
             _set_current_task("Ready")
-            console.print("\n[dim]Interrupted.[/dim]")
+            repair_history(messages)
+            console.print(Text("\n  Interrupted.", style="m.dim"))
         except Exception as e:
             _set_current_task("Ready")
+            repair_history(messages)
             _log_error(cfg["workspace"], e)
             console.print(ui.tool_line("Error", ok=False,
                                        detail=f"{_friendly_error(e)} (full trace in .mitra/errors.log)"))

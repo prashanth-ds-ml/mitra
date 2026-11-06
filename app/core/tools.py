@@ -38,6 +38,9 @@ class Workspace:
     seen: dict[str, float] = field(default_factory=dict)  # path -> mtime when last read or written
     spill_dir: Path | None = None
     changed: set[str] = field(default_factory=set)
+    # before_write(rel, old_text_or_None, new_text): raise ToolError to refuse (the chat's ask mode uses it)
+    before_write: object = None
+    journal: list | None = None  # undo entries in the /undo format, when the caller wants them
 
     def __post_init__(self):
         self.root = Path(self.root).resolve()
@@ -69,6 +72,21 @@ class Workspace:
         name = full.name.lower()
         if name.startswith(".env") or name.endswith((".pem", ".key")):
             raise ToolError(f"'{rel}' looks like a secret file; Mitra does not write those.")
+
+
+def _commit(ws: Workspace, full: Path, new_text: str) -> None:
+    """Write a file after the approval hook, recording an undo entry."""
+    rel = ws.rel(full)
+    old = full.read_text(encoding="utf-8", errors="replace") if full.exists() else None
+    if callable(ws.before_write):
+        ws.before_write(rel, old, new_text)
+    full.parent.mkdir(parents=True, exist_ok=True)
+    full.write_text(new_text, encoding="utf-8")
+    if ws.journal is not None:
+        ws.journal.append({"kind": "create_file", "path": str(full), "existed": old is not None,
+                           "before": old, "after": new_text})
+    ws.seen[rel] = full.stat().st_mtime
+    ws.changed.add(rel)
 
 
 # ── tools ────────────────────────────────────────────────────────────────────
@@ -139,10 +157,7 @@ def write_file(ws: Workspace, path: str, content: str) -> str:
     if isinstance(content, (dict, list)):
         import json
         content = json.dumps(content, indent=2) + "\n"
-    full.parent.mkdir(parents=True, exist_ok=True)
-    full.write_text(str(content), encoding="utf-8")
-    ws.seen[rel] = full.stat().st_mtime
-    ws.changed.add(rel)
+    _commit(ws, full, str(content))
     return f"Wrote {rel} ({len(str(content).splitlines())} lines)."
 
 
@@ -183,9 +198,7 @@ def edit_file(ws: Workspace, path: str, old: str, new: str) -> str:
                      for line in new.splitlines()]
         lines[i:i + len(want)] = new_lines
         text = "\n".join(lines) + "\n"
-    full.write_text(text, encoding="utf-8")
-    ws.seen[rel] = full.stat().st_mtime
-    ws.changed.add(rel)
+    _commit(ws, full, text)
     return f"Edited {rel}."
 
 
