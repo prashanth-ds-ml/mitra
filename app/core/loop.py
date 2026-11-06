@@ -305,7 +305,7 @@ def solve(
                 if run.passed:
                     return finish_with("passed", text or f"Tests pass: {run.summary}")
                 failing_runs += 1
-            stop = guard.after(name, output)
+            stop = guard.after(name, output, ok)
             if stop:
                 return finish_with("stopped", stop)
         if failing_runs >= fresh_round_after:

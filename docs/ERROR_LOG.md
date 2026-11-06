@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-033 | 2026-11-06 | M1 | High | user session (brick breaker, pasted) | The same `cd .../brick-breaker && python -m pytest ...` ran 30+ times (455K tokens, 12 min) until the step limit: chains and `cd` cannot run without a shell, Git Bash paths are not Windows paths, the repeat guard exempted shell commands and missed their failures, and the screen showed only `failed · exit 1` | closed | F-033 |
 | E-032 | 2026-11-06 | M1 | High | user session (brick breaker) | A model's `run_command python ...` found Mitra's own Python inside the installed command (Windows searches the parent's folder first): `No module named pytest` | closed | F-032 |
 | E-031 | 2026-11-06 | M1 | High | user session (brick breaker) | `python -c "import os; os.makedirs(...)"` ran without asking because `python` had been trusted in that folder: trust by program name let inline code through in ask mode | closed | F-031 |
 | E-030 | 2026-11-06 | M2 | Medium | user session (brick breaker) | A 154-line new file was shown as an 80-line diff ending "… 1 more lines": two cut-offs stacked; new files shown as `+` diff lines, printed twice | closed | F-030 |
@@ -58,6 +59,22 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 ```
 
 ## Entries
+
+### E-033: One failing shell command, 30 times
+
+- **Date found:** 2026-11-06 · **Milestone:** M1 · **Severity:** High · **Found by:** user, brick-breaker session (pasted screen)
+- **Status:** closed
+
+**What happened:** after writing the game, Mitra alternated two commands
+(`cd /c/Users/.../brick-breaker && python -m pytest ...` and the same from the repo root) 30+ times, each
+`failed · exit 1`, then told the user tests failed "due to workspace path restrictions". 40 model calls, 455.6K
+prompt tokens, 719 s.
+**Root cause:** (1) model commands run without a shell, so `cd X && ...` can never work; (2) `/c/...` is a Git Bash
+path; (3) the repeat guard exempted `run_command` (E-026 fix) and only counted outputs starting with ✗ as failures;
+(4) `shell_done` hid the error, so neither the user nor a reader of the screen could see why.
+**Fix:** F-033.
+**Regression test:** `tests/test_shell_chains.py` (10).
+**Lesson?** L-036.
 
 ### E-032: The shell's `python` was Mitra's own Python
 

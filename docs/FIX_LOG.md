@@ -8,6 +8,7 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-033 | 2026-11-06 | E-033 | `cd X && cmd` / `;` chains run part by part (cd only inside the workspace), `/c/...` paths converted, pipes/redirects refused with a reason; repeat guard: shell commands are repeats unless a file changed, failures counted by the real result; failed commands show their last output line | `app/agents/shell.py`, `app/agents/limits.py`, `app/ui/render.py`, core loop + chat | `tests/test_shell_chains.py` | works |
 | F-032 | 2026-11-06 | E-032 | `_model_command_args`: a model command's `python` is `project_python()` | `app/agents/shell.py` | `test_model_python_command_uses_the_projects_python` | works |
 | F-031 | 2026-11-06 | E-031 | Inline code is never covered by trust (always asks); new `make_dir` tool | `app/main.py`, `app/core/tools.py` | `test_inline_code_asks_even_when_the_program_is_trusted` | works |
 | F-030 | 2026-11-06 | E-030 | New files as a card (header, syntax colours, line numbers, 20 lines + honest fold), edits as numbered hunks with 2 lines of context, one result line after approval; Yes / Yes to all / No with a reason | `app/ui/files.py`, `app/core/chat.py`, `app/main.py` | `tests/test_display_fixes.py` | works |

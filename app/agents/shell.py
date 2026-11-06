@@ -241,6 +241,49 @@ def runs_inline_code(command: str) -> bool:
     return exe in _INTERPRETERS and any(arg.lower() in _INLINE_CODE_FLAGS for arg in parts[1:])
 
 
+def unix_to_windows_path(arg: str) -> str:
+    """`/c/Users/x` (Git Bash style, which models often write) -> `C:/Users/x` on Windows."""
+    if platform.system() == "Windows" and re.match(r"^/[a-zA-Z](/|$)", arg):
+        return arg[1].upper() + ":" + (arg[2:] or "/")
+    return arg
+
+
+def split_chain(command: str) -> list[str] | None:
+    """`cd X && pytest -q` -> ["cd X", "pytest -q"]; None for a single plain command.
+
+    Model commands run without a shell, so `&&` and `cd` used to fail every time; the model retried the same chain
+    30+ times (E-033). Chains of `&&` / `;` are run one part at a time; pipes and redirects are refused."""
+    if not any(tok in command for tok in ("&&", ";")):
+        return None  # a lone `cd X` stays the built-in that moves the session's folder
+    parts = [p.strip() for p in re.split(r"&&|;", command) if p.strip()]
+    return parts or None
+
+
+def _run_chain(parts: list[str], cwd: str, timeout, console) -> ShellResult:
+    """Run `cd` parts by changing the folder (inside the workspace only) and the rest one by one; stop at a failure."""
+    here = pathlib.Path(cwd)
+    lines: list[str] = []
+    last = ShellResult(command=" && ".join(parts), cwd=str(here), exit_code=0, output_lines=[])
+    for part in parts:
+        if re.match(r"^cd(\s|$)", part, flags=re.IGNORECASE):
+            target = unix_to_windows_path(part[2:].strip().strip("\"'") or ".")
+            new = (here / target).resolve() if not pathlib.Path(target).is_absolute() else pathlib.Path(target).resolve()
+            if err := _check_path_in_workspace(new):
+                return ShellResult(command=part, cwd=str(here), exit_code=1, output_lines=lines + [f"✗ {err}"])
+            if not new.is_dir():
+                return ShellResult(command=part, cwd=str(here), exit_code=1,
+                                   output_lines=lines + [f"✗ No folder {target} (from {here})"])
+            here = new
+            continue
+        last = execute(part, cwd=str(here), timeout=timeout, console=console)
+        lines += last.output_lines
+        if not last.ok:
+            break
+    return ShellResult(command=" && ".join(parts), cwd=str(here), exit_code=last.exit_code,
+                       output_lines=lines, timed_out=last.timed_out, denied=last.denied,
+                       hidden_lines=getattr(last, "hidden_lines", 0))
+
+
 def _model_command_args(command: str, cwd: str) -> list[str]:
     """Split a model's command; `python` means the project's Python (E-028).
 
@@ -445,6 +488,15 @@ def execute(
     """
     resolved_cwd = _resolve_cwd(cwd)
     timeout = timeout if timeout is not None else _config.default_timeout
+
+    if not typed_by_user:
+        if any(tok in command for tok in ("|", ">", "<")) and not re.search(r"""["'][^"']*[|<>][^"']*["']""", command):
+            return ShellResult(command=command, cwd=resolved_cwd, exit_code=1, output_lines=[
+                "✗ Pipes and redirects (| > <) are not supported for model commands. Run one command at a time."])
+        chain = split_chain(command)
+        if chain is not None:
+            return _run_chain(chain, resolved_cwd, timeout, console)
+        command = " ".join(unix_to_windows_path(a) if a.startswith("/") else a for a in command.split(" "))
 
     resolved_path = pathlib.Path(resolved_cwd)
     if err := _check_path_in_workspace(resolved_path):

@@ -118,6 +118,9 @@ def shell_done(result) -> Text:
         t.append("done" + (f" · {n} lines of output" if n else ""), style="m.ok")
     else:
         t.append(f"failed · exit {result.exit_code}", style="m.err")
+        last = next((ln.strip() for ln in reversed(getattr(result, "output_lines", []) or []) if ln.strip()), "")
+        if last:  # say why, not only "failed" (2026-11-06: 30 failures with no visible reason)
+            t.append(f" · {last[:120]}", style="m.err")
     hidden = getattr(result, "hidden_lines", 0) or 0
     if hidden:
         t.append(f"  … +{hidden} lines (ctrl+o)", style="m.faint")

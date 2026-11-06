@@ -290,7 +290,7 @@ class ChatSession:
                 self.hooks.show(name, args, out, ok)
                 self.rec.write("tool", turn=self.turn_no, step=step, name=name, args=args, ok=ok, output=out[:3000])
                 messages.append(ToolMessage(content=out, tool_call_id=tc["id"]))
-                stop = guard.after(name, out) or ""
+                stop = guard.after(name, out, ok) or ""
             if stop:
                 return self._wrap_up(messages, res, stop)
         return self._wrap_up(messages, res, f"step limit ({max_steps} model calls)")

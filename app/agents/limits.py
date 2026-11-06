@@ -19,9 +19,11 @@ class RepeatGuard:
     """
 
     # Checking again is never a pointless repeat: tests and commands are re-run after changes (E-026).
-    EXEMPT = frozenset({"run_tests", "run_command"})
+    # Re-running the tests is never a pointless repeat (E-026). A shell command is: the same failing command was run
+    # 30+ times (E-033), so it is a repeat unless a file changed since (writes clear the memory below).
+    EXEMPT = frozenset({"run_tests"})
     # Tools that change files: after one of them, earlier reads may give a different answer.
-    WRITES = frozenset({"write_file", "edit_file", "run_command", "run_plan", "mcp_call"})
+    WRITES = frozenset({"write_file", "edit_file", "make_dir", "run_plan", "mcp_call"})
 
     def __init__(self, *, max_repeats: int = 1, max_failures: int = 3) -> None:
         self.max_repeats, self.max_failures = max_repeats, max_failures
@@ -47,7 +49,8 @@ class RepeatGuard:
                     "Use the result you have, try different arguments, or give your answer now.")
         return None
 
-    def after(self, name: str, output: str) -> str | None:
+    def after(self, name: str, output: str, ok: bool | None = None) -> str | None:
+        """ok: whether the call worked (a shell command's output does not start with ✗; E-033)."""
         if name in self.WRITES and not str(output).lstrip().startswith("✗"):
             self._calls.clear()  # the files changed: re-reading them is not a repeat (E-026)
         if str(output).startswith("✗ Not run:"):
@@ -56,7 +59,7 @@ class RepeatGuard:
                 return (f"✗ Stopped: the model kept repeating the same {name} call "
                         f"({self._repeats_refused} repeats refused) instead of answering.")
             return None
-        failed = str(output).lstrip().startswith("✗")
+        failed = (not ok) if ok is not None else str(output).lstrip().startswith("✗")
         if not failed:
             self._fail_tool, self._fail_count = "", 0
             return None
