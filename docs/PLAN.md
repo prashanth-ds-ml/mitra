@@ -50,7 +50,8 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 
 **D. Practice ladder, one level per kind** (mitra-playground; hidden tests decide)
 - [ ] 17. Level 02: second arcade game (+ `screenshot` tool: the model looks at the game; qwen3.5 has vision)
-- [ ] 18. Level 03: portfolio site (+ Playwright MCP brought forward from M4)
+- [ ] 17b. Design-kit skill: light CSS framework, tokens, 3-4 layouts; default style for sites and overnight demos
+- [ ] 18. Level 03: portfolio site (+ Playwright MCP brought forward from M4) + visual self-check with `screenshot` before "done"
 - [ ] 19. New DB-design level: schema from a spec, hidden tests on constraints and queries (+ `sql` tool)
 - [ ] 20. Level 04: API + DB (+ `http_request`, localhost only)
 - [ ] 21. Tool sets by project type (core always; game / web / db sets only when the project needs them) + BM25 ranking for `mcp_find`
@@ -60,7 +61,7 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 - [ ] 23. Decide the context size per model from real use (E1)
 - [ ] 24. `mitra improve` on real-session patterns (S2) and auto-revert of harness changes that make things worse (S5)
 - [ ] 25. Serena on/off trial (M4)
-- [ ] 26. Level 06: small web app; then real projects of each kind whose level passed
+- [ ] 26. Level 06: small web app; then real projects of each kind whose level passed (+ shadcn/ui MCP for React apps)
 
 **Later:** Research Desk MCP (M4), I-8 explore sub-agent (only if item 5 shows it is cheap), project memory proposals
 (S4), before/after pairs for training (S3), fine-tune (M7).

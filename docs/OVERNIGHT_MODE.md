@@ -63,7 +63,26 @@ handoffs, or a plan of plans. The plan is the weak spot: approving it before bed
 1. Level 02 (arcade game) from a PRD, hidden tests decide (also the planner experiment, 14c).
 2. One of your real ideas, small first.
 
-## Open questions
+## Decisions (user agreed to the defaults, 2026-11-07)
+| Question | Default |
+|---|---|
+| Plan | **You approve it before you sleep** (2 min). If not approved in time, Mitra runs on its own plan and the report says so |
+| Network at night | **Package installs and web search allowed, inside the project only** (project venv / node_modules; every install listed in the report); nothing else: no push, no uploads |
+| After the build | **The app stays running on localhost** for the morning demo; the report gives the link and the stop/restart command; nothing is left running if the build failed |
+| Leftover time | **Stop when the build is done**; no `mitra improve` during a night at first (the night's failures are recorded for the next day) |
+| Time budget | **Until done, at most 4 hours** (`--hours` changes it per night) |
+
+## Better-looking demos (user agreed, 2026-11-07)
+1. **Design-kit skill** (not an MCP): a light CSS framework (e.g. Pico.css or Tailwind via CDN), colour and spacing
+   tokens, 3-4 page layouts (landing, dashboard, form, game screen); Mitra fills in a proven design instead of
+   inventing one. Offline, plain HTML, the default style for overnight builds.
+2. **Visual self-check**: Playwright + `screenshot` (qwen3.5 has vision) before "done", and in the overnight deploy step.
+3. **shadcn/ui MCP** (official, local, free) for React / Next.js web apps, when those start (level 06, real apps).
+4. **Figma Dev Mode MCP** only if designs are made in Figma first. Not used: 21st.dev Magic (API key, cloud; breaks
+   local-only); local image generation (does not fit next to the 9B on 8 GB).
+Names and terms of each server checked before adding.
+
+## Open questions (answered above)
 1. Approve the plan before you sleep (recommended), or fully hands-off from the PRD?
 2. At night: allow package installs into the project and web search, or offline only?
 3. After the build: leave the app running for the morning demo, or stop it and print the command?
