@@ -8,7 +8,7 @@ Each change is measured on the dashboard (D-041) before and after; the prompt st
 1,133 tokens for the chat, 670 for solve).
 
 ## Order
-E3 → E4 → S1 → E2. The first three are about one short session together; E2 needs a benchmark run.
+E3 → E4 → S1 → M → E2. The first four are about one short session together; E2 needs a benchmark run.
 
 ---
 
@@ -89,6 +89,12 @@ and is not recorded anywhere.
   Recorded in EVALS, whatever it shows. Needs free RAM (close heavy apps; the start check says how much).
 
 ---
+
+## M: measure prompt processing (added 2026-11-07, user agreed)
+- Every trace call also saves Ollama's prompt-processing time and the number of prompt tokens it had to process
+  (`prompt_eval_duration`, `prompt_eval_count` from the reply metadata), so the dashboard shows how much time goes
+  to re-reading the history versus writing the answer. This decides whether a sub-agent (I-8) would cost more than
+  it saves. **Done when:** a unit test sees both fields in a trace; the Models table shows median prompt seconds.
 
 ## Risks
 - **Adaptive thinking makes worse choices on routine steps.** Mitigation: thinking comes back on after any failure;

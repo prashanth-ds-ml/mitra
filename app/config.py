@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import getpass
+import json
 import os
 import pathlib
 import re
@@ -73,7 +74,7 @@ _DEFAULTS: dict = {
     "show_reasoning": False,
     "memory_enabled": False,
     "require_diff_approval": True,
-    "auto_compact_threshold": 120000,  # combined tokens before auto-compact
+    "auto_compact_threshold": 0,      # 0 = 80% of num_ctx (E-046); a number caps it lower
     "num_ctx": 0,                     # 0 = per model, measured on this machine (D-033); set a number to override
     "gpu_layers": "auto",             # "auto" | 0 (CPU only) | -1 (full GPU) | N (N layers)
     "ollama_api_key": "",
@@ -605,8 +606,63 @@ def save_last_model(name: str) -> None:
         pass
 
 
+CONTEXT_CHOICES = {"32k": 32_768, "64k": 65_536, "128k": 131_072, "192k": 196_608, "256k": 262_144}
+
+
+def _context_file() -> pathlib.Path:
+    return _mitra_home() / "context.json"
+
+
+def load_context_choice(name: str) -> int:
+    """The context the user picked for this model with /context (0 = none picked)."""
+    try:
+        return int(json.loads(_context_file().read_text(encoding="utf-8")).get(name.strip(), 0) or 0)
+    except (OSError, ValueError, AttributeError):
+        return 0
+
+
+def save_context_choice(name: str, num_ctx: int) -> None:
+    """Remember /context per model (0 removes the choice: back to the measured default)."""
+    try:
+        f = _context_file()
+        data = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+        if num_ctx:
+            data[name.strip()] = int(num_ctx)
+        else:
+            data.pop(name.strip(), None)
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(json.dumps(data, indent=1), encoding="utf-8")
+    except (OSError, ValueError):
+        pass
+
+
+def parse_context_choice(text: str, max_ctx: int = 0) -> tuple[int, str]:
+    """`/context <size>`: (num_ctx, "") or (0, error). "auto" gives (0, "") = back to the measured default."""
+    word = text.strip().lower().replace(" ", "")
+    if word == "auto":
+        return 0, ""
+    n = CONTEXT_CHOICES.get(word) or (int(word) if word.isdigit() else 0)
+    if not n:
+        return 0, f"Unknown size `{text.strip()}`. Use one of: {', '.join(CONTEXT_CHOICES)}, or auto."
+    if n < MIN_CONTEXT:
+        return 0, f"At least {MIN_CONTEXT // 1024}K: Mitra's prompt, code and tool results need room."
+    if max_ctx and n > max_ctx:
+        return 0, f"This model supports at most {max_ctx // 1024}K."
+    return n, ""
+
+
+def compact_threshold(cfg: dict, num_ctx: int) -> int:
+    """Prompt size at which the chat compacts: 80% of the context, or lower if mitra.toml caps it (E-046)."""
+    cap = int(cfg.get("auto_compact_threshold") or 0)
+    full = int(num_ctx * 0.8)
+    return min(cap, full) if cap > 0 else full
+
+
 def context_for_model(name: str) -> int:
-    """num_ctx Mitra uses for a model when mitra.toml does not set one."""
+    """num_ctx Mitra uses for a model when mitra.toml does not set one: the /context choice, else measured."""
+    chosen = load_context_choice(name)
+    if chosen:
+        return chosen
     facts = get_model_facts(name) or {}
     params = facts.get("parameters") or 0
     return LARGE_MODEL_CONTEXT if params >= LARGE_MODEL_PARAMETERS else SMALL_MODEL_CONTEXT

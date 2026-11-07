@@ -87,6 +87,11 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
 - **I-7 Session gains: write in parts, check before run, /good /bad, adaptive thinking**
   ([SESSION_GAINS_PLAN.md](SESSION_GAINS_PLAN.md)). Impact: fewer broken long writes (E-044) and start crashes
   (run_command 19/20 failed), your judgment as a signal, faster 9B steps. Planned 2026-11-07, waiting for the go.
+- **I-8 One explore sub-agent** (same model, one at a time, its own small context; returns a short summary). No
+  parallel or second-model sub-agents on this machine: Ollama runs one request at a time and the 9B + 4B do not fit
+  together. Only after I-7's prompt-processing measure shows re-reading the history is cheap (Ollama keeps one
+  prompt cache, so a sub-agent call makes the main chat re-process its history). Test: a playground level with vs
+  without; kept only if faster or more tests pass. Agreed as the order 2026-11-07.
 
 ## Later (not milestones)
 Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,

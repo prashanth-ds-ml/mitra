@@ -5,6 +5,10 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next
+2026-11-07, E-046 (committed locally): compaction now at 80% of the context (was a fixed 120K, so 256K was half
+unused); `/context 128k|256k|auto` switches the size live, kept per model. I-7 plan (+ step M: prompt-processing time)
+and I-8 (one explore sub-agent, after M) waiting for the go; no sub-agents otherwise (user, 2026-11-07).
+
 2026-11-07, dashboard I-6 / D-041 (committed locally, not pushed):
 - Central append-only store `~/.mitra/data/` (records + traces, every folder Mitra ran in, never deleted); full traces
   with thinking; turn outcomes; page `~/.mitra/dashboard.html` with sessions, tools/MCP, models, improvement per harness

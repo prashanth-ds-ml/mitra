@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-046 | 2026-11-07 | M2 | Medium | review of the chat flow | Compaction started at a fixed 120K tokens (`auto_compact_threshold = 120000`, min with 80% of num_ctx), so at 256K (D-039) the chat never used more than ~half the context; the memory reserved for the rest was wasted and kept most of the 9B off the GPU | closed | F-046 |
 | E-045 | 2026-11-07 | M2 | Low | full test run, machine busy (Ollama + a training job) | `test_timeout_is_reported_and_the_server_keeps_working`: the fake MCP server did not start within its 2 s timeout ("unhandled errors in a TaskGroup"), so the test sees a start failure instead of a call timeout. Fails on 6a3d32b too (not the dashboard change); passed earlier the same day | open | |
 | E-044 | 2026-11-07 | M1 | High | live session (mitra-try, 9B at 256K, "make a detailed report") | The model wrote one ~5,200-token tool call for 3m20s and ended it before it was closed; Ollama's Qwen3.5 parser failed (`XML syntax error on line 173: unexpected EOF`, ollama.ResponseError) and the whole turn stopped with "Unexpected error"; the model was never told | closed | F-044 |
 | E-043 | 2026-11-07 | M1 | Medium | user, after switching to qwen3.5:latest at 256K | Mitra started the 9B at 256K (12 GB loaded, ~6.8 GB of it in RAM) with only 7 GB RAM free and said nothing; the user could not tell whether it would run or what to close | closed | F-043 |

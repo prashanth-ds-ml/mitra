@@ -91,8 +91,8 @@ show_reasoning = false       # show the model's thinking text (ctrl+o shows it a
 thinking = "auto"            # auto | on | off: off answers faster but plans less (D-020)
 memory_enabled = false
 require_diff_approval = true
-auto_compact_threshold = 120000  # auto-compact when session tokens exceed this
-num_ctx = 0                      # 0 = per model: qwen3.5 4B and 9B at 128K (measured, D-033, D-036)
+auto_compact_threshold = 0       # 0 = compact at 80% of num_ctx (E-046); a number caps it lower
+num_ctx = 0                      # 0 = per model: 4B 128K, 9B 256K (measured, D-036, D-039); /context changes it
 ollama_local_base_url = "http://localhost:11434"
 ollama_cloud_base_url = "https://ollama.com"
 allowed_roots = []           # extra folders Mitra may inspect/edit beyond the workspace
@@ -602,7 +602,7 @@ _COMMAND_HELP = [
         ("/doctor",        "Machine and setup check: RAM, GPU, Ollama, permissions, MCP"),
         ("/report",        "Rebuild the dashboard (sessions, tools, improvement, training data) and open it"),
         ("/model",         "Show the active models (/model list: installed Ollama models)"),
-        ("/context",       "Context-window use and when the session compacts"),
+        ("/context",       "Context use and when it compacts · /context 128k|256k|auto changes the size"),
         ("/think on|off",  "Show or hide the model's reasoning"),
         ("/mode [name]",   "Show or change the session mode"),
         ("! <command>",    "Run a shell command in the workspace (e.g. ! pytest -q)"),
@@ -2099,7 +2099,7 @@ def _chat():
     review_llm = codegen_llm = local_llm  # one model for everything (M1)
 
     # Compact before the model's context is full: at most 80% of num_ctx (D-033).
-    auto_compact_threshold = min(int(cfg.get("auto_compact_threshold", _AUTO_COMPACT_THRESHOLD)), int(num_ctx * 0.8))
+    auto_compact_threshold = config.compact_threshold(cfg, num_ctx)  # 80% of the context (E-046)
     from app.core.chat import ChatSession, Hooks, repair_history
     from app.core.cli import EventPrinter
 
@@ -2321,6 +2321,29 @@ def _chat():
             _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
+            continue
+
+        if cmd.startswith("/context "):  # /context 128k|256k|auto: speed vs room, kept per model (E-046)
+            if cfg.get("num_ctx"):
+                _say(f"`num_ctx = {cfg['num_ctx']}` is set in mitra.toml; change it there (it wins over /context).")
+                continue
+            facts = config.get_model_facts(model) or {}
+            new_ctx, err = config.parse_context_choice(user_input.strip()[len("/context "):],
+                                                       int(facts.get("context") or 0))
+            if err:
+                _say(err)
+                continue
+            config.save_context_choice(model, new_ctx)
+            num_ctx = config.context_for_model(model)
+            auto_compact_threshold = config.compact_threshold(cfg, num_ctx)
+            local_llm = get_local_llm(model, temperature, base_url=cfg.get("ollama_local_base_url"), num_ctx=num_ctx,
+                                      num_gpu=num_gpu, reasoning=thinking_setting(cfg.get("thinking")))
+            review_llm = codegen_llm = local_llm
+            chat.llm, chat.num_ctx = local_llm, num_ctx
+            console.print(Text(f"  context: {num_ctx // 1024}K for {model} (kept for next time) · compacts at "
+                               f"{auto_compact_threshold:,} tokens · Ollama reloads the model on the next message",
+                               style="m.tool"))
+            _print_memory_fit(model, num_ctx, cfg.get("ollama_local_base_url") or "http://127.0.0.1:11434")
             continue
 
         if cmd == "/context":
@@ -2858,7 +2881,7 @@ def _build_move_preview(src: str, dest: str) -> str:
 
 
 # ── Tokens at which auto-compact kicks in ────────────────────────────────────
-_AUTO_COMPACT_THRESHOLD = 120_000  # overridden at runtime from mitra.toml
+_AUTO_COMPACT_THRESHOLD = 0  # 0 = 80% of num_ctx (E-046); overridden at runtime from mitra.toml
 
 
 def _compact(
