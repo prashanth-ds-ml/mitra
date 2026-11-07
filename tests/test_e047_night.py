@@ -100,3 +100,4 @@ def test_run_command_is_wired_in_the_chat():
     from app import main
     src = inspect.getsource(main._chat)
     assert '"night", str(plan_path)' in src and "CREATE_NEW_CONSOLE" in src
+    assert "project = plan_path.parent" in src and '"--workspace", str(project)' in src  # works from any folder

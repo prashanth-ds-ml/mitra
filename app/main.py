@@ -2681,7 +2681,7 @@ def _chat():
             parts = user_input.strip().split()
             plan_file = parts[1] if len(parts) > 1 else "plan.md"
             hours = parts[2] if len(parts) > 2 else "4"
-            plan_path = pathlib.Path(cfg["workspace"]) / plan_file
+            plan_path = (pathlib.Path(cfg["workspace"]) / plan_file.strip('"')).resolve()  # absolute paths work too
             if not plan_path.is_file():
                 _say(f"No plan file `{plan_file}` here. Usage: `/run [plan.md] [hours]` (a plan with 'Done when' tests).")
                 continue
@@ -2690,11 +2690,13 @@ def _chat():
             except ValueError:
                 _say("Usage: `/run [plan.md] [hours]`, e.g. `/run plan.md 4`.")
                 continue
-            cmd = [sys.executable, "-m", "app.main", "night", str(plan_path), "--workspace", str(cfg["workspace"]),
+            project = plan_path.parent  # the project is the plan's folder, so /run works from any folder
+            cmd = [sys.executable, "-m", "app.main", "night", str(plan_path), "--workspace", str(project),
                    "--hours", hours, "--model", model]
             flags = subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0
             subprocess.Popen(cmd, cwd=str(pathlib.Path(__file__).resolve().parents[1]), creationflags=flags)
-            console.print(Text(f"  ⏾ night run started in its own window: {plan_file} · {model} · up to {hours} h", style="m.tool"))
+            console.print(Text(f"  ⏾ night run started in its own window: {plan_path.name} in {project} · {model} · "
+                               f"up to {hours} h", style="m.tool"))
             console.print(Text("    it keeps Windows awake, commits each task on its own branch and writes NIGHT_REPORT.md; "
                                "don't chat meanwhile (one model at a time)", style="m.faint"))
             continue
