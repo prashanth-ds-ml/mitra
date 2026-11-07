@@ -601,6 +601,8 @@ _COMMAND_HELP = [
         ("/status",        "Workspace, model, mode and session status"),
         ("/doctor",        "Machine and setup check: RAM, GPU, Ollama, permissions, MCP"),
         ("/report",        "Rebuild the dashboard (sessions, tools, improvement, training data) and open it"),
+        ("/good [note]",   "Mark the last turn good (your verdict teaches Mitra)"),
+        ("/bad [why]",     "Mark the last turn bad, ideally with why"),
         ("/model",         "Show the active models (/model list: installed Ollama models)"),
         ("/context",       "Context use and when it compacts · /context 128k|256k|auto changes the size"),
         ("/think on|off",  "Show or hide the model's reasoning"),
@@ -1840,11 +1842,12 @@ def _print_memory_fit(model: str, num_ctx: int, base_url: str) -> None:
         fit = fit_mod.check(model, num_ctx, base_url=base_url)
     except Exception as exc:  # a failed check must not stop Mitra
         console.print(Text(f"  ? could not check memory: {exc}", style="m.faint"))
-        return
+        return None
     style = {"ok": "m.ok", "tight": "m.info", "no": "m.err"}.get(fit.verdict, "m.faint")
     console.print(Text("  " + fit_mod.summary(fit), style=style))
     for line in fit_mod.advice(fit):
         console.print(Text("    " + line, style="m.dim"))
+    return fit
 
 
 def _startup_model(cfg: dict) -> str:
@@ -2229,7 +2232,15 @@ def _chat():
         mcp_servers=_mcp_names,
         loaded=loaded,
     ))
-    _print_memory_fit(model, num_ctx, cfg.get("ollama_local_base_url") or "http://127.0.0.1:11434")
+    _fit = _print_memory_fit(model, num_ctx, cfg.get("ollama_local_base_url") or "http://127.0.0.1:11434")
+    try:  # machine state for the dashboard (item 0)
+        _gpu = config.get_gpu_memory_info()
+        chat.note_session(model=model, num_ctx=num_ctx, mode=session_mode,
+                          fit=getattr(_fit, "verdict", None), need_ram_gb=getattr(_fit, "need_ram_gb", None),
+                          ram_free_gb=getattr(_fit, "free_ram_gb", None),
+                          vram_free_gb=_gpu.free_gib if _gpu else None)
+    except Exception:
+        pass
     console.print(ui.header.tips())
     current_task = "Ready"
 
@@ -2321,6 +2332,12 @@ def _chat():
             _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
             memory.update_context(cfg["workspace"], user_input)
+            continue
+
+        if cmd in ("/good", "/bad") or cmd.startswith(("/good ", "/bad ")):  # your verdict on the last turn (A4)
+            verdict = "good" if cmd.startswith("/good") else "bad"
+            note = user_input.strip()[len("/" + verdict):].strip()
+            console.print(Text("  " + chat.feedback(verdict, note), style="m.tool"))
             continue
 
         if cmd.startswith("/context "):  # /context 128k|256k|auto: speed vs room, kept per model (E-046)
@@ -2503,6 +2520,7 @@ def _chat():
                 workspace=cfg["workspace"],
                 reason="manual",
                 total_tokens=ctx_used,
+                rec=chat.rec,
             )
             sess_in = sess_out = 0
             ctx_used = 0
@@ -2592,6 +2610,7 @@ def _chat():
                     workspace=cfg["workspace"],
                     reason="auto",
                     total_tokens=ctx_used,
+                    rec=chat.rec,
                 )
                 tokens_after = 0
                 msg_count_after = len(messages)
@@ -2619,6 +2638,12 @@ def _chat():
             _set_current_task("Ready")
             repair_history(messages)
             _log_error(cfg["workspace"], e)
+            try:  # crashes reach the store and the dashboard too (item 0)
+                import traceback as _tb
+                chat.rec.write("crash", turn=chat.turn_no, error=f"{type(e).__name__}: {e}"[:500],
+                               trace="".join(_tb.format_exception(e)[-8:])[-3000:])
+            except Exception:
+                pass
             console.print(ui.tool_line("Error", ok=False,
                                        detail=f"{_friendly_error(e)} (full trace in .mitra/errors.log)"))
 
@@ -2892,6 +2917,7 @@ def _compact(
     workspace: str | None = None,
     reason: str = "manual",
     total_tokens: int | None = None,
+    rec=None,
 ) -> list:
     """
     Summarise the conversation so far and return a fresh messages list.
@@ -2955,6 +2981,9 @@ def _compact(
 
     with console.status("[m.dim]Compacting history...[/m.dim]", spinner_style="m.accent"):
         summary_msg = llm.invoke([HM(content=summarise_prompt)])
+    if rec is not None:  # the compaction call is traced too (item 0)
+        rec.trace([HM(content=summarise_prompt)], summary_msg, model=str(getattr(llm, "model", "") or ""),
+                  purpose="compact", reason=reason)
 
     summary = (summary_msg.content or "").strip()
     if workspace:

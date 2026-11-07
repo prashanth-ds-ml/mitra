@@ -50,6 +50,40 @@ BAD_TOOL_CALL_NOTE = (
 )
 
 
+MAX_LEFT_BYTES = 200_000   # files bigger than this are not compared for corrections
+MAX_DIFF_CHARS = 4_000
+_PRIVATE = (".env", ".pem", ".key", "id_rsa", "credentials", "secrets")
+
+
+def _rel(path: str, root: Path) -> str:
+    try:
+        return str(Path(path).resolve().relative_to(root.resolve())).replace("\\", "/")
+    except ValueError:
+        return str(path)
+
+
+def _read_small(p: Path) -> str | None:
+    """Text of a file Mitra may compare; None for missing, binary, big or private-looking files."""
+    name = p.name.lower()
+    if any(name == x or name.startswith(x) or name.endswith(x) for x in _PRIVATE):
+        return None
+    try:
+        if not p.is_file() or p.stat().st_size > MAX_LEFT_BYTES:
+            return None
+        return p.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _short_diff(rel: str, old: str | None, new: str | None) -> tuple[str, int, int]:
+    a, b = (old or "").splitlines(), (new or "").splitlines()
+    lines = list(difflib.unified_diff(a, b, f"mitra/{rel}", f"you/{rel}", lineterm="", n=2))
+    added = sum(1 for x in lines if x.startswith("+") and not x.startswith("+++"))
+    removed = sum(1 for x in lines if x.startswith("-") and not x.startswith("---"))
+    text = "\n".join(lines)
+    return (text[:MAX_DIFF_CHARS] + ("\n… (cut)" if len(text) > MAX_DIFF_CHARS else "")), added, removed
+
+
 def turn_outcome(res) -> str:
     """One label per turn for the dashboard and the training-data filter (D-041)."""
     if res.stopped:
@@ -171,6 +205,45 @@ class ChatSession:
                                       traces=traces)  # + full model calls for the fine-tune (D-041)
         self.turn_no = 0
         self.approve_all = False  # "yes to all" for the rest of this turn
+        self._left: dict[str, str | None] = {}  # file -> content Mitra left at the end of a turn (corrections, item 0)
+
+    # ── what you think of Mitra's work (item 0: the strongest self-improvement signals) ────────────────────────
+    def note_session(self, **info) -> None:
+        """One row per chat session: model, context, memory fit, free RAM/VRAM, Mitra version."""
+        from app.core import runinfo
+        self.rec.write("session", code_version=runinfo.code_version(), workspace=str(self.ws.root), **info)
+
+    def feedback(self, verdict: str, note: str = "") -> str:
+        """`/good` / `/bad`: your verdict on the last turn (the last one given counts)."""
+        if not self.turn_no:
+            return "No turn yet to mark."
+        self.rec.write("feedback", of_turn=self.turn_no, verdict=verdict, note=note[:1000], author="user")
+        return f"Turn {self.turn_no} marked {'👍 good' if verdict == 'good' else '👎 bad'}" + (f": {note}" if note else "")
+
+    def _remember_left(self, journal: list) -> None:
+        for entry in journal:
+            path = entry.get("path")
+            if not path:
+                continue
+            self._left[path] = _read_small(Path(path))
+
+    def _check_corrections(self, of_turn: int) -> int:
+        """Files Mitra changed that differ now from what it left: you corrected them. Recorded with a short diff."""
+        found = 0
+        for path, left in list(self._left.items()):
+            now = _read_small(Path(path))
+            if now == left:
+                continue
+            found += 1
+            rel = _rel(path, self.ws.root)
+            if now is None and Path(path).exists():
+                diff, added, removed = "(binary, too big or private: no diff kept)", 0, 0
+            else:
+                diff, added, removed = _short_diff(rel, left, now)
+            self.rec.write("user_edit", of_turn=of_turn, path=rel, deleted=not Path(path).exists(),
+                           added=added, removed=removed, diff=diff, author="user")
+            self._left[path] = now
+        return found
 
     # approval for edits in ask mode
     def _before_write(self, rel: str, old: str | None, new: str) -> None:
@@ -184,10 +257,12 @@ class ChatSession:
             if answer == "yes":
                 return
             reason = answer.split(":", 1)[1].strip() if ":" in answer else ""
+            self.rec.write("declined", turn=self.turn_no, tool="edit", path=rel, reason=reason[:500], author="user")
             raise T.ToolError(f"The user declined the change to {rel}."
                               + (f" Their reason: {reason}" if reason else " Ask what they want instead."))
         title = f"{'Edit' if old is not None else 'Create'} {rel}"
         if not self.hooks.confirm(title, diff_text(rel, old, new), f"{title}?"):
+            self.rec.write("declined", turn=self.turn_no, tool="edit", path=rel, reason="", author="user")
             raise T.ToolError(f"The user declined the change to {rel}. Ask what they want instead.")
 
     def _run(self, name: str, args: dict, plan_runner) -> tuple[str, bool]:
@@ -195,7 +270,11 @@ class ChatSession:
             return f"✗ {name} is not available in plan mode (read-only). Describe the change instead.", False
         try:
             if name == "run_command":
-                return self.hooks.run_shell(str(args.get("command", "")))
+                out, ok = self.hooks.run_shell(str(args.get("command", "")))
+                if "user declined" in out:
+                    self.rec.write("declined", turn=self.turn_no, tool="run_command",
+                                   command=str(args.get("command", ""))[:500], reason="", author="user")
+                return out, ok
             if name == "web_search":
                 with self.hooks.working(f"Searching: {str(args.get('query', ''))[:50]}"):
                     out = self.hooks.web_search(str(args.get("query", "")))
@@ -257,9 +336,11 @@ class ChatSession:
         self.turn_no += 1
         t0 = time.monotonic()
         user = next((m.content for m in reversed(messages) if isinstance(m, HumanMessage)), "")
+        from app.core import runinfo
+        self._check_corrections(of_turn=self.turn_no - 1)  # attributed to the turn they correct
         self.rec.write("turn_start", turn=self.turn_no, mode=self.mode, user=str(user)[:2000],
                        harness_version=self.harness.version, model=str(getattr(self.llm, "model", "") or ""),
-                       num_ctx=self.num_ctx)
+                       num_ctx=self.num_ctx, code_version=runinfo.code_version(), ram_free_gb=runinfo.ram_free_gb())
         try:
             res = self._turn(messages, res, max_steps)
         except BaseException as exc:  # interrupted (esc / ctrl+c) or crashed: still recorded, the analyzer counts it
@@ -268,11 +349,13 @@ class ChatSession:
                            outcome="interrupted" if isinstance(exc, KeyboardInterrupt) else "error",
                            tokens_out=res.tokens_out, seconds=round(time.monotonic() - t0, 1),
                            changed=[e["path"] for e in res.journal])
+            self._remember_left(res.journal)
             raise
         self.rec.write("turn_end", turn=self.turn_no, steps=res.steps, stopped=res.stopped, reason=res.stop_reason,
                        text=res.text[:2000], tokens_in=res.tokens_in, tokens_out=res.tokens_out,
                        ctx_used=res.ctx_used, seconds=round(time.monotonic() - t0, 1), outcome=turn_outcome(res),
                        changed=[e["path"] for e in res.journal])
+        self._remember_left(res.journal)
         return res
 
     def _turn(self, messages: list, res: TurnResult, max_steps: int) -> TurnResult:
@@ -293,6 +376,9 @@ class ChatSession:
                     raise
                 bad_calls += 1
                 self.rec.write("bad_tool_call", turn=self.turn_no, step=step, error=str(exc)[:500])
+                self.rec.trace(messages, None, tools=specs, model=str(getattr(self.llm, "model", "") or ""),
+                               num_ctx=self.num_ctx, turn=self.turn_no, step=step, purpose="failed",
+                               error=str(exc)[:500], harness_version=self.harness.version)
                 self.hooks.show("retry", {}, f"tool call cut off ({exc}); asking for smaller parts", False)
                 messages.append(HumanMessage(content=BAD_TOOL_CALL_NOTE.format(error=exc)))
                 continue
@@ -374,6 +460,10 @@ class ChatSession:
             "what failed and what is left. Do not call tools.")))
         streamed = self._stream(self.llm.stream(messages), res.steps + 1)
         reply = streamed.message if streamed.message is not None else AIMessage(content=streamed.text)
+        self.rec.trace(messages, reply, tools=[], model=str(getattr(self.llm, "model", "") or ""),
+                       num_ctx=self.num_ctx, seconds=getattr(streamed, "seconds", None),
+                       thinking=getattr(streamed, "thinking", "") or "", turn=self.turn_no, step=res.steps + 1,
+                       purpose="wrap_up", harness_version=self.harness.version)
         messages.append(reply)
         res.text = streamed.text
         return res

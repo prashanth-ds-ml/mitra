@@ -109,6 +109,15 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
 - **I-13 Experience recall** (2026-11-07): for a task like one solved before (tests passed or 👍, not corrected), a
   short "how it was solved" note goes into the prompt; learning from examples without training, via the vault.
   Impact: better first attempts on repeat kinds of work; costs prompt tokens. See SELF_IMPROVEMENT.md section 9.
+- **I-14 Data from other users (a friend first)** (brainstorm 2026-11-07): his Mitra records locally as yours does;
+  `mitra share-data` exports a file (he picks projects and dates, secrets scrubbed again, summary shown first);
+  `mitra import-data` puts it in your store under `data/runs/<contributor>/`; dashboard filter by contributor.
+  Explicit opt-in, incl. whether it may be used for training (his code is in the traces). No automatic sync for
+  now (needs a server and breaks "nothing leaves the machine"). Item 0 helps: version + machine on every turn.
+- **I-15 Shared knowledge base** (brainstorm 2026-11-07): a git repo of general lessons (benchmark-passed rules,
+  Windows/tooling know-how, plan templates per kind, generalized recall notes; never code, paths or project facts),
+  pulled into `MitraVault/Mitra/shared/` and read by `recall`; new entries as pull requests you review and that
+  must pass the benchmark (same gate as the harness), undo per rule. After the vault (B) and a few proven rules.
 
 ## Later (not milestones)
 Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,

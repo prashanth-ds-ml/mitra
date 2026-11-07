@@ -143,11 +143,13 @@ class Recorder:
                 out["thinking"] = thinking  # the chat streams thinking separately from the reply
             self._calls += 1
             meta_in, meta_out = _tokens(reply) if reply is not None else (0, 0)
+            from app.core import runinfo
             self._append(self.trace_path, {
                 "t": time.time(), "kind": "call", "id": self._calls, "base": self._calls - 1 if grew else None,
                 "author": "mitra", "model": model, "num_ctx": num_ctx, "prompt": prompt, "new": new, "reply": out,
                 "seconds": round(seconds, 2) if seconds is not None else None, "tokens_in": meta_in,
-                "tokens_out": meta_out, **meta})
+                "tokens_out": meta_out, "code_version": runinfo.code_version(),
+                **(runinfo.ollama_timings(reply) if reply is not None else {}), **meta})
             self._last = fps + ([_fp(out)] if out else [])
         except Exception:
             pass
@@ -271,8 +273,10 @@ def solve(
     rec = Recorder(record_path)
     t0 = time.monotonic()
     result = RunResult(status="stopped", summary="", record_path=str(record_path or ""))
+    from app.core import runinfo
     rec.write("start", task=task, test_command=ws.test_command, workspace=str(ws.root), max_steps=max_steps,
-              harness_version=h.version)
+              harness_version=h.version, code_version=runinfo.code_version(), ram_free_gb=runinfo.ram_free_gb(),
+              model=str(getattr(llm, "model", "") or ""), num_ctx=num_ctx)
 
     files = T.list_files(ws)
     user = (f"Task:\n{task}\n\n" + (f"{context}\n\n" if context else "")
@@ -323,6 +327,8 @@ def solve(
                 break
             except Exception as exc:
                 rec.write("model_error", error=str(exc), attempt=attempt)
+                rec.trace(messages, None, tools=specs, model=str(getattr(llm, "model", "") or ""), num_ctx=num_ctx,
+                          step=step, purpose="failed", error=str(exc)[:500], harness_version=h.version)
                 emit(Event("note", {"text": f"model call failed: {exc}", "ok": False}))
                 time.sleep(1)
         if reply is None:

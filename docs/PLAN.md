@@ -13,19 +13,19 @@ Plan v2 (2026-11-05, D-017); v1 is in [archive/PLAN-v1-2026-10-24.md](archive/PL
 Work top to bottom. Each line points to its plan; the milestone lists below keep the detail.
 
 **0. Record everything that helps self-improvement, first** ([SELF_IMPROVEMENT.md](SELF_IMPROVEMENT.md) section 4, agreed 2026-11-07)
-- [ ] 0a. Mitra code version, machine state, prompt-processing + load time on every turn / call (with A5)
-- [ ] 0b. Your corrections (files you changed after Mitra, short diff), declined edits and commands
-- [ ] 0c. Trace the wrap-up, compaction and failed calls; crash rows
-- [ ] 0d. `/good`, `/bad <why>` (= A4)
-- [ ] 0e. Dashboard: trends by day/week and by Mitra version; corrections, declines, crashes; project filter, all sessions
+- [x] 0a. Mitra code version, machine state, prompt-processing + load time on every turn / call (with A5) (2026-11-07)
+- [x] 0b. Your corrections (files you changed after Mitra, short diff), declined edits and commands (2026-11-07)
+- [x] 0c. Trace the wrap-up, compaction and failed calls; crash rows (2026-11-07)
+- [x] 0d. `/good`, `/bad <why>` (= A4) (2026-11-07)
+- [x] 0e. Dashboard: trends day by day, by Mitra version, by project / model / kind; first try, time to green; corrections, declines, crashes; project filter, all sessions (2026-11-07)
 - [ ] **You:** restart Mitra after each update (a running session keeps the old code)
 
 **A. Every session, now** ([SESSION_GAINS_PLAN.md](SESSION_GAINS_PLAN.md), I-7 + I-11 tools)
 - [ ] 1. `append_file` + "write files over ~150 lines in parts" (E3, E-044)
 - [ ] 2. `check_code`: quick lint (undefined names, unbound locals) before running; crash-on-start hint (E4)
 - [ ] 3. `run_tests(path / -k)`: run one test file or a selection
-- [ ] 4. `/good`, `/bad <why>` on the last turn (S1)
-- [ ] 5. Prompt-processing time in every trace (step M; decides I-8)
+- [x] 4. `/good`, `/bad <why>` on the last turn (S1) (done as 0d, 2026-11-07)
+- [x] 5. Prompt-processing time in every trace (step M; decides I-8) (done in 0a, 2026-11-07)
 - [ ] 6. Adaptive thinking (E2) + Level 01 benchmark on/adaptive, 9B and 4B (overnight, your OK)
 - [ ] 7. **You:** use Mitra daily on small real tasks with tests and mark turns, about a week (person task)
 

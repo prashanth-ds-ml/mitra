@@ -110,6 +110,12 @@ re-planning, now first after item 0 and A1-A5 ([FIRST_TWO_WEEKS.md](FIRST_TWO_WE
 project: tasks passed first try, re-plans, needs help, plan edited by you before approval, and the planner
 experiment (hand-written plan vs Mitra's own plan on the same level).
 
+## 11. More users (brainstorm 2026-11-07): I-14, I-15 in SCOPE
+- A friend's sessions: export on his machine, import into your store under his name; explicit consent, incl. for
+  training. The version and machine fields from item 0 keep mixed data comparable.
+- A shared knowledge base: only general, reviewed, benchmark-passed lessons; personal and project memory stays in
+  each person's vault. Pooled verified turns reach the training target faster, with consent.
+
 ## 9. Does the model's reasoning improve with use? And training on usage (brainstorm 2026-11-07)
 **The model's own reasoning does not change with use**: Ollama runs fixed weights. What improves with use is
 everything around it, so its *effective* reasoning (model + what it is told) gets better:
