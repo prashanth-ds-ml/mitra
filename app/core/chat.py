@@ -44,9 +44,8 @@ READ_ONLY_TOOLS = {"list_files", "read_file", "search", "web_search", "fetch_url
 MAX_BAD_TOOL_CALLS = 2
 BAD_TOOL_CALL_NOTE = (
     "[Mitra: your last tool call could not be read ({error}). It was probably too long and ended before it was "
-    "closed. Nothing was run and nothing was written. Try again in smaller parts: write a long file with write_file "
-    "holding the first ~100 lines, then add the rest with edit_file (old = the last lines, new = those lines plus "
-    "the next part). Keep a report short, or write it to a file in parts the same way.]"
+    "closed. Nothing was run and nothing was written. Try again in smaller parts: write_file with the first ~100 "
+    "lines, then append_file for the rest. Keep a report short, or write it to a file in parts the same way.]"
 )
 
 
@@ -292,6 +291,8 @@ class ChatSession:
         try:
             if name == "run_command":
                 out, ok = self.hooks.run_shell(str(args.get("command", "")))
+                if not ok:
+                    out += T.crash_hint(out)  # where it crashed and what to do next (E4)
                 if "user declined" in out:
                     self.rec.write("declined", turn=self.turn_no, tool="run_command",
                                    command=str(args.get("command", ""))[:500], reason="", author="user")

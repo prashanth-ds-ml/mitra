@@ -178,7 +178,94 @@ def syntax_note(rel: str, text: str) -> str:
     except ValueError as exc:  # json.JSONDecodeError and tomllib.TOMLDecodeError are ValueErrors
         kind = "JSON" if suffix == "json" else "TOML"
         return f"\n⚠ {rel} is not valid {kind}: {exc}. Fix it before going on."
+    if suffix == "py":  # parses: now the errors that crash it at run time (A2 / E4)
+        problems = flake(text, rel)
+        if problems:
+            shown = "; ".join(problems[:5]) + (f" (+{len(problems) - 5} more)" if len(problems) > 5 else "")
+            return f"\n⚠ {rel} will likely fail when it runs: {shown}. Fix these before going on."
     return ""
+
+
+# Errors that crash a program when it runs (E4: most brick-breaker crashes were these); unused imports etc. are noise.
+_RUNTIME_ERRORS = ("UndefinedName", "UndefinedLocal", "UndefinedExport", "ReturnOutsideFunction",
+                   "YieldOutsideFunction", "ContinueOutsideLoop", "BreakOutsideLoop", "DuplicateArgument")
+
+
+def flake(text: str, rel: str) -> list[str]:
+    """`line N: message` for errors pyflakes finds that would crash at run time; [] if clean or pyflakes is missing."""
+    try:
+        import ast
+
+        from pyflakes import checker
+    except ImportError:
+        return []
+    try:
+        tree = ast.parse(text, filename=rel)
+    except SyntaxError as exc:
+        return [f"line {exc.lineno}: {exc.msg}"]
+    w = checker.Checker(tree, filename=rel)
+    out = []
+    for m in sorted(w.messages, key=lambda m: m.lineno):
+        if type(m).__name__ in _RUNTIME_ERRORS:
+            out.append(f"line {m.lineno}: {m.message % m.message_args}")
+    return out
+
+
+def check_code(ws: Workspace, path: str = ".") -> str:
+    """Quick check of Python files for errors that crash at run time (undefined names, variables used before
+    assignment, syntax), before running the program (A2 / E4)."""
+    base = ws.path(path)
+    files = [base] if base.is_file() else [Path(d) / f for d, ds, fs in os.walk(base)
+                                           if not any(s in Path(d).parts for s in SKIP_DIRS)
+                                           for f in fs if f.endswith(".py")]
+    files = sorted(files)[:300]
+    found = []
+    for f in files:
+        try:
+            text = f.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        found += [f"{ws.rel(f)}: {p}" for p in flake(text, ws.rel(f))]
+    if not files:
+        return f"No Python files under '{path}'."
+    if not found:
+        return f"✓ No run-time errors found in {len(files)} Python file{'s' if len(files) != 1 else ''}."
+    more = f"\n… {len(found) - 40} more" if len(found) > 40 else ""
+    return f"Found {len(found)} likely run-time error(s):\n" + "\n".join(found[:40]) + more
+
+
+def crash_hint(output: str) -> str:
+    """When a program crashed with a traceback: where and why, and what to do next (E4)."""
+    if "Traceback (most recent call last)" not in (output or ""):
+        return ""
+    locs = re.findall(r'File "([^"]+)", line (\d+)', output)
+    last = next((ln.strip() for ln in reversed(output.strip().splitlines())
+                 if re.match(r"^[A-Za-z_][\w.]*(Error|Exception|Exit|Interrupt)\b", ln.strip())), "")
+    where = ""
+    for f, n in reversed(locs):  # the deepest frame in the project, not in a library
+        if "site-packages" not in f and "lib\\python" not in f.lower() and "/lib/python" not in f:
+            where = f"{os.path.basename(f)} line {n}"
+            break
+    return (f"\n\n⚠ It crashed ({where + ': ' if where else ''}{last or 'see the traceback'}). Fix this before running "
+            "it again; check_code or run_tests would have caught it first.")
+
+
+def append_file(ws: Workspace, path: str, content: str) -> str:
+    """Add content to the end of a file written or read this turn: long files in parts (E3, E-044)."""
+    full = ws.path(path)
+    ws.check_writable(full)
+    rel = ws.rel(full)
+    if not full.is_file():
+        raise ToolError(f"'{rel}' does not exist. Create it with write_file first, then append the rest.")
+    if rel not in ws.seen:
+        raise ToolError(f"Read '{rel}' (or write it) before appending to it.")
+    if full.stat().st_mtime != ws.seen[rel]:
+        raise ToolError(f"'{rel}' changed since you read it. Read it again, then append.")
+    old = full.read_text(encoding="utf-8")
+    sep = "" if (not old or old.endswith("\n")) else "\n"
+    text = old + sep + str(content)
+    _commit(ws, full, text)
+    return f"Appended {len(str(content).splitlines())} lines to {rel} (now {len(text.splitlines())} lines)."
 
 
 def write_file(ws: Workspace, path: str, content: str) -> str:
@@ -293,9 +380,25 @@ class TestRun:
     seconds: float = 0.0
 
 
-def run_tests(ws: Workspace, command: str | None = None) -> TestRun:
+def test_args(ws: Workspace, path: str = "", keyword: str = "", first_failure: bool = False) -> list[str]:
+    """Extra pytest arguments for one file / a selection (A3); paths must stay inside the workspace."""
+    extra = []
+    if path:
+        extra.append(ws.rel(ws.path(path)))
+    if keyword:
+        extra += ["-k", str(keyword)]
+    if first_failure:
+        extra += ["-x", "--tb=long"]
+    return extra
+
+
+def run_tests(ws: Workspace, command: str | None = None, extra: list[str] | None = None) -> TestRun:
     cmd = command or ws.test_command
     args = cmd.split()
+    if extra:
+        if "pytest" not in cmd:
+            raise ToolError(f"The test command '{cmd}' is not pytest: run_tests cannot select a file or keyword.")
+        args += extra
     if args and args[0] in ("python", "python3", "py"):
         args[0] = project_python(ws.root)
     t0 = time.monotonic()
@@ -342,8 +445,17 @@ TOOL_SPECS = [
     {"name": "edit_file", "description": "Replace one exact block of lines `old` with `new` in a file you have read.",
      "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "old": {"type": "string"},
                                                      "new": {"type": "string"}}, "required": ["path", "old", "new"]}},
-    {"name": "run_tests", "description": "Run the tests. Returns pass/fail and the output.",
-     "parameters": {"type": "object", "properties": {}}},
+    {"name": "append_file", "description": "Add content to the end of a file you wrote or read. Write long files "
+     "in parts: write_file with the first ~150 lines, then append_file for the rest.",
+     "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
+                    "required": ["path", "content"]}},
+    {"name": "check_code", "description": "Find Python errors that crash at run time (undefined names, unbound "
+     "variables). Use before running a program.",
+     "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}},
+    {"name": "run_tests", "description": "Run the tests (all, or one file / a keyword; first_failure stops at the "
+     "first failure with the full traceback). Returns pass/fail and the output.",
+     "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "keyword": {"type": "string"},
+                                                     "first_failure": {"type": "boolean"}}}},
     {"name": "finish", "description": "Call when the tests pass, with a one-line summary of what you did.",
      "parameters": {"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}},
 ]

@@ -22,6 +22,7 @@ dependencies = [
     "PyYAML",
     "mcp>=2.3.0,<3",
     "pytest",  # run_tests falls back to Mitra's own Python for projects without a venv (E-028)
+    "pyflakes",  # check_code: undefined names / unbound locals before a program runs (E4)
 ]
 
 [project.optional-dependencies]

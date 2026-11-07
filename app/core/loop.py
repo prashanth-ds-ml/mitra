@@ -234,12 +234,19 @@ def run_tool(ws: T.Workspace, name: str, args: dict) -> tuple[str, T.TestRun | N
             return T.write_file(ws, args.get("path", ""), args.get("content", "")), None
         if name == "edit_file":
             return T.edit_file(ws, args.get("path", ""), args.get("old", ""), args.get("new", "")), None
+        if name == "append_file":
+            return T.append_file(ws, args.get("path", ""), args.get("content", "")), None
+        if name == "check_code":
+            return T.check_code(ws, args.get("path", ".") or "."), None
         if name == "run_tests":
-            run = T.run_tests(ws)
+            extra = T.test_args(ws, str(args.get("path") or ""), str(args.get("keyword") or ""),
+                                bool(args.get("first_failure")))
+            run = T.run_tests(ws, extra=extra)
             head = "PASSED" if run.passed else "FAILED"
-            return f"{head}: {run.summary}\n\n{run.output}", run
+            scope = f" ({' '.join(extra)})" if extra else ""
+            return f"{head}{scope}: {run.summary}\n\n{run.output}", run
         return (f"✗ Unknown tool '{name}'. Tools: list_files, read_file, search, make_dir, write_file, edit_file, "
-                "run_tests, finish."), None
+                "append_file, check_code, run_tests, finish."), None
     except T.ToolError as exc:
         return f"✗ {exc}", None
     except Exception as exc:  # a crash in a tool is reported, never fatal (E-018)

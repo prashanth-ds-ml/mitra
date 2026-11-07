@@ -43,12 +43,13 @@ _MCP = ("mcp_find", "mcp_call")
 TOOLS: dict[str, tuple[str, ...] | None] = {
     "chat": None,  # everything
     "planner": _READ + ("web_search", "fetch_url") + _MCP,
-    "tester": _READ + ("write_file", "edit_file", "make_dir", "run_tests") + _MCP,
-    "builder": _READ + ("write_file", "edit_file", "make_dir", "run_tests", "run_command") + _MCP,
-    "debugger": _READ + ("edit_file", "run_tests", "run_command") + _MCP,
-    "reviewer": _READ + _MCP,
-    "deployer": _READ + ("run_command", "run_tests") + _MCP,
-    "reporter": _READ + ("write_file", "edit_file"),
+    "tester": _READ + ("write_file", "append_file", "edit_file", "make_dir", "run_tests") + _MCP,
+    "builder": _READ + ("write_file", "append_file", "edit_file", "make_dir", "check_code", "run_tests",
+                        "run_command") + _MCP,
+    "debugger": _READ + ("edit_file", "check_code", "run_tests", "run_command") + _MCP,
+    "reviewer": _READ + ("check_code",) + _MCP,
+    "deployer": _READ + ("check_code", "run_command", "run_tests") + _MCP,
+    "reporter": _READ + ("write_file", "append_file", "edit_file"),
 }
 # MCP servers per role (None = every enabled server); servers not configured yet are simply absent.
 MCP: dict[str, tuple[str, ...] | None] = {
