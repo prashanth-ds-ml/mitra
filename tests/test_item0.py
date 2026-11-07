@@ -245,8 +245,8 @@ def test_page_shows_trends_versions_judgment_crashes_and_filter(tmp_path):
         rec.write(kind, **r)
     out, _ = D.build(roots=[tmp_path], out=tmp_path / "d.html")
     page = out.read_text(encoding="utf-8")
-    for needed in ("Trends (day by day)", "per Mitra version · harness version", "By kind of task", "By project",
-                   "By model", "Your corrections, declines and 👎", "Crashes", "ResponseError: XML",
-                   "fixed g.py", "id='pf'", "first try", "time to green", "prompt s (median)", "reloads",
-                   "usable (total)"):
+    for needed in ("<h2>Trends</h2>", "Mitra version · harness", "by kind of task", "by project",
+                   "by model", "Your corrections, declines and marks", "Crashes", "ResponseError: XML",
+                   "you fixed g.py", "👎 n", "id='pf'", "first try", "time to green", "prompt s (median)", "reloads",
+                   "usable for training", "Self-improvement"):
         assert needed in page, needed

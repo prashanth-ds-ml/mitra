@@ -60,8 +60,11 @@ class Step:
     name: str = ""
     detail: str = ""
     ok: bool = True
-    seconds: float = 0.0
+    seconds: float | None = 0.0   # tool: run time (None when it cannot be measured from the records)
     tokens: int = 0
+
+
+OLD = "not recorded (older)"   # label for records from before a field was saved
 
 
 @dataclass
@@ -75,6 +78,7 @@ class Turn:
     seconds: float = 0.0
     tokens_in: int = 0
     tokens_out: int = 0
+    ctx_used: int = 0                       # prompt size of the turn's last call (how full the context was)
     harness_version: int = 0
     code_version: str = ""
     started: float = 0.0
@@ -147,12 +151,17 @@ def sessions(files: list[Path]) -> list[Session]:
         kind = "chat" if any(r.get("kind") == "turn_start" for r in rows) else "solve"
         s = Session(project=store.project_of(f), file=f.name, kind=kind, started=float(rows[0].get("t") or 0))
         cur: Turn | None = None
-        prev_t = None
+        prev_t, prev_kind = None, ""
         for r in rows:
             k, t = r.get("kind"), float(r.get("t") or 0)
             dt = round(t - prev_t, 1) if prev_t else 0.0
-            prev_t = t
+            tool_dt = dt if prev_kind in ("model", "tool") else None  # a tool runs right after the model's reply
+            prev_t, prev_kind = t, k
             if k == "session":
+                if s.turns:  # the chat file is per day: each Mitra start begins a new session
+                    out.append(s)
+                    s = Session(project=s.project, file=s.file, kind=kind, started=t)
+                    cur = None
                 s.machine = {key: r.get(key) for key in ("model", "num_ctx", "fit", "need_ram_gb", "ram_free_gb",
                                                          "vram_free_gb", "mode")}
                 s.code_version = str(r.get("code_version") or s.code_version)
@@ -200,7 +209,7 @@ def sessions(files: list[Path]) -> list[Session]:
             elif k == "tool":
                 name = str(r.get("name"))
                 ok = bool(r.get("ok"))
-                cur.steps.append(Step("tool", _tool_label(name, r.get("args")), _args_text(r.get("args")), ok, dt))
+                cur.steps.append(Step("tool", _tool_label(name, r.get("args")), _args_text(r.get("args")), ok, tool_dt))
                 if name in EDIT_TOOLS and ok and not cur._first_edit_t:
                     cur._first_edit_t = t
                 if name == "run_tests" and ok and cur._first_edit_t and cur.green_s is None:
@@ -219,11 +228,13 @@ def sessions(files: list[Path]) -> list[Session]:
                 cur.reason = str(r.get("reason") or r.get("summary") or "")[:300]
                 cur.seconds = float(r.get("seconds") or 0)
                 cur.tokens_in, cur.tokens_out = int(r.get("tokens_in") or 0), int(r.get("tokens_out") or 0)
+                cur.ctx_used = int(r.get("ctx_used") or 0)
                 if kind == "chat":
                     cur = None
+        out.append(s)
+    for s in out:
         for t in s.turns:  # a turn with a start and no end: the session was killed mid-turn
             t.outcome = t.outcome or "interrupted"
-        out.append(s)
     return sorted(out, key=lambda s: s.started, reverse=True)
 
 
@@ -263,7 +274,8 @@ def tool_stats(sess: list[Session]) -> list[ToolStat]:
                     continue
                 ts = stats.setdefault(st.name, ToolStat(st.name))
                 ts.calls += 1
-                ts.seconds.append(st.seconds)
+                if st.seconds is not None:
+                    ts.seconds.append(st.seconds)
                 if not st.ok:
                     ts.failures += 1
     return sorted(stats.values(), key=lambda s: s.calls, reverse=True)
@@ -368,6 +380,7 @@ class Signals:
     tested: int = 0
     first_try: int = 0
     green: list = field(default_factory=list)
+    ctx: list = field(default_factory=list)
     sessions: set = field(default_factory=set)
     first: float = 0.0
     # from traces (filled by trends / model views)
@@ -394,7 +407,9 @@ class Signals:
         self.first_try += t.tested and t.first_try
         if t.green_s is not None:
             self.green.append(t.green_s)
-        self.sessions.add(f"{s.project}/{s.file}")
+        if t.ctx_used:
+            self.ctx.append(t.ctx_used)
+        self.sessions.add(f"{s.project}/{s.file}/{s.started}")
         start = t.started or s.started
         self.first = min(self.first, start) if self.first else start
 
@@ -408,6 +423,14 @@ class Signals:
     @property
     def first_try_pct(self) -> int | None:
         return round(100 * self.first_try / self.tested) if self.tested else None
+
+    @property
+    def first_try_text(self) -> str:
+        return f"{self.first_try_pct}% ({self.first_try}/{self.tested})" if self.tested else "–"
+
+    @property
+    def median_ctx(self) -> int:
+        return int(statistics.median(self.ctx)) if self.ctx else 0
 
     @property
     def median_green_s(self) -> float | None:
@@ -437,7 +460,7 @@ def improvement(sess: list[Session], by: str = "harness") -> list[Signals]:
     groups: dict = {}
     for s, t in _turns(sess):
         if by == "code":
-            key = (t.code_version or s.code_version or "unknown", t.harness_version)
+            key = (t.code_version or s.code_version or OLD, t.harness_version)
             g = groups.get(key) or groups.setdefault(key, Signals(label=f"{key[0]} · h{key[1]}"))
         else:
             g = groups.get(t.harness_version) or groups.setdefault(t.harness_version, VersionStat(t.harness_version))
@@ -525,7 +548,7 @@ def breakdown(sess: list[Session], by: str) -> list[Signals]:
         if by == "project":
             key = s.project
         elif by == "model":
-            key = t.model or s.machine.get("model") or "?"
+            key = t.model or s.machine.get("model") or OLD
         else:
             key = project_kind(dirs.get(s.project))
         groups.setdefault(key, Signals(label=key)).add(s, t)

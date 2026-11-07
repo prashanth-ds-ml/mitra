@@ -5,6 +5,12 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next
+2026-11-07 night, dashboard reworked after looking at it (headless Edge screenshots): most useful first
+(headline with counts, trend tiles, improving per version, your judgment, where it works, sessions, tools/models,
+training, then self-improvement internals with problem patterns folded); compact tables (no cut-off columns); real
+tool times only (no idle gaps); output tokens instead of summed context; sessions split at each Mitra start;
+"not recorded (older)" labels.
+
 2026-11-07 night, item 0 built (D-044): code version, machine state, Ollama prompt/load time, your corrections
 (diffs), declines, /good /bad, wrap-up / compaction / failed calls traced, crash rows; dashboard: trends day by day,
 per Mitra version, by project / model / kind, first try, time to green, your judgment, crashes, project filter.

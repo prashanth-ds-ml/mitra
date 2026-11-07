@@ -122,7 +122,7 @@ def test_the_page_has_every_section_and_works_from_the_store_alone(tmp_path):
     shutil.rmtree(tmp_path / "proj")  # the project is gone; the store still has it
     out, _ = D.build(roots=[tmp_path], out=tmp_path / "dash.html")
     page = out.read_text(encoding="utf-8")
-    for heading in ("Sessions (every project", "Tools", "Models (from traces)", "Is Mitra improving?",
+    for heading in ("<h2>Sessions</h2>", "Tools", "Models (from traces)", "Is Mitra improving?",
                     "Training data (D-022)"):
         assert heading in page
     assert "<b>proj</b>" in page and "qwen3.5:4b" in page and "tests_passed" in page
