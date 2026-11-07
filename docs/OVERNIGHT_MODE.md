@@ -10,8 +10,8 @@ It completes M3 (unattended runner, D-025) and the C block of PLAN "Next up", pl
 | When | Who | What |
 |---|---|---|
 | Evening (~10 min) | you + Mitra | discuss the idea; `/prd` writes `PRD.md` (or bring your own); Mitra writes `plan.md` from it; you approve the plan (2 min, recommended); `mitra overnight PRD.md --hours 4` |
-| 0 Preflight | Mitra | free RAM / VRAM / disk → model and context; git repo + branch `mitra/overnight-<date>`; project venv; keep Windows awake; time budget set |
-| 1 Plan | Mitra | 9B, thinking on: tasks with files and a test each, ending with "app runs on localhost and answers"; plan check (red-then-green); skipped if you approved a plan already |
+| 0 Preflight | Mitra (you still there) | 9B at 256K fits? (else what to close); disk; git repo + branch `mitra/overnight-<date>`; project venv; keep Windows awake; time budget set |
+| 1 Plan | Mitra | thinking on: tasks with files and a test each, ending with "app runs on localhost and answers"; plan check (red-then-green); skipped if you approved a plan already |
 | 2 Build | Mitra | task by task: code → tests → fix → re-plan the step when stuck → "needs help" and skip after N rounds; one commit per task |
 | 3 Deploy | Mitra | start the app on a free port, health check (HTTP 200 / process alive / smoke test); leave it running for the demo or stop it and print the command |
 | 4 Report | Mitra | morning report (and a handoff in the vault once B exists): tasks done / needs help, tests, demo URL, time, tokens, dashboard link |
@@ -24,14 +24,18 @@ It completes M3 (unattended runner, D-025) and the C block of PLAN "Next up", pl
 - Never: `git push`, deleting outside the folder, system settings, credential stores; every command has a timeout.
 - Kill switch: `.mitra/STOP` file or ctrl+c; automatic stop at the time budget or critical RAM.
 
-## Flexible with free resources
-- Before the run and at every step: free RAM, VRAM and disk.
-- Model choice: plenty free → 9B 256K; less → 9B 128K; tight → 4B. Default **"9B plans, 4B builds"**: the 9B writes
-  the plan and does re-plans, the 4B (~3x faster) does most of the coding; one model loaded at a time, each switch
-  ~10-20 s.
-- If RAM drops (an app opened, a leak): smaller context or the 4B, or pause until it recovers (the M3 RAM guard).
-- Disk: check free space for traces, venv and builds; stop cleanly when low.
+## One model all night: qwen3.5:latest (9B) at 256K (user, 2026-11-07)
+- **No model switching**: the 9B stays loaded the whole night (no reloads), at **256K = its maximum native context**
+  (262,144; going beyond needs RoPE scaling and loses quality, so not done). Slow is fine at night.
+- Speed: ~8 tok/s measured at 256K (12 GB, 43% GPU); with other apps closed it should be at least that. A step with
+  thinking ~60-120 s → **~120-200 model steps in 3-4 h**.
+- Long nights: compaction at ~205K (E-046), a handoff after the second compaction (I-9), so the context stays clean.
+- **The memory check happens before you leave**: at the evening start Mitra checks the 9B at 256K fits comfortably
+  and, if not, says what to close (D-040) while you are there. During the night nothing is switched: if RAM gets
+  critical Mitra pauses, and stops cleanly if it does not recover. Disk is checked the same way.
 - Laptop: Mitra keeps Windows awake during the run; plugged in; the GPU power cap still applies.
+- To measure once, not a default: KV cache `q4_0` instead of `q8_0` (more of the model on the GPU, faster; may cost
+  quality): one benchmark night before deciding.
 
 ## Fixing itself, no instructions
 Retry with the error → re-plan the step (split it, or fix an earlier step) → "needs help", skip it and the tasks that
@@ -43,7 +47,7 @@ everything; if time is left after the build, `mitra improve` may run on the nigh
 benchmark gate. Next nights then start with the improved harness, and the dashboard compares nights per version.
 
 ## What fits in 3-4 hours (honest)
-9B ~8 tok/s, 4B ~27 tok/s; a step ~30-90 s → **~150-300 model steps a night**. Enough for a small-to-medium project
+One model, the 9B at 256K, ~8 tok/s; a step ~60-120 s with thinking → **~120-200 model steps a night**. Enough for a small-to-medium project
 (arcade game, portfolio site, small FastAPI + SQLite app with tests). A large product needs several nights with
 handoffs, or a plan of plans. The plan is the weak spot: approving it before bed is the best insurance.
 
@@ -51,7 +55,7 @@ handoffs, or a plan of plans. The plan is the weak spot: approving it before bed
 1. `/prd`: Mitra writes a PRD from the discussion (goals, features, out of scope, acceptance = tests, how to run it).
 2. Overnight profile: full access inside the project, the limits above, kill switch, time budget.
 3. Keep-awake during the run.
-4. Resource-adaptive model and context choice, with "9B plans, 4B builds".
+4. Evening memory/disk check for the 9B at 256K; pause/stop on critical RAM at night (no switching).
 5. Deploy step with a health check (needs `start_program`, `setup_env`, `http_request`).
 6. Morning report (+ dashboard view per night: tasks done, needs help, time, tokens, demo URL).
 

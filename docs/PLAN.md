@@ -46,7 +46,7 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 **C. Mitra plans and builds by itself** (M3, I-12)
 - [ ] 15. Runner tools: `start_program` / `stop_program` (games, servers in the background), `setup_env` (project venv via uv)
 - [ ] 16. `mitra run plan.md` unattended: branch, commit per task, RAM guard, stop/resume, "needs help" briefs, report
-- [ ] 16b. Overnight mode (I-16, [OVERNIGHT_MODE.md](OVERNIGHT_MODE.md)): `/prd`, full-access profile inside the project, keep-awake, resource-adaptive model ("9B plans, 4B builds"), deploy + health check, morning report; first trial level 02 from a PRD
+- [ ] 16b. Overnight mode (I-16, [OVERNIGHT_MODE.md](OVERNIGHT_MODE.md)): `/prd`, full-access profile inside the project, keep-awake, one model all night (qwen3.5:latest at 256K, evening memory check), deploy + health check, morning report; first trial level 02 from a PRD
 
 **D. Practice ladder, one level per kind** (mitra-playground; hidden tests decide)
 - [ ] 17. Level 02: second arcade game (+ `screenshot` tool: the model looks at the game; qwen3.5 has vision)
