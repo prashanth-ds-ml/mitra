@@ -1,10 +1,17 @@
 # Status
 
-**Now:** M1 done + Level 01 run (71/72); self-improvement steps 0-3 done, next overnight runs (on the user's ok) · **Last updated:** 2026-11-06 · **Repo:** https://github.com/prashanth-ds-ml/mitra
+**Now:** M1 done + Level 01 run (71/72); self-improvement steps 0-3 done, next overnight runs (on the user's ok) · **Last updated:** 2026-11-07 · **Repo:** https://github.com/prashanth-ds-ml/mitra
 **Plan:** [PLAN.md](PLAN.md) · **Scope:** [SCOPE.md](SCOPE.md) · **Decisions:** [DECISIONS.md](DECISIONS.md) ·
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next
+2026-11-07 (not committed yet):
+- D-039: flash attention + q8_0 KV in Ollama; the 9B (`qwen3.5:latest`) runs at 256K (12 GB, 43% GPU); last model set
+  to it.
+- D-040 / E-043: memory check at every start (`app/fit.py`): one line ✓/⚠/✗, and when not comfortable the programs
+  to close and a smaller option; also in `/doctor`. 15 tests; 570 pass. Live: ✗ with 6.3 GB free (VS Code 2.1 GB, a
+  `pt_train.py` job 1.9 GB listed).
+
 2026-11-06 night, self-improvement (D-038):
 - Step 0 (E-033): shell chains / cd / Git Bash paths; guard counts real failures; failed commands show why.
 - Step 1: harness settings (`app/core/harness.py`, `mitra harness`), used by solve, plans and chat.

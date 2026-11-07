@@ -1774,6 +1774,21 @@ def _shell_command_name(command: str) -> str:
 
 
 
+def _print_memory_fit(model: str, num_ctx: int, base_url: str) -> None:
+    """Startup line: can this machine run the model at this context, and what to close if not (D-040).
+    Only warns; never blocks the start."""
+    from app import fit as fit_mod
+    try:
+        fit = fit_mod.check(model, num_ctx, base_url=base_url)
+    except Exception as exc:  # a failed check must not stop Mitra
+        console.print(Text(f"  ? could not check memory: {exc}", style="m.faint"))
+        return
+    style = {"ok": "m.ok", "tight": "m.info", "no": "m.err"}.get(fit.verdict, "m.faint")
+    console.print(Text("  " + fit_mod.summary(fit), style=style))
+    for line in fit_mod.advice(fit):
+        console.print(Text("    " + line, style="m.dim"))
+
+
 def _startup_model(cfg: dict) -> str:
     """Model for this session without asking: mitra.toml, else the last one used, else qwen3.5:4b (D-034).
     Falls back to the picker only when none of those is installed."""
@@ -2153,6 +2168,7 @@ def _chat():
         mcp_servers=_mcp_names,
         loaded=loaded,
     ))
+    _print_memory_fit(model, num_ctx, cfg.get("ollama_local_base_url") or "http://127.0.0.1:11434")
     console.print(ui.header.tips())
     current_task = "Ready"
 
@@ -2410,8 +2426,10 @@ def _chat():
         if cmd == "/doctor":
             from app.doctor import ollama_report
             ollama_url = cfg.get("ollama_local_base_url") or "http://127.0.0.1:11434"
+            from app import fit as fit_mod
             ai_reply = "\n\n".join([
                 _build_resources_reply(),
+                "## Memory fit\n\n" + fit_mod.markdown(fit_mod.check(model, num_ctx, base_url=ollama_url)),
                 "## Ollama\n\n" + ollama_report(model, num_ctx, base_url=ollama_url),
                 _build_permissions_reply(cfg, session_mode),
                 "## MCP\n\n" + mcp_registry.summarize(mcp_registry.discover(cfg["workspace"])),
