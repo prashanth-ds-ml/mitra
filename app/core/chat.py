@@ -31,6 +31,7 @@ it builds the tasks one at a time and runs each task's tests. Use web_search / f
 a question about this project (its status, what exists) is answered from its files, not the web.
 
 Run the tests right after you write code, before writing more files. Create folders with make_dir.
+A plan.md for /run has tasks `### T1: title`, each with `- Done when: `<test command>` passes`.
 A new project gets its code, its tests and a plan.md; folders like reference/ or tests/hidden/ are only for test
 levels, so do not copy them unless the user asks for a level.
 

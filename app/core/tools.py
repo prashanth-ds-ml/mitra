@@ -162,6 +162,9 @@ def syntax_note(rel: str, text: str) -> str:
     """A warning when a written .py / .json / .toml file does not parse, so the model fixes it right away
     (2026-11-06: Mitra wrote level.toml as Markdown bullets)."""
     suffix = rel.rsplit(".", 1)[-1].lower() if "." in rel else ""
+    from app.core import plans
+    if plans.is_plan_file(rel):  # a plan Mitra writes must run with /run (D-055)
+        return plans.write_note(rel, text)
     try:
         if suffix == "py":
             compile(text, rel, "exec")
@@ -265,7 +268,9 @@ def append_file(ws: Workspace, path: str, content: str) -> str:
     sep = "" if (not old or old.endswith("\n")) else "\n"
     text = old + sep + str(content)
     _commit(ws, full, text)
-    return f"Appended {len(str(content).splitlines())} lines to {rel} (now {len(text.splitlines())} lines)."
+    from app.core import plans
+    note = plans.write_note(rel, text) if plans.is_plan_file(rel) else ""
+    return f"Appended {len(str(content).splitlines())} lines to {rel} (now {len(text.splitlines())} lines)." + note
 
 
 def write_file(ws: Workspace, path: str, content: str) -> str:

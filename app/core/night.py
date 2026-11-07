@@ -30,19 +30,11 @@ def keep_awake(on: bool) -> bool:
 
 def check_plan(plan: Path) -> tuple[int, str]:
     """(number of tasks, problem) before anything starts: a plan with no tasks or no 'Done when' test is refused."""
-    from app.core.loop import parse_plan
+    from app.core import plans
     try:
-        _, tasks = parse_plan(plan.read_text(encoding="utf-8"))
+        return plans.check_text(plan.read_text(encoding="utf-8"))
     except OSError as exc:
         return 0, f"cannot read {plan}: {exc}"
-    if not tasks:
-        return 0, ("no tasks found. Tasks look like `### T1: title`, each with "
-                   "a line '- Done when:' followed by the test command in backticks, "
-                   "e.g. python -m pytest -q tests/test_t1_x.py.")
-    missing = [x.id for x in tasks if not x.test_command]
-    if missing:
-        return len(tasks), f"{', '.join(missing)} have no 'Done when' test command in backticks."
-    return len(tasks), ""
 
 
 def _state_file() -> Path:

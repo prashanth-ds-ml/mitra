@@ -628,6 +628,7 @@ _COMMAND_HELP = [
         ("/model use <m>", "Switch the chat model now (no restart)"),
         ("/run [plan] [h]", "Build a plan unattended in the background (overnight), up to h hours (default 4)"),
         ("/night",         "The latest night run: running?, progress, report"),
+        ("/plan template", "Write a runnable plan template here · /plan check [file] checks a plan"),
         ("/good [note]",   "Mark the last turn good (your verdict teaches Mitra)"),
         ("/bad [why]",     "Mark the last turn bad, ideally with why"),
         ("/model",         "Show the active models (/model list: installed Ollama models)"),
@@ -2725,6 +2726,30 @@ def _chat():
                 console.print(Text("    showing it live here · ctrl+c stops watching (the night keeps going, also if you "
                                    "close Mitra) · `/night` shows it again · don't chat meanwhile", style="m.faint"))
                 _follow_night()
+            continue
+
+        if cmd in ("/plan", "/plan help") or cmd.startswith(("/plan template", "/plan check")):  # runnable plans (D-055)
+            from app.core import plans as plans_mod
+            parts = user_input.strip().split()
+            sub = parts[1].lower() if len(parts) > 1 else "help"
+            target = pathlib.Path(cfg["workspace"]) / (parts[2] if len(parts) > 2 else "plan.md")
+            if sub == "template":
+                if target.exists():
+                    _say(f"`{target.name}` already exists here; `/plan check` checks it.")
+                else:
+                    target.write_text(plans_mod.TEMPLATE, encoding="utf-8")
+                    _say(f"Wrote the plan template to `{target}`. Fill it in (or ask Mitra: \"fill plan.md for <idea>\"), "
+                         "then `/plan check` and `/run plan.md`.")
+            elif sub == "check":
+                if not target.is_file():
+                    _say(f"No `{target.name}` here. `/plan template` writes one.")
+                else:
+                    n, problem = plans_mod.check_text(target.read_text(encoding="utf-8"))
+                    _say(f"✗ `{target.name}` cannot run: {problem}" if problem
+                         else f"✓ `{target.name}` is runnable with `/run {target.name}` ({n} tasks).")
+            else:
+                _say("`/plan template` writes a runnable plan template here · `/plan check [file]` checks a plan · "
+                     "`/run [plan] [hours]` builds it (Mitra writing whole plans itself comes with the planner).")
             continue
 
         if cmd == "/night":  # the latest night run: live while it runs, then the report

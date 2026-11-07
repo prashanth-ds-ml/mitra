@@ -965,7 +965,7 @@ class TestWorkspaceNameIsNotNested:
 
 def test_no_text_mentions_removed_commands():
     import re as _re
-    removed = ["/plan", "/next", "/start", "/build", "/brainstorm", "/understand", "/prd", "/playbook",
+    removed = ["/next", "/start", "/build", "/brainstorm", "/understand", "/prd", "/playbook",
                "/hibernate", "/tasks", "/search", "/permissions", "/thinking", "/reset"]
     root = pathlib.Path(__file__).resolve().parents[1] / "app"
     hits = []
