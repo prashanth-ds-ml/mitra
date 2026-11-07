@@ -2714,14 +2714,30 @@ def _chat():
             if problem:
                 _say(f"The plan cannot run: {problem}\n\nExample: `C:\\Users\\prash\\projects\\brick-breaker-night\\plan.md`.")
                 continue
+            try:  # a branch + one commit per task needs a repo with at least one commit
+                has_commit = subprocess.run(["git", "rev-parse", "--verify", "HEAD"], cwd=str(project),
+                                            capture_output=True, timeout=15).returncode == 0
+            except (OSError, subprocess.TimeoutExpired):
+                has_commit = False
+            if not has_commit:
+                console.print(Text("  note: this folder's git has no commit yet (or no git): tasks will not get their own "
+                                   "commits. First run e.g. `! git init` then `! git add -A` and `! git commit -m start`.",
+                                   style="m.info"))
             info = night_mod.launch(plan_path, project, float(hours), model)
             console.print(Text(f"  ⏾ night run started: {plan_path.name} ({n_tasks} tasks) in {project} · {model} · "
                                f"up to {hours} h", style="m.tool"))
             import time as _t
             _t.sleep(6)  # an error in the first seconds is shown here, not lost in a closing window
             if info["proc"].poll() is not None:
-                console.print(Text("  ✗ the night run stopped right away:", style="m.err"))
-                console.print(Text(night_mod.tail(pathlib.Path(info["console_log"]), 25) or "(no output)", style="m.dim"))
+                st = night_mod.status(n=40)
+                if st and st["report"]:  # it ran, just fast (e.g. every task skipped): show what happened, not an error
+                    console.print(Text("  ⏾ the night run finished within seconds:", style="m.info"))
+                    console.print(Text(st["tail"] or "", style="m.dim"))
+                    console.print(Markdown(st["report"]))
+                else:
+                    console.print(Text("  ✗ the night run stopped right away:", style="m.err"))
+                    console.print(Text(night_mod.tail(pathlib.Path(info["console_log"]), 25) or "(no output)",
+                                       style="m.dim"))
             else:
                 console.print(Text("    showing it live here · ctrl+c stops watching (the night keeps going, also if you "
                                    "close Mitra) · `/night` shows it again · don't chat meanwhile", style="m.faint"))
@@ -2744,7 +2760,7 @@ def _chat():
                 if not target.is_file():
                     _say(f"No `{target.name}` here. `/plan template` writes one.")
                 else:
-                    n, problem = plans_mod.check_text(target.read_text(encoding="utf-8"))
+                    n, problem = plans_mod.check_text(target.read_text(encoding="utf-8"), target.resolve().parent.name)
                     _say(f"✗ `{target.name}` cannot run: {problem}" if problem
                          else f"✓ `{target.name}` is runnable with `/run {target.name}` ({n} tasks).")
             else:

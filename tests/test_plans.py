@@ -52,3 +52,36 @@ def test_prompt_and_commands_know_the_format():
     assert "### T1: title" in chat.CHAT_PROMPT
     src = inspect.getsource(main._chat)
     assert '"/plan template"' in src and "plans_mod.check_text(" in src
+
+
+def test_check_catches_what_broke_the_2026_11_08_plan():
+    plan = """### T1: fix collisions
+- Done when: `pytest brick-breaker/tests/test_game.py::test_a -v && pytest brick-breaker/tests/test_game.py::test_b` passes
+- Needs: T1
+### T2: next
+- Done when: `python -m pytest -q tests/test_game.py` passes
+- Needs: T1
+"""
+    n, why = P.check_text(plan, "brick-breaker")
+    assert n == 2
+    for part in ("one command per task", "python -m pytest", "relative to the plan's folder", "T1 needs itself"):
+        assert part in why, part
+
+
+def test_check_catches_circles_and_accepts_clean_plans():
+    circle = ("### T1: a\n- Done when: `python -m pytest -q` passes\n- Needs: T2\n"
+              "### T2: b\n- Done when: `python -m pytest -q` passes\n- Needs: T1\n")
+    assert "circle" in P.check_text(circle)[1]
+    assert P.check_text(GOOD, "brick-breaker-night") == (2, "")
+
+
+def test_write_note_uses_the_plans_folder(tmp_path):
+    note = P.write_note("brick-breaker/plan.md", "### T1: a\n- Done when: `python -m pytest -q brick-breaker/tests/t.py` passes\n- Needs: -\n")
+    assert "relative to the plan's folder 'brick-breaker'" in note
+
+
+def test_the_prepared_night_plan_still_passes():
+    from app.core import night as N
+    p = N.Path(r"C:\Users\prash\projects\brick-breaker-night\plan.md")
+    if p.exists():
+        assert N.check_plan(p) == (7, "")

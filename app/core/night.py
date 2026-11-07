@@ -32,7 +32,7 @@ def check_plan(plan: Path) -> tuple[int, str]:
     """(number of tasks, problem) before anything starts: a plan with no tasks or no 'Done when' test is refused."""
     from app.core import plans
     try:
-        return plans.check_text(plan.read_text(encoding="utf-8"))
+        return plans.check_text(plan.read_text(encoding="utf-8"), plan.resolve().parent.name)
     except OSError as exc:
         return 0, f"cannot read {plan}: {exc}"
 
