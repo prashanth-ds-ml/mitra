@@ -38,6 +38,22 @@ When the work is done, or you need the user, reply in a few short lines: what yo
 changes you did not make."""
 
 READ_ONLY_TOOLS = {"list_files", "read_file", "search", "web_search", "fetch_url", "mcp_find"}  # plan mode
+
+# Ollama parses Qwen3.5's tool calls (XML); a very long call that ends before it closes fails inside Ollama and comes
+# back as an exception, not a reply (E-044). The model is told and tries again in smaller parts.
+MAX_BAD_TOOL_CALLS = 2
+BAD_TOOL_CALL_NOTE = (
+    "[Mitra: your last tool call could not be read ({error}). It was probably too long and ended before it was "
+    "closed. Nothing was run and nothing was written. Try again in smaller parts: write a long file with write_file "
+    "holding the first ~100 lines, then add the rest with edit_file (old = the last lines, new = those lines plus "
+    "the next part). Keep a report short, or write it to a file in parts the same way.]"
+)
+
+
+def is_tool_call_parse_error(exc: BaseException) -> bool:
+    """Ollama's 'XML syntax error ...' / 'tool call parsing failed' (ollama.ResponseError) for a broken tool call."""
+    text = str(exc)
+    return type(exc).__name__ == "ResponseError" and ("XML syntax error" in text or "tool call" in text.lower())
 MAX_STEPS = 40
 
 EXTRA_SPECS = [
@@ -255,9 +271,19 @@ class ChatSession:
         bound = self.llm.bind_tools(specs)
         guard = RepeatGuard(max_repeats=self.harness.limit("max_repeats"),
                             max_failures=self.harness.limit("max_failures"))
+        bad_calls = 0
         for step in range(1, max_steps + 1):
             res.steps = step
-            streamed = self._stream(bound.stream(messages), step)
+            try:
+                streamed = self._stream(bound.stream(messages), step)
+            except Exception as exc:  # Ollama could not read the model's tool call (E-044)
+                if not is_tool_call_parse_error(exc) or bad_calls >= MAX_BAD_TOOL_CALLS:
+                    raise
+                bad_calls += 1
+                self.rec.write("bad_tool_call", turn=self.turn_no, step=step, error=str(exc)[:500])
+                self.hooks.show("retry", {}, f"tool call cut off ({exc}); asking for smaller parts", False)
+                messages.append(HumanMessage(content=BAD_TOOL_CALL_NOTE.format(error=exc)))
+                continue
             if streamed.stopped:
                 messages.append(AIMessage(content=streamed.text))
                 res.text, res.stopped, res.stop_reason = streamed.text, True, "stopped by you (esc)"

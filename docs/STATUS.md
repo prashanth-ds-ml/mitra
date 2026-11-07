@@ -5,7 +5,9 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next
-2026-11-07 (not committed yet):
+2026-11-07 (D-039, D-040 pushed; E-044 committed locally):
+- E-044: a cut-off Qwen3.5 tool call (Ollama `XML syntax error ... unexpected EOF`) no longer crashes the turn: the
+  model is told and retries in parts (max 2). Seen live on "make a detailed report" (one 5.2K-token call, 3m20s).
 - D-039: flash attention + q8_0 KV in Ollama; the 9B (`qwen3.5:latest`) runs at 256K (12 GB, 43% GPU); last model set
   to it.
 - D-040 / E-043: memory check at every start (`app/fit.py`): one line ✓/⚠/✗, and when not comfortable the programs
