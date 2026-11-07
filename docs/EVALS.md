@@ -115,6 +115,24 @@ Scripts: `ctx_probe.py`, `speed_probe.py` (session scratchpad, to be moved to `b
 GPU, so its largest context that fits in RAM (128K) costs little extra speed (13.4 to 9.6 tok/s). Chosen: 4B at 64K,
 9B at 128K (user, 2026-11-06). Prompt-processing speed at full context is not measured yet.
 
+### 2026-11-07 · M2 · Compressed context memory: flash attention + q8_0 KV cache (D-039)
+
+Same machine and method as above (`ctx_probe.py`, 200 tokens, `think` off), Ollama 0.40.13 with the user-level
+settings `OLLAMA_FLASH_ATTENTION=1` and `OLLAMA_KV_CACHE_TYPE=q8_0` (were unset).
+
+| Model | num_ctx | Loaded size | On GPU | Generation |
+|---|---|---|---|---|
+| qwen3.5:4b | 128K | 6.7 GB (was 8.30) | 87% (was 65%) | 27.0 tok/s (was 24.2) |
+| qwen3.5:4b | 256K | 10 GB | 52% | 14.7 tok/s |
+| qwen3.5 9B (`latest`) | 128K | 9.5 GB (was 10.55) | 58% (was 47%) | 10.8 tok/s (was 9.6) |
+| qwen3.5 9B | 192K | 11 GB | 49% | 8.9 tok/s |
+| qwen3.5 9B | 256K | 12 GB | 43% | 8.0 tok/s |
+
+**Reading:** the 9B now loads at its full 256K context (it did not fit in RAM before), at a cost of about 25% speed
+against 128K. Free RAM with the 9B loaded at 256K was about 1.1 GB, so other heavy apps should be closed during runs.
+The 4B gains GPU share but still spills at 128K, so its speed barely moves. Chosen: 9B at 256K, 4B stays at 128K
+(user, 2026-11-07). Answer quality with the q8_0 cache is not measured yet; the next Level 01 run on each model checks it.
+
 ### 2026-11-06 · M1 · First playground run: level 01 (snake), Mitra core loop
 
 `python scripts/run_level.py levels/01-snake --builder mitra --model qwen3.5:4b --max-steps 30` (mitra-playground),

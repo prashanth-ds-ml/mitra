@@ -241,7 +241,7 @@ def test_only_official_qwen35_tags_are_listed(name, ok):
         assert "custom qwen3.5 variant" in problem
 
 
-@pytest.mark.parametrize("params,ctx", [(4_660_000_000, 131_072), (9_650_000_000, 131_072)])
+@pytest.mark.parametrize("params,ctx", [(4_660_000_000, 131_072), (9_650_000_000, 262_144)])
 def test_context_for_model_uses_the_measured_sizes(monkeypatch, params, ctx):
     monkeypatch.setattr(config, "get_model_facts", lambda name: {**QWEN, "parameters": params})
     assert config.context_for_model("qwen3.5:any") == ctx

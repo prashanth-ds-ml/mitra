@@ -575,8 +575,10 @@ SUPPORTED_BASE_NAMES = ("qwen3.5",)
 # Context per model size, measured 2026-11-06 on the 8 GB GPU + 24 GB RAM machine (EVALS):
 #   qwen3.5:4b 128K = 65% GPU, 24 tok/s (64K would be 100% GPU, 82 tok/s)  -- D-036: room over speed
 #   qwen3.5 9B 128K = 47% GPU, 10 tok/s (never fits the GPU; 256K does not fit in RAM)  -- D-033
+# With flash attention + q8_0 KV cache in Ollama (2026-11-07, D-039):
+#   qwen3.5:4b 128K = 6.7 GB, 87% GPU, 27 tok/s;  qwen3.5 9B 256K (its maximum) = 12 GB, 43% GPU, 8 tok/s
 SMALL_MODEL_CONTEXT = 131_072
-LARGE_MODEL_CONTEXT = 131_072
+LARGE_MODEL_CONTEXT = 262_144
 LARGE_MODEL_PARAMETERS = 6_000_000_000
 
 
