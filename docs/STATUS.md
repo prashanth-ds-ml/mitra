@@ -5,6 +5,10 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next
+2026-11-07, MCP next steps added to PLAN M4 (no code): Serena on/off trial on a playground level, Playwright
+when the first web project starts, Research Desk MCP as planned. Other candidates noted in chat (DuckDB, ABDM docs,
+Docker) are not planned yet.
+
 2026-11-07, E-046 (committed locally): compaction now at 80% of the context (was a fixed 120K, so 256K was half
 unused); `/context 128k|256k|auto` switches the size live, kept per model. I-7 plan (+ step M: prompt-processing time)
 and I-8 (one explore sub-agent, after M) waiting for the go; no sub-agents otherwise (user, 2026-11-07).

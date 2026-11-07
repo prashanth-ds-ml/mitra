@@ -124,7 +124,14 @@ Design, ability list and what happens to local-codex's code: [M2_PLAN.md](M2_PLA
 - [ ] Settings sweep on the tuning half: context 32K / 64K / 128K, thinking off / on; best setting per model kept, reported on held-out
 - [ ] Tool registry (`find_tool`) over every connected MCP server: short descriptions of our own, only the 1-2 tools a step needs go into the prompt
 - [ ] More servers through the registry: Serena, GitHub (test repo, scoped token), SQLite/Postgres (read-only SQL by default), Docker, AWS (LocalStack, or a read-only IAM profile)
-- [ ] Research Desk MCP server added to project 04: `search_library`, `get_report` (read-only)
+- [ ] **Serena trial (agreed 2026-11-07):** first start with your OK (downloads from GitHub), pin its version, then the
+      same playground level with Serena off vs on, same model and settings; compare right-tool rate (symbol lookups
+      instead of whole-file reads), prompt tokens per turn, time, hidden-test pass rate; RAM of its language server
+      noted. Kept on by default only if the pass rate is not lower and tokens or time drop. Result in EVALS.
+- [ ] **Playwright MCP (`@playwright/mcp`), when the first web project starts (agreed 2026-11-07):** added to
+      `DEFAULT_SERVERS` turned off, first start with your OK, pinned; used on that project to open the app, click
+      through it and read the page; a playground web level checks it before it is turned on by default.
+- [ ] Research Desk MCP server added to project 04: `search_library`, `get_report` (read-only) (agreed 2026-11-07: as planned here)
 - [ ] Ops sandbox = playground level 07: Docker Compose (demo API, seeded Postgres, LocalStack), test GitHub repo, planted problems with checkable answers
 - [ ] MCP comparison on the same model and tasks: all tools in the prompt vs registry vs core only (pass rate, right-tool rate, prompt tokens, time, blocked unsafe calls)
 - [ ] Harness² tuning in WSL (Codex executor pointed at local Ollama) on the tuning half; three columns: stock, stock + Harness², Mitra
