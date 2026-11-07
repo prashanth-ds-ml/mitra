@@ -97,6 +97,15 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
 - **I-10 Obsidian vault as the center of Mitra's memory and context** (same plan, D-043). Impact: projects,
   sessions, compaction summaries, handoffs, plans and lessons in one linked vault (`MitraVault`), with recall /
   remember tools; `.mitra/` is hidden from Obsidian today. Code stays in the projects. Plan agreed, build pending go.
+- **I-11 Tools that fix what we saw** (2026-11-07): `check_code` (lint before run: most of run_command's 19/20
+  failures were undefined names / unbound locals), `run_tests(path / -k)`, `start_program` / `stop_program`,
+  `setup_env` (uv venv), `http_request` (localhost), `sql` (project SQLite), `screenshot` (Playwright + qwen3.5
+  vision); tool sets by project type (bigtool idea: core always, game / web / db sets on demand) and BM25 for
+  `mcp_find` (keyword today; no embeddings: a second model would push the 9B out of memory). In PLAN "Next up".
+- **I-12 Mitra plans and builds games, sites, DB designs and web apps by itself** (2026-11-07): `/plan` with a test
+  per task, red-then-green plan check, unattended runner, one ladder level per kind (new DB-design level) with
+  hidden tests, overnight self-improvement on them; real projects of a kind only after its level passes. Honest
+  limit: bigger web apps will finish only partly at first ("needs help" briefs). In PLAN "Next up".
 
 ## Later (not milestones)
 Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,

@@ -9,6 +9,48 @@ Plan v2 (2026-11-05, D-017); v1 is in [archive/PLAN-v1-2026-10-24.md](archive/PL
 
 **Progress:** Before starting 4/4 · M0-M7 0/8
 
+## Next up: priority order (agreed with the user 2026-11-07)
+Work top to bottom. Each line points to its plan; the milestone lists below keep the detail.
+
+**A. Every session, now** ([SESSION_GAINS_PLAN.md](SESSION_GAINS_PLAN.md), I-7 + I-11 tools)
+- [ ] 1. `append_file` + "write files over ~150 lines in parts" (E3, E-044)
+- [ ] 2. `check_code`: quick lint (undefined names, unbound locals) before running; crash-on-start hint (E4)
+- [ ] 3. `run_tests(path / -k)`: run one test file or a selection
+- [ ] 4. `/good`, `/bad <why>` on the last turn (S1)
+- [ ] 5. Prompt-processing time in every trace (step M; decides I-8)
+- [ ] 6. Adaptive thinking (E2) + Level 01 benchmark on/adaptive, 9B and 4B (overnight, your OK)
+- [ ] 7. **You:** use Mitra daily on small real tasks with tests and mark turns, about a week (person task)
+
+**B. Memory that lasts** ([HANDOFF_VAULT_PLAN.md](HANDOFF_VAULT_PLAN.md), I-10, I-9, D-043)
+- [ ] 8. Vault basics: `MitraVault`, `Mitra/` layout, safe writes, import of old `.mitra/` memory
+- [ ] 9. Startup context from the vault + `recall` / `remember` / `read_note`
+- [ ] 10. Compaction summaries saved to the vault
+- [ ] 11. Handoff report + "start fresh" pop-up (2nd compaction)
+- [ ] 12. Plans and lessons in the vault
+
+**C. Mitra plans and builds by itself** (M3, I-12)
+- [ ] 13. `/plan`: Mitra writes plan.md with a test per task (9B, thinking on); you approve or edit it
+- [ ] 14. Plan check: every task has a test, and each test **fails before** the task and **passes after** (red-then-green, so tests cannot be fake)
+- [ ] 15. Runner tools: `start_program` / `stop_program` (games, servers in the background), `setup_env` (project venv via uv)
+- [ ] 16. `mitra run plan.md` unattended: branch, commit per task, RAM guard, stop/resume, "needs help" briefs, report
+
+**D. Practice ladder, one level per kind** (mitra-playground; hidden tests decide)
+- [ ] 17. Level 02: second arcade game (+ `screenshot` tool: the model looks at the game; qwen3.5 has vision)
+- [ ] 18. Level 03: portfolio site (+ Playwright MCP brought forward from M4)
+- [ ] 19. New DB-design level: schema from a spec, hidden tests on constraints and queries (+ `sql` tool)
+- [ ] 20. Level 04: API + DB (+ `http_request`, localhost only)
+- [ ] 21. Tool sets by project type (core always; game / web / db sets only when the project needs them) + BM25 ranking for `mcp_find`
+- [ ] 22. Overnight self-improvement on the levels (`mitra improve`, kept only if hidden tests improve; scheduled task needs your OK)
+
+**E. After about two weeks of real use** (judged on the dashboard)
+- [ ] 23. Decide the context size per model from real use (E1)
+- [ ] 24. `mitra improve` on real-session patterns (S2) and auto-revert of harness changes that make things worse (S5)
+- [ ] 25. Serena on/off trial (M4)
+- [ ] 26. Level 06: small web app; then real projects of each kind whose level passed
+
+**Later:** Research Desk MCP (M4), I-8 explore sub-agent (only if item 5 shows it is cheap), project memory proposals
+(S4), before/after pairs for training (S3), fine-tune (M7).
+
 ---
 
 ## Before starting
