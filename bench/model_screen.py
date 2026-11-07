@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 OLLAMA = "http://127.0.0.1:11435"  # bench server (bench/ollama_server.py)
+THINK: bool | None = None  # --think on/off: test a model the way its role runs it (None = the model's default)
 SCREEN_CTX = 32768  # must exceed the longest case (C09, ~17K tokens); Ollama drops old messages silently (E-008)
 SYSTEM = (
     "You are a coding agent working in a Python repository. Use the tools to inspect and change code. "
@@ -262,6 +263,7 @@ def screen(model: str) -> dict:
                     "tools": TOOLS,
                     "stream": False,
                     "options": {"num_ctx": SCREEN_CTX, "temperature": 0, "seed": 0},
+                    **({"think": THINK} if THINK is not None else {}),
                 },
             )
         except (urllib.error.URLError, OSError, ValueError) as exc:
@@ -306,10 +308,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--models", nargs="+", required=True)
     parser.add_argument("--ollama", default=OLLAMA)
+    parser.add_argument("--think", choices=["default", "on", "off"], default="default",
+                        help="thinking for every case (a role's setting); default = the model decides")
     parser.add_argument("--out", type=Path, default=Path("results/model_screen.json"))
     args = parser.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
     OLLAMA = args.ollama
+    global THINK
+    THINK = {"on": True, "off": False}.get(args.think)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     report = json.loads(args.out.read_text(encoding="utf-8")) if args.out.exists() else {}
     for model in args.models:

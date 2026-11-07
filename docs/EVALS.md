@@ -161,3 +161,13 @@ text tool calls or model errors were needed. Result file: mitra-playground `resu
 - **What it means:** one paragraph, including what did not work.
 - **Kept / dropped:** for experiments.
 ```
+
+## 2026-11-08 Model screen for the roles (D-051): first attempt void
+- **Run:** `bench/model_screen.py --models deepseek-r1:8b qwen3.5:latest --ollama :11434` (12 tool-call cases).
+- **Result: void, not a model result.** Ollama was updated mid-run (0.40.13 → 0.40.15, needed by mimo-v2.6:9b), so
+  cases from deepseek C04 and all of qwen3.5:latest failed with "connection refused" (marked infra by the screen).
+- **Signal to check:** before the update, deepseek-r1:8b's C01-C03 each hit the 600 s limit (thinking by default, no
+  think setting sent; a stuck "Stopping…" 9B may have held memory). The screen now takes `--think on|off` so each
+  model is tested the way its role runs it; re-run started on a fresh Ollama (builders: qwen3.5:latest, mimo-v2.6:9b;
+  planner: deepseek-r1:8b with thinking on).
+
