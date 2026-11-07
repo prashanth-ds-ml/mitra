@@ -5,6 +5,13 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next
+2026-11-08 night: A1-A3 + E4 built (append_file, check_code also after every .py write, run_tests targets, crash
+hint); E-047 fixed (/model vs /mode, lost Ollama → wait + retry, real pytest summary, no input gap); overnight
+stopgap `mitra night` / `/run` (D-053). First night: C:\Users\prash\projects\brick-breaker-night (plan.md,
+tests-first, Mitra writes tests; hidden judge in brick-breaker-night-judge). Ollama updated to 0.40.15 by the user;
+mimo-v2.6:9b downloading (needed 0.40.15); model screen re-run pending (first attempt void, EVALS). A6 adaptive
+thinking and E-045 still open.
+
 2026-11-08, role routing (D-052): `/role [name]` swaps model, max context, tools, MCP servers and thinking live;
 `/model use` switches without a restart; defaults deepseek-r1:8b (planner, reviewer) and mimo-v2.6:9b (tester,
 builder, debugger, deployer), falling back to the chat model until installed; builder cannot edit tests/; filesystem

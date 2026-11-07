@@ -324,6 +324,7 @@ class InputBox:
             history=history,
             completer=MitraCompleter(commands, FileIndex(workspace)),
             complete_while_typing=True,
+            reserve_space_for_menu=0,  # no empty block under the input; the menu still opens (E-047)
             key_bindings=make_key_bindings(state, print_folded=print_folded),
             style=prompt_style(),
             bottom_toolbar=toolbar,

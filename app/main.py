@@ -4,6 +4,7 @@ import json
 import pathlib
 import re
 import subprocess
+import sys
 import time
 import traceback
 from datetime import datetime
@@ -308,12 +309,30 @@ def cmd_solve(
     max_steps: int = typer.Option(0, "--max-steps", help="Model calls per task before stopping (0 = the harness "
                                   "setting, 40 by default)."),
     as_json: bool = typer.Option(False, "--json", help="Print a JSON result instead of progress."),
+    write_tests: bool = typer.Option(False, "--write-tests", help="Let Mitra write tests/ (tests-first plans)."),
 ) -> None:
     """Work on a task until its tests pass (the core loop, M1). Exit 0 = tests pass."""
     from app.core.cli import cmd_solve as _solve
 
     raise typer.Exit(_solve(task, test=test, plan=plan, workspace=workspace, model=model,
-                            max_steps=max_steps or None, as_json=as_json))
+                            max_steps=max_steps or None, as_json=as_json, write_tests=write_tests))
+
+
+def cmd_night(
+    plan: str = typer.Argument("plan.md", help="The plan file (tasks with 'Done when' tests)."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Project folder."),
+    hours: float = typer.Option(4.0, "--hours", help="Stop after this many hours."),
+    model: str = typer.Option("", "--model", help="Model (default: the builder role)."),
+    read_only_tests: bool = typer.Option(False, "--read-only-tests", help="Mitra may not write tests/."),
+) -> None:
+    """Build a plan unattended (overnight): keeps Windows awake, stops at the time limit, writes NIGHT_REPORT.md."""
+    from app.core import night
+
+    raise typer.Exit(night.run(plan, workspace=workspace, hours=hours, model=model,
+                               write_tests=not read_only_tests, echo=lambda s: console.print(s)))
+
+
+cli.command("night")(cmd_night)
 
 
 cli.command("solve")(cmd_solve)
@@ -546,11 +565,15 @@ def main(
 # ── Known friendly error patterns ────────────────────────────────────────────
 _ERROR_HINTS: list[tuple[str, str]] = [
     ("connection refused",        "Ollama is not running. Start it with: ollama serve"),
+    ("10054",                     "Lost the connection to Ollama (it restarted or stopped). Make sure it runs, then send your message again."),
+    ("10061",                     "Ollama is not running. Start it, then send your message again."),
+    ("forcibly closed",           "Lost the connection to Ollama (it restarted or stopped). Make sure it runs, then send your message again."),
+    ("connection reset",          "Lost the connection to Ollama (it restarted or stopped). Make sure it runs, then send your message again."),
     ("ollama",                    "Cannot reach Ollama. Is it running? Try: ollama serve"),
     ("validation error",          "The model returned malformed tool arguments. Try rephrasing your request."),
     ("list_type",                 "Package list was not recognised. Try: install pygame numpy"),
     ("context length",            "The conversation is too long. Use /reset to start a fresh session."),
-    ("requires more system memory", "The selected model is too large for the free RAM. Close other programs, or switch to the 4B model with `/model use qwen3.5:4b` and restart Mitra."),
+    ("requires more system memory", "The selected model is too large for the free RAM. Close other programs, or switch now with `/model use qwen3.5:4b` or `/context 128k`."),
     ("rate_limit",                "Request rate-limited. Wait a moment and try again."),
 ]
 
@@ -603,6 +626,7 @@ _COMMAND_HELP = [
         ("/report",        "Rebuild the dashboard (sessions, tools, improvement, training data) and open it"),
         ("/role [name]",   "Show roles, or switch role: model, tools and MCP servers at once"),
         ("/model use <m>", "Switch the chat model now (no restart)"),
+        ("/run [plan] [h]", "Build a plan unattended in its own window (overnight), up to h hours (default 4)"),
         ("/good [note]",   "Mark the last turn good (your verdict teaches Mitra)"),
         ("/bad [why]",     "Mark the last turn bad, ideally with why"),
         ("/model",         "Show the active models (/model list: installed Ollama models)"),
@@ -2460,7 +2484,7 @@ def _chat():
             memory.update_context(cfg["workspace"], user_input)
             continue
 
-        if cmd.startswith("/mode"):
+        if cmd == "/mode" or cmd.startswith("/mode "):  # not /model (E-047)
             requested = user_input.strip()[5:].strip()
             if not requested:
                 ai_reply = _build_mode_reply(session_mode)
@@ -2654,8 +2678,25 @@ def _chat():
             continue
 
         if cmd == "/run" or cmd.startswith("/run "):
-            _say("`/run <plan>` comes with the plan runner (M3). For a shell command use `! <command>`, "
-                "for example `! pytest -q`.")
+            parts = user_input.strip().split()
+            plan_file = parts[1] if len(parts) > 1 else "plan.md"
+            hours = parts[2] if len(parts) > 2 else "4"
+            plan_path = pathlib.Path(cfg["workspace"]) / plan_file
+            if not plan_path.is_file():
+                _say(f"No plan file `{plan_file}` here. Usage: `/run [plan.md] [hours]` (a plan with 'Done when' tests).")
+                continue
+            try:
+                float(hours)
+            except ValueError:
+                _say("Usage: `/run [plan.md] [hours]`, e.g. `/run plan.md 4`.")
+                continue
+            cmd = [sys.executable, "-m", "app.main", "night", str(plan_path), "--workspace", str(cfg["workspace"]),
+                   "--hours", hours, "--model", model]
+            flags = subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0
+            subprocess.Popen(cmd, cwd=str(pathlib.Path(__file__).resolve().parents[1]), creationflags=flags)
+            console.print(Text(f"  ⏾ night run started in its own window: {plan_file} · {model} · up to {hours} h", style="m.tool"))
+            console.print(Text("    it keeps Windows awake, commits each task on its own branch and writes NIGHT_REPORT.md; "
+                               "don't chat meanwhile (one model at a time)", style="m.faint"))
             continue
 
         if user_input.strip().startswith("/"):

@@ -371,6 +371,18 @@ def project_python(root: Path) -> str:
     return sys.executable
 
 
+_PYTEST_SUMMARY = re.compile(r"\b\d+ (passed|failed|errors?|skipped|xfailed|xpassed|deselected)\b|no tests ran")
+
+
+def test_summary(out: str) -> str:
+    """pytest's result line ("2 failed, 30 passed in 1.2s"), not the last line (often a warning, E-047)."""
+    for line in reversed((out or "").splitlines()):
+        if _PYTEST_SUMMARY.search(line):
+            return line.strip().strip("=").strip()
+    lines = [ln for ln in (out or "").splitlines() if ln.strip()]
+    return lines[-1].strip() if lines else ""
+
+
 @dataclass
 class TestRun:
     passed: bool
@@ -412,7 +424,7 @@ def run_tests(ws: Workspace, command: str | None = None, extra: list[str] | None
     except OSError as exc:
         out, ok = f"Could not run '{cmd}': {exc}", False
     secs = time.monotonic() - t0
-    last = out.splitlines()[-1] if out else ("passed" if ok else "failed")
+    last = test_summary(out) or ("passed" if ok else "failed")
     full_path = ""
     if ws.spill_dir is not None:
         ws.spill_dir.mkdir(parents=True, exist_ok=True)

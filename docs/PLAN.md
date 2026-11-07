@@ -21,9 +21,9 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 - [ ] **You:** restart Mitra after each update (a running session keeps the old code)
 
 **A. Every session, now** ([SESSION_GAINS_PLAN.md](SESSION_GAINS_PLAN.md), I-7 + I-11 tools)
-- [ ] 1. `append_file` + "write files over ~150 lines in parts" (E3, E-044)
-- [ ] 2. `check_code`: quick lint (undefined names, unbound locals) before running; crash-on-start hint (E4)
-- [ ] 3. `run_tests(path / -k)`: run one test file or a selection
+- [x] 1. `append_file` + "write files over ~150 lines in parts" (E3, E-044) (2026-11-08)
+- [x] 2. `check_code`: quick lint (undefined names, unbound locals) before running; crash-on-start hint (E4) (2026-11-08; also automatic after every .py write)
+- [x] 3. `run_tests(path / -k)`: run one test file or a selection (2026-11-08, + first_failure)
 - [x] 4. `/good`, `/bad <why>` on the last turn (S1) (done as 0d, 2026-11-07)
 - [x] 5. Prompt-processing time in every trace (step M; decides I-8) (done in 0a, 2026-11-07)
 - [ ] 6. Adaptive thinking (E2) + Level 01 benchmark on/adaptive, 9B and 4B (overnight, your OK)
@@ -49,6 +49,7 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 **C. Mitra plans and builds by itself** (M3, I-12)
 - [ ] 15. Runner tools: `start_program` / `stop_program` (games, servers in the background), `setup_env` (project venv via uv)
 - [ ] 16. `mitra run plan.md` unattended: branch, commit per task, RAM guard, stop/resume, "needs help" briefs, report
+- [x] 16a. Overnight stopgap: `mitra night` / `/run [plan] [hours]` (keep-awake, time limit, NIGHT_REPORT.md, --write-tests) (D-053, 2026-11-08)
 - [ ] 16b. Overnight mode (I-16, [OVERNIGHT_MODE.md](OVERNIGHT_MODE.md)): `/prd`, full-access profile inside the project, keep-awake, one model all night (qwen3.5:latest at 256K, evening memory check), deploy + health check, morning report; first trials: level 02 from a PRD, night A (9B only, 256K) vs night B (9B plans + 4B builds, both 256K), D-048
 
 **D. Practice ladder, one level per kind** (mitra-playground; hidden tests decide)

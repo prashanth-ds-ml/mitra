@@ -92,6 +92,28 @@ def turn_outcome(res) -> str:
     return "answered"
 
 
+def is_connection_error(exc: BaseException) -> bool:
+    """The connection to Ollama broke (restart, update, crash), not a model error (E-047)."""
+    text = str(exc).lower()
+    return (isinstance(exc, ConnectionError) or type(exc).__name__ in ("ConnectError", "RemoteProtocolError",
+                                                                      "ReadError")
+            or any(s in text for s in ("10054", "10061", "forcibly closed", "connection reset", "connection refused")))
+
+
+def wait_for_ollama(base_url: str | None = None, timeout_s: float = 90, poll_s: float = 3) -> bool:
+    """True once Ollama answers again (within timeout_s)."""
+    import urllib.request
+    url = (base_url or "http://127.0.0.1:11434").rstrip("/").removesuffix("/v1") + "/api/version"
+    end = time.monotonic() + timeout_s
+    while time.monotonic() < end:
+        try:
+            with urllib.request.urlopen(url, timeout=3):
+                return True
+        except OSError:
+            time.sleep(poll_s)
+    return False
+
+
 def is_tool_call_parse_error(exc: BaseException) -> bool:
     """Ollama's 'XML syntax error ...' / 'tool call parsing failed' (ollama.ResponseError) for a broken tool call."""
     text = str(exc)
@@ -396,11 +418,19 @@ class ChatSession:
         guard = RepeatGuard(max_repeats=self.harness.limit("max_repeats"),
                             max_failures=self.harness.limit("max_failures"))
         bad_calls = 0
+        conn_retried = False
         for step in range(1, max_steps + 1):
             res.steps = step
             try:
                 streamed = self._stream(bound.stream(messages), step)
             except Exception as exc:  # Ollama could not read the model's tool call (E-044)
+                if is_connection_error(exc) and not conn_retried:  # Ollama restarted (E-047): wait, retry once
+                    conn_retried = True
+                    self.rec.write("model_error", turn=self.turn_no, step=step, error=str(exc)[:500], retry=True)
+                    self.hooks.show("retry", {}, f"lost Ollama ({exc}); waiting for it to come back", False)
+                    if wait_for_ollama(getattr(self.llm, "base_url", None)):
+                        continue
+                    raise
                 if not is_tool_call_parse_error(exc) or bad_calls >= MAX_BAD_TOOL_CALLS:
                     raise
                 bad_calls += 1
