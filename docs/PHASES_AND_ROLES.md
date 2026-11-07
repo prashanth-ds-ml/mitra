@@ -28,6 +28,17 @@ A night-B run swaps ~3-6 times: plan + tests (9B) → build (4B) → [stuck: re-
 report (9B). Context: 256K for both by default (user, D-048); option to test: planner phases at ~64K so a bigger
 planner fits.
 
+## Current choice: deepseek-r1 thinks, mimo-v2.6 does (user, 2026-11-08, D-050; pending the screen)
+| Phase | Model | Note |
+|---|---|---|
+| Planner | **deepseek-r1** (screen both `:14b` 9 GB, Qwen2.5-14B distill, and `:8b` 5.2 GB, R1-0528 / Qwen3-8B) | plan taken from its reply text; Mitra writes plan.md, so no tool calls needed; 128K context (enough for planning); always thinks, slow but rare |
+| Final reviewer | **deepseek-r1** | diff + PRD go in the prompt; no tool calls |
+| Tester, builder, debugger, deployer, live chat | **mimo-v2.6:9b** | tool-heavy phases; mimo = Qwen3.5-9B tuned for agent work (MIT); the tester moves here from the planner model |
+- Baseline kept: qwen3.5:latest. Night A = qwen3.5:latest only; night B = deepseek-r1 plans/reviews + mimo builds.
+- Screen first: `model_screen.py` (tools, speed, memory fit), Level 01 with mimo vs qwen3.5, planner eval deepseek
+  14b vs 8b vs qwen3.5; then nights A/B. Both added to an allowed-models list (Mitra lists only qwen3.5 tags today,
+  D-032). Licences rechecked before any training use.
+
 ## Tools per phase (✓ exists, ✚ new / planned)
 | Phase | Tools |
 |---|---|
