@@ -1,8 +1,21 @@
 # Status
 
-**Now:** M1 done + Level 01 run (71/72); self-improvement steps 0-3 done, next overnight runs (on the user's ok) · **Last updated:** 2026-11-07 · **Repo:** https://github.com/prashanth-ds-ml/mitra
+**Now:** first overnight build (brick breaker, 2026-11-08) + experiments registry next · **Last updated:** 2026-11-08 · **Repo:** https://github.com/prashanth-ds-ml/mitra
 **Plan:** [PLAN.md](PLAN.md) · **Scope:** [SCOPE.md](SCOPE.md) · **Decisions:** [DECISIONS.md](DECISIONS.md) ·
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
+
+## Next session starts here (handoff 2026-11-08)
+1. **Read the night:** `C:\Users\prash\projects\brick-breaker-night\NIGHT_REPORT.md` (started by the user with
+   `/run C:\Users\prash\projects\brick-breaker-night\plan.md 4`, qwen3.5:latest 256K, Mitra writes its own tests).
+   Score it with the hidden judge (`brick-breaker-night-judge\JUDGE.md`, 25 tests, proven against a reference
+   kept out of the project); compare with Mitra's own tests (test quality). Look at the night in the dashboard.
+2. **PLAN block X** ([EXPERIMENTS.md](EXPERIMENTS.md), I-20): first registry entry, `mitra judge`, Experiments
+   section on the dashboard, model screen re-run (qwen3.5 / mimo-v2.6:9b / deepseek-r1:8b --think on), E-048.
+3. **Decide I-19** ([PIPELINES.md](PIPELINES.md)): the phase loop (14e) as a LangGraph pipeline with checkpoints +
+   approval interrupt + bigtool (BM25) retrieval; then week 2 of [FIRST_TWO_WEEKS.md](FIRST_TWO_WEEKS.md)
+   (`/plan`, plan check, re-plan, planner experiment).
+- Still open: A6 adaptive thinking (+ its benchmark night), E-045 flaky MCP test, push (several local commits; the user has not said push yet), memory clean-up offer (WSL, Research Desk server).
+- Machine: Ollama 0.40.15 (flash attention + q8_0 KV); models qwen3.5:4b/latest, mimo-v2.6:9b, deepseek-r1:8b.
 
 ## Next
 2026-11-08 night: A1-A3 + E4 built (append_file, check_code also after every .py write, run_tests targets, crash

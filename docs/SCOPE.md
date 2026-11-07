@@ -130,6 +130,13 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   the builder; new tools `inspect`, `diff`, `app_logs`; filesystem MCP off. Model shortlist to screen: mimo-v2.6:9b,
   ornith-1.5:9b / 35b, deepseek-r1:14b (tev1 only as a possible router later; granite4.2, qwen2.5-coder, llama3.1
   skipped).
+- **I-19 Pipelines with LangGraph + bigtool** ([PIPELINES.md](PIPELINES.md), plan 2026-11-08): the outer pipeline
+  (build-from-PRD, fix, review, improve, experiment) as LangGraph graphs with code-decided edges, SQLite checkpoints
+  (resume a night after a crash) and an approval interrupt; Mitra's inner tool loop kept as a node; bigtool registry
+  with BM25 retrieval (no embeddings) for MCP tools and later tool sets. Decided by experiment 12.
+- **I-20 Experiments registry + dashboard section** ([EXPERIMENTS.md](EXPERIMENTS.md), plan 2026-11-08): one result
+  file per experiment run (question, setup, numbers, verdict, decision), written by `mitra night`, a new
+  `mitra judge`, the screen and level runs; an Experiments section with comparisons and "what chose this default".
 
 ## Later (not milestones)
 Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,

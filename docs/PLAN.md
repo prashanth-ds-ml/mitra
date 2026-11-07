@@ -20,6 +20,13 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 - [x] 0e. Dashboard: trends day by day, by Mitra version, by project / model / kind; first try, time to green; corrections, declines, crashes; project filter, all sessions (2026-11-07)
 - [ ] **You:** restart Mitra after each update (a running session keeps the old code)
 
+**X. Experiments, first after the brick-breaker night** ([EXPERIMENTS.md](EXPERIMENTS.md), I-20)
+- [ ] X1. Score night 1 with the hidden judge (`brick-breaker-night-judge/JUDGE.md`); first registry entry by hand
+- [ ] X2. `mitra judge` + `mitra night` write registry entries automatically
+- [ ] X3. Dashboard "Experiments" section: table, side-by-side comparisons, "what chose this default"
+- [ ] X4. Model screen re-run (qwen3.5 / mimo-v2.6:9b / deepseek-r1:8b --think on), entry in the registry
+- [ ] X5. E-048: status line inside the prompt (no empty block in tall terminals)
+
 **A. Every session, now** ([SESSION_GAINS_PLAN.md](SESSION_GAINS_PLAN.md), I-7 + I-11 tools)
 - [x] 1. `append_file` + "write files over ~150 lines in parts" (E3, E-044) (2026-11-08)
 - [x] 2. `check_code`: quick lint (undefined names, unbound locals) before running; crash-on-start hint (E4) (2026-11-08; also automatic after every .py write)
@@ -36,6 +43,7 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 - [ ] 14c. Planner experiment: level 02 with the hand-written plan vs Mitra's own plan (hidden tests decide)
 - [ ] 14d. Planning numbers on the dashboard: first-try tasks, re-plans, needs help, plan edited before approval
 - [x] 14e-1. Role routing: model, max context, tools, MCP servers, thinking, read-only paths per role; `/role`, live `/model use`, `/model role`; route rows (D-052, 2026-11-08)
+- [ ] 14e-0. Decide I-19: build the phase loop as a LangGraph pipeline (checkpoints, approval interrupt, code-decided edges) — [PIPELINES.md](PIPELINES.md); experiment 12 confirms
 - [ ] 14e. Phases and roles ([PHASES_AND_ROLES.md](PHASES_AND_ROLES.md)): planner + tester phases (tests first, from the PRD), builder with tests read-only, debugger with `inspect` and `run_tests(path -k -x)`, reviewer (per task + final); tools and MCP servers per phase; filesystem MCP off
 - [ ] 14f. Model screen for the roles (downloaded 2026-11-08): **mimo-v2.6:9b** (builder etc.), **deepseek-r1:8b** (planner), D-051; then Level 01 with mimo vs qwen3.5 and the planner eval; ornith-1.5 only if these fall short
 
