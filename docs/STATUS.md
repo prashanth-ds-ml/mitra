@@ -5,6 +5,11 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next
+2026-11-07 late, brainstorm documented (no code): [SELF_IMPROVEMENT.md](SELF_IMPROVEMENT.md) (loop, what we
+have / miss, item 0 recording design, trends, dashboard views, link); PLAN "Next up" item 0 first; the user's
+running chat (started 19:18) was on pre-D-041 code: records merged by hand, restart needed for traces. The user
+asked to keep brainstorming and documenting before building.
+
 2026-11-07, MCP next steps added to PLAN M4 (no code): Serena on/off trial on a playground level, Playwright
 when the first web project starts, Research Desk MCP as planned. Other candidates noted in chat (DuckDB, ABDM docs,
 Docker) are not planned yet.

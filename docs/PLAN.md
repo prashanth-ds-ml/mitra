@@ -12,6 +12,14 @@ Plan v2 (2026-11-05, D-017); v1 is in [archive/PLAN-v1-2026-10-24.md](archive/PL
 ## Next up: priority order (agreed with the user 2026-11-07)
 Work top to bottom. Each line points to its plan; the milestone lists below keep the detail.
 
+**0. Record everything that helps self-improvement, first** ([SELF_IMPROVEMENT.md](SELF_IMPROVEMENT.md) section 4, agreed 2026-11-07)
+- [ ] 0a. Mitra code version, machine state, prompt-processing + load time on every turn / call (with A5)
+- [ ] 0b. Your corrections (files you changed after Mitra, short diff), declined edits and commands
+- [ ] 0c. Trace the wrap-up, compaction and failed calls; crash rows
+- [ ] 0d. `/good`, `/bad <why>` (= A4)
+- [ ] 0e. Dashboard: trends by day/week and by Mitra version; corrections, declines, crashes; project filter, all sessions
+- [ ] **You:** restart Mitra after each update (a running session keeps the old code)
+
 **A. Every session, now** ([SESSION_GAINS_PLAN.md](SESSION_GAINS_PLAN.md), I-7 + I-11 tools)
 - [ ] 1. `append_file` + "write files over ~150 lines in parts" (E3, E-044)
 - [ ] 2. `check_code`: quick lint (undefined names, unbound locals) before running; crash-on-start hint (E4)
