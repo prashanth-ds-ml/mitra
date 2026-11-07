@@ -24,7 +24,19 @@ It completes M3 (unattended runner, D-025) and the C block of PLAN "Next up", pl
 - Never: `git push`, deleting outside the folder, system settings, credential stores; every command has a timeout.
 - Kill switch: `.mitra/STOP` file or ctrl+c; automatic stop at the time budget or critical RAM.
 
-## One model all night: qwen3.5:latest (9B) at 256K (user, 2026-11-07)
+## Models: decided by an A/B test of two nights (user, 2026-11-07, D-048)
+| Night | Setup | Switches |
+|---|---|---|
+| **A** | 9B (`qwen3.5:latest`) for everything, 256K (D-045) | none |
+| **B** | **9B thinks and plans** (plan, re-plan when a task is stuck), **4B builds** (`qwen3.5:4b`), both at 256K | per phase only: a handful per night, ~10-20 s each |
+- Both models at 256K cannot be loaded together (12 GB + 10 GB), so B switches only at phase / task boundaries;
+  plan tasks start with a fresh, small context anyway (`run_plan`), so a switch costs just the reload.
+- 4B at 256K: 10 GB, 52% GPU, 14.7 tok/s; 9B at 256K: 12 GB, 43% GPU, ~8 tok/s (EVALS 2026-11-07).
+- Same PRD both nights (level 02, hidden tests decide); compared on hidden tests passed, tasks done vs needs help,
+  total time, steps, reloads, your 👍/👎 on the demo. The winner becomes the overnight default (EVALS + DECISIONS).
+- Both models at their maximum native context (256K); no RoPE scaling.
+
+### Night A details: one model all night, qwen3.5:latest (9B) at 256K
 - **No model switching**: the 9B stays loaded the whole night (no reloads), at **256K = its maximum native context**
   (262,144; going beyond needs RoPE scaling and loses quality, so not done). Slow is fine at night.
 - Speed: ~8 tok/s measured at 256K (12 GB, 43% GPU); with other apps closed it should be at least that. A step with

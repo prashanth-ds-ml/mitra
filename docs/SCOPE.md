@@ -120,8 +120,8 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   must pass the benchmark (same gate as the harness), undo per rule. After the vault (B) and a few proven rules.
 - **I-16 Overnight mode: PRD → running app on localhost, unattended** ([OVERNIGHT_MODE.md](OVERNIGHT_MODE.md),
   brainstorm 2026-11-07): `/prd`, full access inside the project only (branch, commit per task, project venv, no push,
-  kill switch), keep-awake, one model all night (qwen3.5:latest at 256K, its maximum; no switching; memory checked
-  before you leave), deploy + health check, morning report; 3-4 h ≈ 120-200 model steps = a small-to-medium
+  kill switch), keep-awake, models decided by an A/B of two nights (A: 9B only; B: 9B plans + 4B builds; both at
+  256K, D-048; memory checked before you leave), deploy + health check, morning report; 3-4 h ≈ 120-200 model steps = a small-to-medium
   project. Completes M3 / the C block.
 
 ## Later (not milestones)
