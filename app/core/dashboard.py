@@ -226,21 +226,26 @@ def store_text() -> str:
     return store.size_text()
 
 
-def build(roots: list[Path] | None = None, out: Path | None = None) -> tuple[Path, A.Report]:
+def page_html(roots: list[Path] | None = None) -> tuple[str, A.Report]:
+    """The whole dashboard page from the central store (old records merged in first)."""
     from app.core import insights as I
     from app.core import store
+    from app.core.improve import attempts
 
     roots = roots or default_roots()
     files = run_files(roots)
     rep = A.analyze(files)
-    out = out or (H.home() / "dashboard.html")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    from app.core.improve import attempts
-
     sess = I.sessions(files)
     tools = I.tool_stats(sess)
     I.tool_errors(files, tools)
     page = render(load_results(roots), rep, harness_history(), H.load(), attempts())
     extra = render_more(sess, tools, I.model_stats(store.stored_files("traces")), I.improvement(sess), I.training(files))
-    out.write_text(page.replace("</main></body></html>", extra + "</main></body></html>"), encoding="utf-8")
+    return page.replace("</main></body></html>", extra + "</main></body></html>"), rep
+
+
+def build(roots: list[Path] | None = None, out: Path | None = None) -> tuple[Path, A.Report]:
+    page, rep = page_html(roots)
+    out = out or (H.home() / "dashboard.html")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(page, encoding="utf-8")
     return out, rep

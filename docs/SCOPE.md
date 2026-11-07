@@ -84,6 +84,9 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   Impact: shows whether Mitra really improves and starts saving full traces for the fine-tune (PLAN M1 "every run
   saved"); central never-delete store + 6 small steps, static page auto-rebuilt, no new dependency. Built
   2026-11-07 (D-041), in PLAN.md.
+- **I-7 Session gains: write in parts, check before run, /good /bad, adaptive thinking**
+  ([SESSION_GAINS_PLAN.md](SESSION_GAINS_PLAN.md)). Impact: fewer broken long writes (E-044) and start crashes
+  (run_command 19/20 failed), your judgment as a signal, faster 9B steps. Planned 2026-11-07, waiting for the go.
 
 ## Later (not milestones)
 Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,

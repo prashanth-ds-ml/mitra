@@ -103,6 +103,7 @@ Design, ability list and what happens to local-codex's code: [M2_PLAN.md](M2_PLA
 - [x] Step 3: tools / MCP servers and models (2026-11-07)
 - [x] Step 4: improvement per harness version, "not enough data" under 20 turns (2026-11-07)
 - [x] Step 5: training data counts + `mitra report --export-training` (2026-11-07)
+- [x] Localhost: `mitra dashboard` on 127.0.0.1:8765, Refresh button (D-042, 2026-11-07)
 - [ ] Step 6: rebuilt on session end + `/report` (done 2026-11-07); you look at the page with real data before it is pushed
 
 ## M3 Local planning + unattended runner

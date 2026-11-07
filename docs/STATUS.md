@@ -11,6 +11,8 @@
   version, training data; rebuilt on session end and by `/report`; `mitra report --export-training`.
 - Live on real data: 8 sessions / 31 turns imported, build 2.1 s; run_command failed 19/20 (mostly real game bugs, plus
   pre-E-040/E-041 cases); 0 usable training turns yet (all records predate traces).
+- D-042: `mitra dashboard` serves it on http://127.0.0.1:8765/ with a Refresh button (live check: page 25 ms
+  from cache, Refresh 0.5 s).
 - Next: the user looks at the page (PLAN I-6 step 6), then push. E-045 (flaky MCP start timeout under load) open.
 
 2026-11-07 (D-039, D-040 pushed; E-044 committed locally):

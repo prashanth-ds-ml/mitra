@@ -389,6 +389,43 @@ def cmd_report(
 cli.command("report")(cmd_report)
 
 
+def cmd_dashboard(
+    port: int = typer.Option(8765, "--port", help="Port on 127.0.0.1."),
+    no_open: bool = typer.Option(False, "--no-open", help="Do not open the browser."),
+) -> None:
+    """The dashboard on localhost (127.0.0.1 only, read-only): sessions, tools, improvement, training data."""
+    from app.core import server as S
+
+    if S.running(port):
+        console.print(Text(f"Already running: http://127.0.0.1:{port}/", style="m.tool"))
+        if not no_open:
+            import webbrowser
+            webbrowser.open(f"http://127.0.0.1:{port}/")
+        return
+    try:
+        srv = S.make_server(port)
+    except OSError as exc:
+        console.print(f"[m.err]Port {port} is in use ({exc}). Try --port 8766.[/m.err]")
+        raise typer.Exit(1)
+    console.print(Text("Building the page from the store ...", style="m.dim"))
+    srv.pages.get()
+    url = f"http://127.0.0.1:{port}/"
+    console.print(Text(f"✻ Mitra dashboard: {url}  (Refresh button on the page · ctrl+c stops)", style="m.tool"))
+    if not no_open:
+        import webbrowser
+        webbrowser.open(url)
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        srv.server_close()
+        console.print(Text("dashboard stopped", style="m.dim"))
+
+
+cli.command("dashboard")(cmd_dashboard)
+
+
 def cmd_improve(
     model: str = typer.Option("", "--model", help="Builder model for the benchmark (default: the last one used)."),
     proposer: str = typer.Option("", "--proposer", help="Model that proposes the change (default: the 9B if installed)."),
@@ -2449,10 +2486,17 @@ def _chat():
             continue
 
         if cmd == "/report":
+            import webbrowser
+
+            from app.core import server as dash_server
+            if dash_server.running():  # the live page (mitra dashboard) rebuilds itself on Refresh
+                console.print(Text(f"  dashboard: {dash_server.URL}", style="m.faint"))
+                webbrowser.open(dash_server.URL)
+                continue
             out = _rebuild_dashboard()
             if out:
-                import webbrowser
                 webbrowser.open(out.as_uri())
+                console.print(Text("  tip: `mitra dashboard` in another terminal serves it on localhost", style="m.faint"))
             continue
 
         if cmd == "/doctor":
