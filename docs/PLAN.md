@@ -35,6 +35,7 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 - [ ] 14b. Re-plan a failing step: retry with the error, then split it or fix an earlier step, then "needs help"
 - [ ] 14c. Planner experiment: level 02 with the hand-written plan vs Mitra's own plan (hidden tests decide)
 - [ ] 14d. Planning numbers on the dashboard: first-try tasks, re-plans, needs help, plan edited before approval
+- [x] 14e-1. Role routing: model, max context, tools, MCP servers, thinking, read-only paths per role; `/role`, live `/model use`, `/model role`; route rows (D-052, 2026-11-08)
 - [ ] 14e. Phases and roles ([PHASES_AND_ROLES.md](PHASES_AND_ROLES.md)): planner + tester phases (tests first, from the PRD), builder with tests read-only, debugger with `inspect` and `run_tests(path -k -x)`, reviewer (per task + final); tools and MCP servers per phase; filesystem MCP off
 - [ ] 14f. Model screen for the roles (downloaded 2026-11-08): **mimo-v2.6:9b** (builder etc.), **deepseek-r1:8b** (planner), D-051; then Level 01 with mimo vs qwen3.5 and the planner eval; ornith-1.5 only if these fall short
 

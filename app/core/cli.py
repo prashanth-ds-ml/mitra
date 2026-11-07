@@ -61,8 +61,9 @@ def cmd_solve(task: str = "", *, test: str = "python -m pytest -q", plan: str = 
               model: str = "", max_steps: int | None = None, as_json: bool = False) -> int:
     console = ui.apply(Console())
     cfg = config.load()
-    model = model or cfg.get("local_model") or config.load_last_model() or "qwen3.5:4b"
-    num_ctx = int(cfg.get("num_ctx") or 0) or config.context_for_model(model)
+    from app.core import roles
+    model = model or roles.resolve("builder", cfg)[0]  # mitra solve = the builder role (D-051)
+    num_ctx = roles.context_for(model, cfg)              # its maximum context for now (D-052)
     ws = Workspace(Path(workspace), test_command=test)
     from app.core import store
     store.note_project(ws.root)  # the dashboard reads every folder Mitra ran in (D-041)

@@ -69,6 +69,7 @@ DEFAULT_SERVERS: dict[str, dict[str, Any]] = {
         "args": ["-y", "@modelcontextprotocol/server-filesystem", "${WORKSPACE}"],
         "description": "Search for files and read them inside this project",
         "allow": ["read_*", "list_*", "search_files", "directory_tree", "get_file_info"],
+        "enabled": False,  # duplicates Mitra's own read / list / search tools: confuses a small model (D-049)
     },
     "semgrep": {
         "command": "uvx",
@@ -677,12 +678,14 @@ def call_tool(
     return finish(not is_error, short, approved=approved, secrets=conn.resolved.secrets, path=path)
 
 
-def search_tools(workspace: str | os.PathLike, query: str, k: int = 5, *, connect_missing: bool = True) -> list[ToolInfo]:
-    """Rank tools on usable servers by keyword overlap with the query (name counts most)."""
+def search_tools(workspace: str | os.PathLike, query: str, k: int = 5, *, connect_missing: bool = True,
+                 servers: tuple[str, ...] | list[str] | None = None) -> list[ToolInfo]:
+    """Rank tools on usable servers by keyword overlap with the query (name counts most).
+    `servers` limits the search to those servers (role routing); None = every usable server."""
     words = [w for w in re.findall(r"[a-z0-9]+", (query or "").lower()) if len(w) >= 2]
     scored: list[tuple[float, ToolInfo]] = []
     for spec in discover(workspace):
-        if not spec.usable:
+        if not spec.usable or (servers is not None and spec.name not in servers):
             continue
         tools = cached_tools(spec)
         if tools is None and connect_missing:

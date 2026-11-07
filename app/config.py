@@ -572,6 +572,8 @@ def get_recommended_model_budget_gib() -> float | None:
 # not custom variants such as qwen3.5-32k (D-032, D-033).
 SUPPORTED_FAMILIES = ("qwen35",)
 SUPPORTED_BASE_NAMES = ("qwen3.5",)
+# Other models allowed by name for the role trials (D-051): still need chat + native tool calling.
+ALLOWED_BASE_NAMES = ("mimo-v2.6", "deepseek-r1")
 
 # Context per model size, measured 2026-11-06 on the 8 GB GPU + 24 GB RAM machine (EVALS):
 #   qwen3.5:4b 128K = 65% GPU, 24 tok/s (64K would be 100% GPU, 82 tok/s)  -- D-036: room over speed
@@ -660,12 +662,14 @@ def compact_threshold(cfg: dict, num_ctx: int) -> int:
 
 def context_for_model(name: str) -> int:
     """num_ctx Mitra uses for a model when mitra.toml does not set one: the /context choice, else measured."""
+    facts = get_model_facts(name) or {}
+    native = int(facts.get("context") or 0)  # e.g. deepseek-r1:8b supports 128K: never ask for more
     chosen = load_context_choice(name)
     if chosen:
-        return chosen
-    facts = get_model_facts(name) or {}
+        return min(chosen, native) if native else chosen
     params = facts.get("parameters") or 0
-    return LARGE_MODEL_CONTEXT if params >= LARGE_MODEL_PARAMETERS else SMALL_MODEL_CONTEXT
+    measured = LARGE_MODEL_CONTEXT if params >= LARGE_MODEL_PARAMETERS else SMALL_MODEL_CONTEXT
+    return min(measured, native) if native else measured
 MIN_PARAMETERS = 4_000_000_000   # qwen3.5:2b and smaller cannot drive a coding agent
 MIN_CONTEXT = 32_768             # Mitra's prompt + code + tool results need room
 _facts_cache: dict[str, dict | None] = {}
@@ -720,9 +724,10 @@ def compatibility_problem(facts: dict | None, name: str | None = None) -> str | 
         return "not a chat model"
     if "tools" not in caps:
         return "no tool calling"
-    if facts.get("family") and facts["family"] not in SUPPORTED_FAMILIES:
+    allowed = bool(name) and name.split(":", 1)[0] in ALLOWED_BASE_NAMES
+    if not allowed and facts.get("family") and facts["family"] not in SUPPORTED_FAMILIES:
         return f"not qwen3.5 (family {facts['family']})"
-    if name and name.split(":", 1)[0] not in SUPPORTED_BASE_NAMES:
+    if not allowed and name and name.split(":", 1)[0] not in SUPPORTED_BASE_NAMES:
         return "custom qwen3.5 variant (Mitra sets the context itself)"
     if facts.get("parameters") and facts["parameters"] < MIN_PARAMETERS:
         return f"too small ({facts['parameters'] / 1e9:.1f}B parameters)"
@@ -772,6 +777,8 @@ def get_local_model_inventory(*, include_incompatible: bool = False) -> list[Loc
             if compatible and facts:
                 large = (facts.get("parameters") or 0) >= LARGE_MODEL_PARAMETERS
                 context = LARGE_MODEL_CONTEXT if large else SMALL_MODEL_CONTEXT
+                if facts.get("context"):
+                    context = min(context, int(facts["context"]))  # never more than the model supports
                 if context > 65_536 and placement == "gpu":
                     placement = "split"  # measured: above 64K the 4B and the 9B spill to CPU (D-033, D-036)
             models.append(

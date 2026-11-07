@@ -5,6 +5,12 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next
+2026-11-08, role routing (D-052): `/role [name]` swaps model, max context, tools, MCP servers and thinking live;
+`/model use` switches without a restart; defaults deepseek-r1:8b (planner, reviewer) and mimo-v2.6:9b (tester,
+builder, debugger, deployer), falling back to the chat model until installed; builder cannot edit tests/; filesystem
+MCP off; header shows roles / learning / dashboard. Downloads of deepseek-r1:8b and mimo-v2.6:9b running; the
+model screen (14f) runs when they finish. Phase loop itself (planner → tester → builder ...) still to build.
+
 2026-11-07 night, dashboard reworked after looking at it (headless Edge screenshots): most useful first
 (headline with counts, trend tiles, improving per version, your judgment, where it works, sessions, tools/models,
 training, then self-improvement internals with problem patterns folded); compact tables (no cut-off columns); real

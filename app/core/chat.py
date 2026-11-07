@@ -206,6 +206,26 @@ class ChatSession:
         self.turn_no = 0
         self.approve_all = False  # "yes to all" for the rest of this turn
         self._left: dict[str, str | None] = {}  # file -> content Mitra left at the end of a turn (corrections, item 0)
+        # role routing (D-049..D-051): which tools and MCP servers this role may use; None = all
+        self.noticed: list[str] = []  # your corrections found at the start of the last turn (shown once)
+        self.role = "chat"
+        self.allowed_tools: tuple[str, ...] | None = None
+        self.allowed_mcp: tuple[str, ...] | None = None
+
+    def apply_route(self, route: dict, llm=None, num_ctx: int | None = None) -> None:
+        """Switch role: model (if given), tools, MCP servers and read-only paths at once; recorded for the dashboard."""
+        self.role = route["role"]
+        self.allowed_tools = route.get("tools")
+        self.allowed_mcp = route.get("mcp")
+        self.ws.read_only = tuple(route.get("read_only") or ())
+        if llm is not None:
+            self.llm = llm
+        if num_ctx:
+            self.num_ctx = num_ctx
+        self.rec.write("route", turn=self.turn_no, role=self.role, model=route.get("model"), source=route.get("source"),
+                       tools=list(self.allowed_tools) if self.allowed_tools is not None else "all",
+                       mcp=list(self.allowed_mcp) if self.allowed_mcp is not None else "all",
+                       thinking=route.get("thinking"), read_only=list(self.ws.read_only), num_ctx=self.num_ctx)
 
     # ── what you think of Mitra's work (item 0: the strongest self-improvement signals) ────────────────────────
     def note_session(self, **info) -> None:
@@ -240,6 +260,7 @@ class ChatSession:
                 diff, added, removed = "(binary, too big or private: no diff kept)", 0, 0
             else:
                 diff, added, removed = _short_diff(rel, left, now)
+            self.noticed.append(rel)
             self.rec.write("user_edit", of_turn=of_turn, path=rel, deleted=not Path(path).exists(),
                            added=added, removed=removed, diff=diff, author="user")
             self._left[path] = now
@@ -286,6 +307,10 @@ class ChatSession:
             if name == "mcp_find":
                 return self.hooks.mcp_find(str(args.get("query", ""))), True
             if name == "mcp_call":
+                server = str(args.get("server", ""))
+                if self.allowed_mcp is not None and server not in self.allowed_mcp:
+                    return (f"✗ MCP server '{server}' is not available to the {self.role} role. "
+                            f"Available: {', '.join(self.allowed_mcp) or 'none'}."), False
                 raw = args.get("arguments") or {}
                 if isinstance(raw, str):
                     raw = json.loads(raw) if raw.strip() else {}
@@ -340,7 +365,8 @@ class ChatSession:
         self._check_corrections(of_turn=self.turn_no - 1)  # attributed to the turn they correct
         self.rec.write("turn_start", turn=self.turn_no, mode=self.mode, user=str(user)[:2000],
                        harness_version=self.harness.version, model=str(getattr(self.llm, "model", "") or ""),
-                       num_ctx=self.num_ctx, code_version=runinfo.code_version(), ram_free_gb=runinfo.ram_free_gb())
+                       num_ctx=self.num_ctx, code_version=runinfo.code_version(), ram_free_gb=runinfo.ram_free_gb(),
+                       role=self.role)
         try:
             res = self._turn(messages, res, max_steps)
         except BaseException as exc:  # interrupted (esc / ctrl+c) or crashed: still recorded, the analyzer counts it
@@ -363,6 +389,8 @@ class ChatSession:
         self.ws.journal = res.journal
         self.ws.before_write = self._before_write
         specs = H.apply_tools(tool_specs(self.mode), self.harness)
+        if self.allowed_tools is not None:  # the role's tool set (routing)
+            specs = [s for s in specs if s["name"] in self.allowed_tools]
         bound = self.llm.bind_tools(specs)
         guard = RepeatGuard(max_repeats=self.harness.limit("max_repeats"),
                             max_failures=self.harness.limit("max_failures"))
@@ -440,7 +468,7 @@ class ChatSession:
         self.rec.trace(messages, reply, tools=specs, model=str(getattr(self.llm, "model", "") or ""),
                        num_ctx=self.num_ctx, seconds=getattr(streamed, "seconds", None),
                        thinking=getattr(streamed, "thinking", "") or "", turn=self.turn_no, step=step,
-                       stopped=bool(streamed.stopped), harness_version=self.harness.version)
+                       stopped=bool(streamed.stopped), harness_version=self.harness.version, role=self.role)
 
     def _stream(self, chunks, step: int):
         import inspect

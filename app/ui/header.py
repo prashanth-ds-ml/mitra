@@ -42,7 +42,8 @@ def model_table(models) -> Table:
 
 
 def header(*, model: str, folder: str, context: int | None = None, placement: str = "",
-           mcp_servers: list[str] | None = None, loaded: list[str] | None = None, version: str = "") -> Panel:
+           mcp_servers: list[str] | None = None, loaded: list[str] | None = None, version: str = "",
+           roles: str = "", learning: str = "", dashboard: str = "") -> Panel:
     rows = Table.grid(padding=(0, 2))
     rows.add_column(style="m.dim")
     rows.add_column(style="m.text")
@@ -63,6 +64,12 @@ def header(*, model: str, folder: str, context: int | None = None, placement: st
         rows.add_row("mcp", mcp)
     if loaded:
         rows.add_row("loaded", Text(" · ".join(loaded), style="m.dim"))
+    if roles:
+        rows.add_row("roles", Text(roles, style="m.dim"))
+    if learning:
+        rows.add_row("learning", Text(learning, style="m.dim"))
+    if dashboard:
+        rows.add_row("dashboard", Text(dashboard, style="m.dim"))
     title = Text("✻ Mitra", style="m.accent.b")
     if version:
         title.append(f" {version}", style="m.dim")
@@ -72,8 +79,8 @@ def header(*, model: str, folder: str, context: int | None = None, placement: st
 
 def tips() -> Text:
     t = Text("  ", style="m.dim")
-    for i, (key, what) in enumerate((("/", "commands"), ("!", "shell command"), ("/doctor", "check"),
-                                     ("ctrl+c", "stop"), ("exit", "quit"))):
+    for i, (key, what) in enumerate((("/", "commands"), ("!", "shell"), ("/good /bad", "teach Mitra"),
+                                     ("/role", "switch role"), ("ctrl+c", "stop"), ("exit", "quit"))):
         if i:
             t.append("  ·  ", style="m.faint")
         t.append(key, style="m.text")

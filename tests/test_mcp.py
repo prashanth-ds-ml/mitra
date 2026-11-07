@@ -46,10 +46,11 @@ def test_defaults_include_the_day_one_servers(monkeypatch, workspace):
     monkeypatch.delenv("MITRA_MCP_NO_DEFAULTS")
     specs = {s.name: s for s in mcp.discover(workspace)}
 
-    for name in ("git", "github", "context7", "filesystem", "semgrep"):
+    for name in ("git", "github", "context7", "semgrep"):
         assert specs[name].usable, name
     assert specs["github"].kind == "http"
     assert not specs["aws-docs"].enabled
+    assert not specs["filesystem"].enabled  # duplicates Mitra's own read/list/search tools (D-049)
 
 
 def test_user_file_overrides_a_default_per_key(monkeypatch, workspace):

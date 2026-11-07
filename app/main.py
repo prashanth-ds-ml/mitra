@@ -601,6 +601,8 @@ _COMMAND_HELP = [
         ("/status",        "Workspace, model, mode and session status"),
         ("/doctor",        "Machine and setup check: RAM, GPU, Ollama, permissions, MCP"),
         ("/report",        "Rebuild the dashboard (sessions, tools, improvement, training data) and open it"),
+        ("/role [name]",   "Show roles, or switch role: model, tools and MCP servers at once"),
+        ("/model use <m>", "Switch the chat model now (no restart)"),
         ("/good [note]",   "Mark the last turn good (your verdict teaches Mitra)"),
         ("/bad [why]",     "Mark the last turn bad, ideally with why"),
         ("/model",         "Show the active models (/model list: installed Ollama models)"),
@@ -1834,6 +1836,31 @@ def _rebuild_dashboard(quiet: bool = False):
     return out
 
 
+def _header_extras(cfg: dict, harness) -> tuple[str, str, str]:
+    """Header rows: role models at a glance, what Mitra has learned and records, the dashboard link."""
+    roles_line = learning = dash = ""
+    try:
+        from app.core import roles as R
+        have = R.installed()
+        picks = [(r, R.resolve(r, cfg, have)[0]) for r in ("planner", "builder")]
+        roles_line = " · ".join(f"{r} {m}" for r, m in picks) + " · /role to switch"
+    except Exception:
+        pass
+    try:
+        from app.core import runinfo
+        traces = "traces on" if cfg.get("save_traces", True) else "traces off"
+        learning = (f"harness v{harness.version} · {len(harness.rules)} learned rule{'s' if len(harness.rules) != 1 else ''}"
+                    f" · {traces} · Mitra {runinfo.code_version()}")
+    except Exception:
+        pass
+    try:
+        from app.core import server as dash_server
+        dash = dash_server.URL if dash_server.running() else "mitra dashboard (not running)"
+    except Exception:
+        pass
+    return roles_line, learning, dash
+
+
 def _print_memory_fit(model: str, num_ctx: int, base_url: str) -> None:
     """Startup line: can this machine run the model at this context, and what to close if not (D-040).
     Only warns; never blocks the start."""
@@ -2039,7 +2066,8 @@ def _chat():
     temperature = cfg.get("temperature", 0.2)
     session_mode = _normalize_session_mode(cfg.get("session_mode"))
     show_reasoning = bool(cfg.get("show_reasoning", False))
-    num_ctx = int(cfg.get("num_ctx") or 0) or config.context_for_model(model)
+    from app.core import roles as _roles
+    num_ctx = _roles.context_for(model, cfg)  # max context for the first days (D-052); mitra.toml / /context still win
     gpu_layers_cfg = cfg.get("gpu_layers", "auto")
 
     # Determine GPU placement for the chosen model
@@ -2172,8 +2200,9 @@ def _chat():
         ui_state.folded.remember(f"Output of {command}", result.output)
         return result.to_llm_summary(), result.ok or result.still_running  # E-041: running != failed
 
-    def _chat_mcp_find(query):
-        return mcp_registry.format_search(cfg["workspace"], mcp_registry.search_tools(cfg["workspace"], query))
+    def _chat_mcp_find(query):  # only the active role's MCP servers (routing)
+        return mcp_registry.format_search(cfg["workspace"], mcp_registry.search_tools(
+            cfg["workspace"], query, servers=chat.allowed_mcp))
 
     def _chat_mcp_call(server, tool, arguments):
         res = mcp_registry.call_tool(
@@ -2224,6 +2253,7 @@ def _chat():
     except Exception:
         _mcp_names = []
     console.print()
+    _roles_line, _learning_line, _dash_line = _header_extras(cfg, harness)
     console.print(ui.header.header(
         model=model,
         folder=_shorten_display(str(cfg["workspace"]), 60),
@@ -2231,6 +2261,9 @@ def _chat():
         placement=_placement,
         mcp_servers=_mcp_names,
         loaded=loaded,
+        roles=_roles_line,
+        learning=_learning_line,
+        dashboard=_dash_line,
     ))
     _fit = _print_memory_fit(model, num_ctx, cfg.get("ollama_local_base_url") or "http://127.0.0.1:11434")
     try:  # machine state for the dashboard (item 0)
@@ -2261,7 +2294,7 @@ def _chat():
         state=ui_state,
         message=ui.prompt_message,
         toolbar=lambda: ui.framed_status(
-            model=model,
+            model=model if chat.role == "chat" else f"{chat.role} · {model}",
             mode=ui.mode_label(ui_state.mode),
             total_tokens=ctx_used,          # E-025: what is in the context now, not the sum of all calls
             context_limit=num_ctx,
@@ -2276,6 +2309,25 @@ def _chat():
     messages = [SystemMessage(content=system_prompt)]
     sess_in = sess_out = 0  # cumulative session token counts (work done)
     ctx_used = 0            # prompt tokens of the latest model call = how full the context is (E-025)
+
+    from app.core import roles as roles_mod
+
+    def _apply_role(role_name: str) -> None:
+        """Swap model, context, tools, MCP servers and thinking for a role, live (D-049..D-052)."""
+        nonlocal model, num_ctx, local_llm, review_llm, codegen_llm, auto_compact_threshold
+        r = roles_mod.route(role_name, cfg)
+        think = {"on": True, "off": False}.get(r["thinking"] or "", thinking_setting(cfg.get("thinking")))
+        swapped = r["model"] != model or r["num_ctx"] != num_ctx
+        model, num_ctx = r["model"], r["num_ctx"]
+        local_llm = get_local_llm(model, temperature, base_url=cfg.get("ollama_local_base_url"), num_ctx=num_ctx,
+                                  num_gpu=num_gpu, reasoning=think)
+        review_llm = codegen_llm = local_llm
+        auto_compact_threshold = config.compact_threshold(cfg, num_ctx)
+        chat.apply_route(r, llm=local_llm, num_ctx=num_ctx)
+        console.print(Text("  ⇄ " + roles_mod.describe(r), style="m.tool"))
+        if swapped:
+            console.print(Text("    Ollama loads the model on the next message (one model at a time)", style="m.faint"))
+            _print_memory_fit(model, num_ctx, cfg.get("ollama_local_base_url") or "http://127.0.0.1:11434")
 
     while True:
         _set_current_task("Ready")
@@ -2442,6 +2494,52 @@ def _chat():
             memory.update_context(cfg["workspace"], user_input)
             continue
 
+        if cmd == "/role" or cmd == "/model roles":  # which model, tools and MCP servers each role uses
+            lines = ["| role | model | context | from | tools | MCP | thinking |", "|---|---|---|---|---|---|---|"]
+            have = roles_mod.installed()
+            for rn in roles_mod.ROLES:
+                r = roles_mod.route(rn, cfg, have)
+                mark = " ◀ now" if rn == chat.role else ""
+                lines.append(f"| {rn}{mark} | `{r['model']}` | {r['num_ctx'] // 1024}K | {r['source']} | "
+                             f"{'all' if r['tools'] is None else len(r['tools'])} | "
+                             f"{'all' if r['mcp'] is None else ', '.join(r['mcp']) or '-'} | {r['thinking'] or 'as set'} |")
+            lines.append("\n`/role <name>` switches role (model, tools, MCP at once) · `/model role <role> <model|default>` "
+                         "sets a role's model · `/model use <model>` switches the chat model now")
+            _say("\n".join(lines))
+            continue
+
+        if cmd.startswith("/role "):
+            role_name = cmd.split(maxsplit=1)[1].strip()
+            if role_name not in roles_mod.ROLES:
+                _say(f"Unknown role `{role_name}`. Roles: {', '.join(roles_mod.ROLES)}.")
+                continue
+            _apply_role(role_name)
+            continue
+
+        if cmd.startswith("/model role "):
+            parts = user_input.strip().split()
+            if len(parts) < 4 or parts[2].lower() not in roles_mod.ROLES:
+                _say(f"Usage: `/model role <role> <model|default>`. Roles: {', '.join(roles_mod.ROLES)}.")
+                continue
+            role_name, target = parts[2].lower(), parts[3]
+            if target != "default" and target not in roles_mod.installed():
+                _say(f"`{target}` is not one of Mitra's installed models. `/model list` shows them.")
+                continue
+            roles_mod.save_choice(role_name, target)
+            console.print(Text(f"  {role_name} → {target} (kept for next time)", style="m.tool"))
+            if role_name == chat.role:
+                _apply_role(role_name)
+            continue
+
+        if cmd.startswith(("/model use ", "/model switch ", "/model set ")):  # live, no restart (was: restart)
+            target = user_input.strip().split(maxsplit=2)[2].strip()
+            if target not in roles_mod.installed():
+                _say(f"`{target}` is not one of Mitra's installed models. `/model list` shows them.")
+                continue
+            config.save_last_model(target)  # the chat role follows the model you pick
+            _apply_role("chat")
+            continue
+
         if cmd.startswith("/model"):
             ai_reply = _handle_model_command(
                 user_input,
@@ -2577,6 +2675,11 @@ def _chat():
             chat.mode = session_mode
             typed_buffer.clear()
             turn = chat.turn(messages)
+            if chat.noticed:  # your edits since the last turn: recorded as corrections (self-improvement)
+                console.print(Text(f"  ✎ noticed your change to {', '.join(chat.noticed[:3])}"
+                                   f"{' …' if len(chat.noticed) > 3 else ''}: recorded as a correction of the turn before",
+                                   style="m.faint"))
+                chat.noticed.clear()
             typed_ahead += "".join(typed_buffer)
             turn_in, turn_out = turn.tokens_in, turn.tokens_out
             ctx_used = turn.ctx_used or ctx_used

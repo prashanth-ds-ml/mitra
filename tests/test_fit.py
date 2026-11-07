@@ -112,7 +112,7 @@ def test_check_gathers_live_facts_and_lists_programs_only_when_needed(monkeypatc
     monkeypatch.setattr(config, "get_available_system_memory_gib", lambda: 8.0)
     fit = F.check("qwen3.5:latest", 262_144)
     assert fit.verdict == "tight" and calls == [1] and fit.close[0].name == "chrome"
-    assert fit.alternatives[0] == "/model use qwen3.5:4b" and "131072" in fit.alternatives[1]
+    assert fit.alternatives[0] == "/model use qwen3.5:4b" and "/context 128k" in fit.alternatives[1]
 
 
 def test_startup_line_never_blocks_when_the_check_fails(monkeypatch, capsys):

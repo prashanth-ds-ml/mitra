@@ -17,6 +17,7 @@ MIN_PROGRAM_GB = 0.3  # smaller programs are not worth closing
 # Loaded size and GPU part measured on this machine (8 GB GPU, flash attention + q8_0 KV, EVALS 2026-11-07, D-039).
 MEASURED: dict[tuple[str, int], tuple[float, float]] = {
     ("qwen3.5:4b", 131_072): (6.7, 5.8),
+    ("qwen3.5:4b", 262_144): (10.0, 5.2),
     ("qwen3.5:latest", 262_144): (12.0, 5.2),
     ("qwen3.5:9b", 262_144): (12.0, 5.2),
     ("qwen3.5:latest", 131_072): (9.5, 5.5),
@@ -200,7 +201,7 @@ def check(model: str, context: int, *, base_url: str = "http://127.0.0.1:11434")
     small = [n for n in ("qwen3.5:4b",) if n in inv and _norm(n) != _norm(model)]
     alternatives = [f"/model use {n}" for n in small]
     if context > 131_072:
-        alternatives.append("num_ctx = 131072 in mitra.toml (half the context)")
+        alternatives.append("/context 128k (half the context)")
     fit = assess(model, context, free_ram_gb=config.get_available_system_memory_gib(),
                  free_vram_gb=gpu.free_gib if gpu else None,
                  file_gb=getattr(info, "size_gib", None), loaded=_ollama_ps(base_url), programs=[],
@@ -240,7 +241,7 @@ def advice(fit: Fit) -> list[str]:
         names = [f"{p.name}{' (' + p.hint + ')' if p.hint else ''} {p.gb:.1f} GB" for p in fit.close]
         lines.append("Close to free RAM: " + " · ".join(names))
     if fit.alternatives:
-        lines.append("Or: " + " · ".join(fit.alternatives) + ", then restart Mitra")
+        lines.append("Or: " + " · ".join(fit.alternatives) + " — both work right away")
     return lines
 
 
