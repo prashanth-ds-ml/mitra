@@ -96,6 +96,15 @@ Design, ability list and what happens to local-codex's code: [M2_PLAN.md](M2_PLA
 - [ ] Used for a week on small real tasks in my projects; problems logged in ERROR_LOG and fixed
 - [ ] Release v0.2 + post: "A coding assistant that actually works on a 4B model"
 
+## I-6 Dashboard (D-041, [DASHBOARD_PLAN.md](DASHBOARD_PLAN.md))
+- [x] Step 0: central append-only store `~/.mitra/data/` + `projects.json`; old records merged on every build (2026-11-07)
+- [x] Step 1: full traces (messages, reply, thinking, tool calls, model, context; prompt once, deltas) + turn outcome (2026-11-07)
+- [x] Step 2: session timeline (2026-11-07)
+- [x] Step 3: tools / MCP servers and models (2026-11-07)
+- [x] Step 4: improvement per harness version, "not enough data" under 20 turns (2026-11-07)
+- [x] Step 5: training data counts + `mitra report --export-training` (2026-11-07)
+- [ ] Step 6: rebuilt on session end + `/report` (done 2026-11-07); you look at the page with real data before it is pushed
+
 ## M3 Local planning + unattended runner
 - [ ] Plan format (one Markdown file): feature, design notes, tasks with files, expected behaviour, test command, order
 - [ ] `/plan`: Mitra writes a plan in that format with the local 9B (thinking on); I can edit it before running (D-025)

@@ -362,11 +362,18 @@ cli.command("harness")(cmd_harness)
 def cmd_report(
     html_page: bool = typer.Option(False, "--html", help="Also write the dashboard page and print its path."),
     as_json: bool = typer.Option(False, "--json", help="Print the report as JSON."),
+    export_training: str = typer.Option("", "--export-training",
+                                        help="Write the usable turns (tests passed, all Mitra) to this JSONL file."),
 ) -> None:
     """What goes wrong in recorded runs (patterns with counts), and a local dashboard page with --html."""
     from app.core import analyze as A
     from app.core import dashboard as D
 
+    if export_training:
+        from app.core import insights as I
+        n = I.export_training(D.run_files(), pathlib.Path(export_training))
+        console.print(Text(f"{n} usable turns written to {export_training} (local file, nothing sent)", style="m.tool"))
+        return
     if html_page:
         out, rep = D.build()
     else:
@@ -556,6 +563,7 @@ _COMMAND_HELP = [
         ("/init",          "Create MITRA.md + mitra.toml in this folder"),
         ("/status",        "Workspace, model, mode and session status"),
         ("/doctor",        "Machine and setup check: RAM, GPU, Ollama, permissions, MCP"),
+        ("/report",        "Rebuild the dashboard (sessions, tools, improvement, training data) and open it"),
         ("/model",         "Show the active models (/model list: installed Ollama models)"),
         ("/context",       "Context-window use and when the session compacts"),
         ("/think on|off",  "Show or hide the model's reasoning"),
@@ -1774,6 +1782,19 @@ def _shell_command_name(command: str) -> str:
 
 
 
+def _rebuild_dashboard(quiet: bool = False):
+    """Rebuild ~/.mitra/dashboard.html from the central store. Never raises (an exit must not fail on it)."""
+    from app.core import dashboard as D
+    try:
+        out, _ = D.build()
+    except Exception as exc:
+        if not quiet:
+            console.print(Text(f"  ✗ dashboard not rebuilt: {exc}", style="m.err"))
+        return None
+    console.print(Text(f"  dashboard: {out}", style="m.faint"))
+    return out
+
+
 def _print_memory_fit(model: str, num_ctx: int, base_url: str) -> None:
     """Startup line: can this machine run the model at this context, and what to close if not (D-040).
     Only warns; never blocks the start."""
@@ -1972,6 +1993,8 @@ def _chat():
     cfg = config.load()
     model = _startup_model(cfg)
     config.save_last_model(model)
+    from app.core import store as _store
+    _store.note_project(cfg["workspace"])  # the dashboard reads every folder Mitra ran in (D-041)
     codegen_model = _resolve_codegen_model(cfg)
     temperature = cfg.get("temperature", 0.2)
     session_mode = _normalize_session_mode(cfg.get("session_mode"))
@@ -2127,6 +2150,7 @@ def _chat():
         mode=session_mode,
         num_ctx=num_ctx,
         harness=harness,
+        traces=bool(cfg.get("save_traces", True)),  # full model calls, the fine-tune data (D-041)
         hooks=Hooks(
             stream=_chat_stream,
             show=_chat_show,
@@ -2226,6 +2250,7 @@ def _chat():
                 message_count=len(messages),
                 context=hook_ctx,
             ))
+            _rebuild_dashboard(quiet=True)  # the page always shows every session so far (D-041)
             console.print(Text("  Bye.", style="m.dim"))
             break
 
@@ -2423,6 +2448,13 @@ def _chat():
             ctx_used = 0
             continue
 
+        if cmd == "/report":
+            out = _rebuild_dashboard()
+            if out:
+                import webbrowser
+                webbrowser.open(out.as_uri())
+            continue
+
         if cmd == "/doctor":
             from app.doctor import ollama_report
             ollama_url = cfg.get("ollama_local_base_url") or "http://127.0.0.1:11434"
@@ -2430,6 +2462,7 @@ def _chat():
             ai_reply = "\n\n".join([
                 _build_resources_reply(),
                 "## Memory fit\n\n" + fit_mod.markdown(fit_mod.check(model, num_ctx, base_url=ollama_url)),
+                "## Run data\n\n- **Central store (never deleted, back it up yourself):** " + _store.size_text(),
                 "## Ollama\n\n" + ollama_report(model, num_ctx, base_url=ollama_url),
                 _build_permissions_reply(cfg, session_mode),
                 "## MCP\n\n" + mcp_registry.summarize(mcp_registry.discover(cfg["workspace"])),

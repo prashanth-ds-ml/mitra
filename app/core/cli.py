@@ -64,6 +64,8 @@ def cmd_solve(task: str = "", *, test: str = "python -m pytest -q", plan: str = 
     model = model or cfg.get("local_model") or config.load_last_model() or "qwen3.5:4b"
     num_ctx = int(cfg.get("num_ctx") or 0) or config.context_for_model(model)
     ws = Workspace(Path(workspace), test_command=test)
+    from app.core import store
+    store.note_project(ws.root)  # the dashboard reads every folder Mitra ran in (D-041)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     runs = ws.root / ".mitra" / "runs" / stamp
     ws.spill_dir = runs / "output"

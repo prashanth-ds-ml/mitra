@@ -5,6 +5,14 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next
+2026-11-07, dashboard I-6 / D-041 (committed locally, not pushed):
+- Central append-only store `~/.mitra/data/` (records + traces, every folder Mitra ran in, never deleted); full traces
+  with thinking; turn outcomes; page `~/.mitra/dashboard.html` with sessions, tools/MCP, models, improvement per harness
+  version, training data; rebuilt on session end and by `/report`; `mitra report --export-training`.
+- Live on real data: 8 sessions / 31 turns imported, build 2.1 s; run_command failed 19/20 (mostly real game bugs, plus
+  pre-E-040/E-041 cases); 0 usable training turns yet (all records predate traces).
+- Next: the user looks at the page (PLAN I-6 step 6), then push. E-045 (flaky MCP start timeout under load) open.
+
 2026-11-07 (D-039, D-040 pushed; E-044 committed locally):
 - E-044: a cut-off Qwen3.5 tool call (Ollama `XML syntax error ... unexpected EOF`) no longer crashes the turn: the
   model is told and retries in parts (max 2). Seen live on "make a detailed report" (one 5.2K-token call, 3m20s).

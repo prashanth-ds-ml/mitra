@@ -80,6 +80,10 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   preview, setup may cost time.
 - **I-5 Bigger mixture-of-experts model overnight** (partly on CPU, 8 GB GPU + 24 GB RAM). Impact: may handle harder
   tasks; slow and RAM-tight. Test after the baselines.
+- **I-6 Dashboard: sessions, tools, self-improvement, training data** ([DASHBOARD_PLAN.md](DASHBOARD_PLAN.md)).
+  Impact: shows whether Mitra really improves and starts saving full traces for the fine-tune (PLAN M1 "every run
+  saved"); central never-delete store + 6 small steps, static page auto-rebuilt, no new dependency. Built
+  2026-11-07 (D-041), in PLAN.md.
 
 ## Later (not milestones)
 Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,

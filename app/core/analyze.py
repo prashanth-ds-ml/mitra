@@ -12,7 +12,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-SKIP = {".git", ".venv", "venv", "node_modules", "__pycache__", "worktrees", "site-packages", "AppData", "Library"}
+SKIP = {".git", ".venv", "venv", "node_modules", "__pycache__", "worktrees", "site-packages", "AppData", "Library", "traces"}  # traces are not run records (D-041)
 
 # what each pattern means, and the kind of harness change that could help (the improve loop reads this)
 PATTERNS = {
@@ -92,9 +92,9 @@ def _norm_error(text: str) -> str:
 
 
 def _project(path: Path) -> str:
-    """The project folder a record belongs to (the folder holding `.mitra`)."""
-    parts = path.parts
-    return parts[parts.index(".mitra") - 1] if ".mitra" in parts[1:] else path.parent.name
+    """The project folder a record belongs to (the folder holding `.mitra`, or its slug in the central store)."""
+    from app.core import store
+    return store.project_of(path)
 
 
 def file_version(path: Path) -> int | None:

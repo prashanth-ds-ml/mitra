@@ -50,6 +50,15 @@ BAD_TOOL_CALL_NOTE = (
 )
 
 
+def turn_outcome(res) -> str:
+    """One label per turn for the dashboard and the training-data filter (D-041)."""
+    if res.stopped:
+        return "stopped_by_user" if "esc" in (res.stop_reason or "") else "stopped"
+    if res.tests_run:
+        return "tests_passed" if res.last_test_ok else "tests_failed"
+    return "answered"
+
+
 def is_tool_call_parse_error(exc: BaseException) -> bool:
     """Ollama's 'XML syntax error ...' / 'tool call parsing failed' (ollama.ResponseError) for a broken tool call."""
     text = str(exc)
@@ -152,13 +161,14 @@ class TurnResult:
 
 class ChatSession:
     def __init__(self, *, workspace: str | Path, llm, hooks: Hooks, mode: str = "approve", num_ctx: int = 131072,
-                 harness=None):
+                 harness=None, traces: bool = True):
         self.llm, self.hooks, self.mode, self.num_ctx = llm, hooks, mode, num_ctx
         self.harness = harness if harness is not None else H.load()
         self.ws = T.Workspace(Path(workspace), read_only=())  # in the chat the user may ask for test edits
         self.ws.spill_dir = self.ws.root / ".mitra" / "output"
         # every step of every turn, scrubbed, one file per day: follow a session live, replay it later (D-022)
-        self.rec = core_loop.Recorder(self.ws.root / ".mitra" / "runs" / f"chat-{time.strftime('%Y%m%d')}.jsonl")
+        self.rec = core_loop.Recorder(self.ws.root / ".mitra" / "runs" / f"chat-{time.strftime('%Y%m%d')}.jsonl",
+                                      traces=traces)  # + full model calls for the fine-tune (D-041)
         self.turn_no = 0
         self.approve_all = False  # "yes to all" for the rest of this turn
 
@@ -248,18 +258,20 @@ class ChatSession:
         t0 = time.monotonic()
         user = next((m.content for m in reversed(messages) if isinstance(m, HumanMessage)), "")
         self.rec.write("turn_start", turn=self.turn_no, mode=self.mode, user=str(user)[:2000],
-                       harness_version=self.harness.version)
+                       harness_version=self.harness.version, model=str(getattr(self.llm, "model", "") or ""),
+                       num_ctx=self.num_ctx)
         try:
             res = self._turn(messages, res, max_steps)
         except BaseException as exc:  # interrupted (esc / ctrl+c) or crashed: still recorded, the analyzer counts it
             self.rec.write("turn_end", turn=self.turn_no, steps=res.steps, stopped=True, interrupted=True,
                            reason=f"interrupted ({type(exc).__name__})", text="", tokens_in=res.tokens_in,
+                           outcome="interrupted" if isinstance(exc, KeyboardInterrupt) else "error",
                            tokens_out=res.tokens_out, seconds=round(time.monotonic() - t0, 1),
                            changed=[e["path"] for e in res.journal])
             raise
         self.rec.write("turn_end", turn=self.turn_no, steps=res.steps, stopped=res.stopped, reason=res.stop_reason,
                        text=res.text[:2000], tokens_in=res.tokens_in, tokens_out=res.tokens_out,
-                       ctx_used=res.ctx_used, seconds=round(time.monotonic() - t0, 1),
+                       ctx_used=res.ctx_used, seconds=round(time.monotonic() - t0, 1), outcome=turn_outcome(res),
                        changed=[e["path"] for e in res.journal])
         return res
 
@@ -284,6 +296,7 @@ class ChatSession:
                 self.hooks.show("retry", {}, f"tool call cut off ({exc}); asking for smaller parts", False)
                 messages.append(HumanMessage(content=BAD_TOOL_CALL_NOTE.format(error=exc)))
                 continue
+            self._trace(messages, streamed, specs, step)
             if streamed.stopped:
                 messages.append(AIMessage(content=streamed.text))
                 res.text, res.stopped, res.stop_reason = streamed.text, True, "stopped by you (esc)"
@@ -335,6 +348,13 @@ class ChatSession:
             if stop:
                 return self._wrap_up(messages, res, stop)
         return self._wrap_up(messages, res, f"step limit ({max_steps} model calls)")
+
+    def _trace(self, messages, streamed, specs, step: int) -> None:
+        reply = streamed.message if streamed.message is not None else AIMessage(content=streamed.text or "")
+        self.rec.trace(messages, reply, tools=specs, model=str(getattr(self.llm, "model", "") or ""),
+                       num_ctx=self.num_ctx, seconds=getattr(streamed, "seconds", None),
+                       thinking=getattr(streamed, "thinking", "") or "", turn=self.turn_no, step=step,
+                       stopped=bool(streamed.stopped), harness_version=self.harness.version)
 
     def _stream(self, chunks, step: int):
         import inspect

@@ -67,21 +67,108 @@ class RunResult:
                 "record": self.record_path}
 
 
-class Recorder:
-    """Append-only JSONL record of a run (authorship per part, D-022)."""
+def _role(m) -> str:
+    return {"system": "system", "human": "user", "ai": "assistant", "tool": "tool"}.get(getattr(m, "type", ""), "user")
 
-    def __init__(self, path: Path | None):
+
+def message_dict(m) -> dict:
+    """A LangChain message as plain data, nothing cut (traces, D-041)."""
+    d = {"role": _role(m), "content": m.content if isinstance(m.content, str) else json.dumps(m.content, default=str)}
+    if getattr(m, "tool_calls", None):
+        d["tool_calls"] = [{"name": c.get("name"), "args": c.get("args"), "id": c.get("id")} for c in m.tool_calls]
+    if getattr(m, "tool_call_id", None):
+        d["tool_call_id"] = m.tool_call_id
+    thinking = (getattr(m, "additional_kwargs", None) or {}).get("reasoning_content")
+    if thinking:
+        d["thinking"] = thinking
+    return d
+
+
+def _fp(d: dict) -> str:
+    import hashlib
+    return hashlib.sha1(json.dumps(d, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")).hexdigest()
+
+
+class Recorder:
+    """Append-only JSONL record of a run (authorship per part, D-022), mirrored to the central store (D-041).
+
+    With traces on, every model call is also saved in full next to the record (`traces/<record>.jsonl`): the
+    messages the model got, its reply with thinking and tool calls, model and context. The system prompt + tool specs
+    are saved once (`prompt` row, by hash); a call stores only the messages new since the call before it when the
+    history just grew (`base`), else all of them (after compaction or a fresh round). `rebuild_calls` undoes this."""
+
+    def __init__(self, path: Path | None, *, traces: bool = True):
         self.path = path
+        self.trace_path = (path.parent / "traces" / f"{path.stem}.jsonl") if (path and traces) else None
+        self._prompts: set[str] = set()
+        self._calls = 0
+        self._last: list[str] = []  # fingerprints of the last call's input + reply
         if path:
             path.parent.mkdir(parents=True, exist_ok=True)
+
+    def _append(self, path: Path, row: dict) -> None:
+        # secrets never reach a record or a trace: both may become training data (D-022)
+        line = json.dumps(scrub_obj(row), ensure_ascii=False, default=str) + "\n"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
+            f.write(line)
+        from app.core import store
+        store.append(path, line)  # central copy: never lost with the project (D-041)
 
     def write(self, kind: str, **data) -> None:
         if not self.path:
             return
-        # secrets never reach a run record: records may become training data (D-022)
-        row = scrub_obj({"t": time.time(), "kind": kind, "author": data.pop("author", "mitra"), **data})
-        with self.path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
+        self._append(self.path, {"t": time.time(), "kind": kind, "author": data.pop("author", "mitra"), **data})
+
+    def trace(self, messages: list, reply, *, tools: list | None = None, model: str = "", num_ctx: int = 0,
+              seconds: float | None = None, thinking: str = "", **meta) -> None:
+        """Save one model call in full. Never raises: a trace must not break a run."""
+        if not self.trace_path:
+            return
+        try:
+            msgs = [message_dict(m) for m in messages]
+            prompt = ""
+            if msgs and msgs[0]["role"] == "system":
+                prompt = _fp({"system": msgs[0]["content"], "tools": tools or []})[:16]
+                if prompt not in self._prompts:
+                    self._prompts.add(prompt)
+                    self._append(self.trace_path, {"t": time.time(), "kind": "prompt", "hash": prompt,
+                                                   "system": msgs[0]["content"], "tools": tools or []})
+                msgs[0] = {"role": "system", "prompt": prompt}
+            fps = [_fp(m) for m in msgs]
+            grew = bool(self._last) and fps[:len(self._last)] == self._last
+            new = msgs[len(self._last):] if grew else msgs
+            out = message_dict(reply) if reply is not None else None
+            if out is not None and thinking and "thinking" not in out:
+                out["thinking"] = thinking  # the chat streams thinking separately from the reply
+            self._calls += 1
+            meta_in, meta_out = _tokens(reply) if reply is not None else (0, 0)
+            self._append(self.trace_path, {
+                "t": time.time(), "kind": "call", "id": self._calls, "base": self._calls - 1 if grew else None,
+                "author": "mitra", "model": model, "num_ctx": num_ctx, "prompt": prompt, "new": new, "reply": out,
+                "seconds": round(seconds, 2) if seconds is not None else None, "tokens_in": meta_in,
+                "tokens_out": meta_out, **meta})
+            self._last = fps + ([_fp(out)] if out else [])
+        except Exception:
+            pass
+
+
+def rebuild_calls(rows: list[dict]) -> list[dict]:
+    """From trace rows back to full calls: [{"messages": [...], "reply": {...}, "tools": [...], **meta}]."""
+    prompts = {r["hash"]: r for r in rows if r.get("kind") == "prompt"}
+    out, history = [], []
+    for r in rows:
+        if r.get("kind") != "call":
+            continue
+        base = history if r.get("base") is not None else []
+        msgs = base + [dict(m) for m in r.get("new") or []]
+        p = prompts.get(r.get("prompt") or "")
+        full = [{"role": "system", "content": p["system"]} if (m.get("role") == "system" and "prompt" in m and p)
+                else m for m in msgs]
+        out.append({**{k: v for k, v in r.items() if k not in ("new",)}, "messages": full,
+                    "tools": p["tools"] if p else []})
+        history = msgs + ([r["reply"]] if r.get("reply") else [])
+    return out
 
 
 def _tokens(msg) -> tuple[int, int]:
@@ -229,7 +316,10 @@ def solve(
         reply = None
         for attempt in range(2):  # one retry on a failed call
             try:
+                t_call = time.monotonic()
                 reply = call_model(bound, messages, call_timeout)
+                rec.trace(messages, reply, tools=specs, model=str(getattr(llm, "model", "") or ""), num_ctx=num_ctx,
+                          seconds=time.monotonic() - t_call, step=step, harness_version=h.version)
                 break
             except Exception as exc:
                 rec.write("model_error", error=str(exc), attempt=attempt)
