@@ -626,7 +626,8 @@ _COMMAND_HELP = [
         ("/report",        "Rebuild the dashboard (sessions, tools, improvement, training data) and open it"),
         ("/role [name]",   "Show roles, or switch role: model, tools and MCP servers at once"),
         ("/model use <m>", "Switch the chat model now (no restart)"),
-        ("/run [plan] [h]", "Build a plan unattended in its own window (overnight), up to h hours (default 4)"),
+        ("/run [plan] [h]", "Build a plan unattended in the background (overnight), up to h hours (default 4)"),
+        ("/night",         "The latest night run: running?, progress, report"),
         ("/good [note]",   "Mark the last turn good (your verdict teaches Mitra)"),
         ("/bad [why]",     "Mark the last turn bad, ideally with why"),
         ("/model",         "Show the active models (/model list: installed Ollama models)"),
@@ -1885,6 +1886,22 @@ def _header_extras(cfg: dict, harness) -> tuple[str, str, str]:
     return roles_line, learning, dash
 
 
+def _follow_night() -> None:
+    """Live view of the latest night run in the chat; ctrl+c stops watching only."""
+    from app.core import night as night_mod
+    try:
+        st = night_mod.follow(lambda line: console.print(Text("  " + line, style="m.dim")))
+    except KeyboardInterrupt:
+        console.print(Text("\n  stopped watching; the night keeps going · `/night` to watch again", style="m.faint"))
+        return
+    if st and not st["running"]:
+        console.print(Text("  ⏾ the night run finished", style="m.tool"))
+        if st["report"]:
+            console.print(Markdown(st["report"]))
+        else:
+            console.print(Text(f"  no report was written: see {st['console_log']}", style="m.err"))
+
+
 def _print_memory_fit(model: str, num_ctx: int, base_url: str) -> None:
     """Startup line: can this machine run the model at this context, and what to close if not (D-040).
     Only warns; never blocks the start."""
@@ -2691,14 +2708,46 @@ def _chat():
                 _say("Usage: `/run [plan.md] [hours]`, e.g. `/run plan.md 4`.")
                 continue
             project = plan_path.parent  # the project is the plan's folder, so /run works from any folder
-            cmd = [sys.executable, "-m", "app.main", "night", str(plan_path), "--workspace", str(project),
-                   "--hours", hours, "--model", model]
-            flags = subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0
-            subprocess.Popen(cmd, cwd=str(pathlib.Path(__file__).resolve().parents[1]), creationflags=flags)
-            console.print(Text(f"  ⏾ night run started in its own window: {plan_path.name} in {project} · {model} · "
+            from app.core import night as night_mod
+            n_tasks, problem = night_mod.check_plan(plan_path)
+            if problem:
+                _say(f"The plan cannot run: {problem}\n\nExample: `C:\\Users\\prash\\projects\\brick-breaker-night\\plan.md`.")
+                continue
+            info = night_mod.launch(plan_path, project, float(hours), model)
+            console.print(Text(f"  ⏾ night run started: {plan_path.name} ({n_tasks} tasks) in {project} · {model} · "
                                f"up to {hours} h", style="m.tool"))
-            console.print(Text("    it keeps Windows awake, commits each task on its own branch and writes NIGHT_REPORT.md; "
-                               "don't chat meanwhile (one model at a time)", style="m.faint"))
+            import time as _t
+            _t.sleep(6)  # an error in the first seconds is shown here, not lost in a closing window
+            if info["proc"].poll() is not None:
+                console.print(Text("  ✗ the night run stopped right away:", style="m.err"))
+                console.print(Text(night_mod.tail(pathlib.Path(info["console_log"]), 25) or "(no output)", style="m.dim"))
+            else:
+                console.print(Text("    showing it live here · ctrl+c stops watching (the night keeps going, also if you "
+                                   "close Mitra) · `/night` shows it again · don't chat meanwhile", style="m.faint"))
+                _follow_night()
+            continue
+
+        if cmd == "/night":  # the latest night run: live while it runs, then the report
+            from app.core import night as night_mod
+            st = night_mod.status()
+            if st and st["running"]:
+                console.print(Text(f"  ⏾ night running · {st['elapsed_min']} min of up to {st['hours']} h · "
+                                   "live below · ctrl+c stops watching", style="m.tool"))
+                _follow_night()
+                continue
+            if not st:
+                _say("No night run yet. Start one with `/run <plan.md> [hours]`.")
+                continue
+            state = "running" if st["running"] else "finished"
+            lines = [f"**Night:** {state} · {pathlib.Path(st['plan']).name} in `{st['project']}` · {st['model']} · "
+                     f"{st['elapsed_min']} min of up to {st['hours']} h"]
+            if st["tail"]:
+                lines += ["", "Latest lines:", "```", st["tail"], "```"]
+            if st["report"] and not st["running"]:
+                lines += ["", st["report"]]
+            elif not st["running"] and not st["report"]:
+                lines += ["", f"No report was written: see `{st['console_log']}`."]
+            _say("\n".join(lines))
             continue
 
         if user_input.strip().startswith("/"):

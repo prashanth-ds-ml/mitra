@@ -80,6 +80,8 @@ def cmd_solve(task: str = "", *, test: str = "python -m pytest -q", plan: str = 
         plan_text = Path(plan).read_text(encoding="utf-8")
         out = run_plan(plan_text, ws, llm, full_test_command=test, max_steps=max_steps, on_event=printer,
                        record_dir=runs, num_ctx=num_ctx)
+        runs.mkdir(parents=True, exist_ok=True)
+        (runs / "result.json").write_text(json.dumps(out, indent=2, default=str), encoding="utf-8")
         ok = out["final_tests_passed"]
         if as_json:
             print(json.dumps(out, indent=2))

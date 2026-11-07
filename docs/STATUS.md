@@ -5,6 +5,10 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next session starts here (handoff 2026-11-08)
+0. 02:00 note: the user's first `/run` attempts ran an old Mitra in mitra-try with a plan that had 0 tasks
+   (a Mitra-written test document, not the `### T1:` format): nothing ran. Fixed (D-054): plan check, background
+   run, live view in the chat, `/night`. Verified with a real 1-minute background run in brick-breaker-night
+   (cleaned up afterwards: branch deleted, project back on master).
 1. **Read the night:** `C:\Users\prash\projects\brick-breaker-night\NIGHT_REPORT.md` (started by the user with
    `/run C:\Users\prash\projects\brick-breaker-night\plan.md 4`, qwen3.5:latest 256K, Mitra writes its own tests).
    Score it with the hidden judge (`brick-breaker-night-judge\JUDGE.md`, 25 tests, proven against a reference
