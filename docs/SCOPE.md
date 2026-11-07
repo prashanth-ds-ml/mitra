@@ -123,6 +123,13 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   kill switch), keep-awake, models decided by an A/B of two nights (A: 9B only; B: 9B plans + 4B builds; both at
   256K, D-048; memory checked before you leave), deploy + health check, morning report; 3-4 h ≈ 120-200 model steps = a small-to-medium
   project. Completes M3 / the C block.
+- **I-17 Models per role** and **I-18 the missing pieces** (reviewer, clarifying questions, decision notes, runtime
+  logs, project docs, review-and-merge, energy per night), together as **phases and roles**
+  ([PHASES_AND_ROLES.md](PHASES_AND_ROLES.md), 2026-11-08): one loop moving through planner → tester → builder →
+  debugger → reviewer → deployer → reporter, each with its own prompt, tools, MCP servers and model; tests read-only to
+  the builder; new tools `inspect`, `diff`, `app_logs`; filesystem MCP off. Model shortlist to screen: mimo-v2.6:9b,
+  ornith-1.5:9b / 35b, deepseek-r1:14b (tev1 only as a possible router later; granite4.2, qwen2.5-coder, llama3.1
+  skipped).
 
 ## Later (not milestones)
 Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,

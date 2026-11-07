@@ -35,6 +35,8 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 - [ ] 14b. Re-plan a failing step: retry with the error, then split it or fix an earlier step, then "needs help"
 - [ ] 14c. Planner experiment: level 02 with the hand-written plan vs Mitra's own plan (hidden tests decide)
 - [ ] 14d. Planning numbers on the dashboard: first-try tasks, re-plans, needs help, plan edited before approval
+- [ ] 14e. Phases and roles ([PHASES_AND_ROLES.md](PHASES_AND_ROLES.md)): planner + tester phases (tests first, from the PRD), builder with tests read-only, debugger with `inspect` and `run_tests(path -k -x)`, reviewer (per task + final); tools and MCP servers per phase; filesystem MCP off
+- [ ] 14f. Model screen for the roles (downloads with your OK): mimo-v2.6:9b, ornith-1.5:9b (licence first), ornith-1.5:35b (if it fits), deepseek-r1:14b; then Level 01 (builders) and the planner eval (planners)
 
 **B. Memory that lasts** ([HANDOFF_VAULT_PLAN.md](HANDOFF_VAULT_PLAN.md), I-10, I-9, D-043)
 - [ ] 8. Vault basics: `MitraVault`, `Mitra/` layout, safe writes, import of old `.mitra/` memory
