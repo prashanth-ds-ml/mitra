@@ -78,7 +78,7 @@ handoffs, or a plan of plans. The plan is the weak spot: approving it before bed
    inventing one. Offline, plain HTML, the default style for overnight builds.
 2. **Visual self-check**: Playwright + `screenshot` (qwen3.5 has vision) before "done", and in the overnight deploy step.
 3. **shadcn/ui MCP** (official, local, free) for React / Next.js web apps, when those start (level 06, real apps).
-4. **Figma Dev Mode MCP** only if designs are made in Figma first. Not used: 21st.dev Magic (API key, cloud; breaks
+4. **Not used:** Figma Dev Mode MCP (user: no, 2026-11-07, D-047), 21st.dev Magic (API key, cloud; breaks
    local-only); local image generation (does not fit next to the 9B on 8 GB).
 Names and terms of each server checked before adding.
 
