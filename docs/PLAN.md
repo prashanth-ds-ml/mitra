@@ -29,6 +29,13 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 - [ ] 6. Adaptive thinking (E2) + Level 01 benchmark on/adaptive, 9B and 4B (overnight, your OK)
 - [ ] 7. **You:** use Mitra daily on small real tasks with tests and mark turns, about a week (person task)
 
+**Planning first (moved ahead of B, user 2026-11-07: breaking work down is the key differentiator; [FIRST_TWO_WEEKS.md](FIRST_TWO_WEEKS.md))**
+- [ ] 13. `/plan`: Mitra writes plan.md with a test per task (9B, thinking on); you approve or edit it
+- [ ] 14. Plan check: every task has a test, and each test **fails before** the task and **passes after** (red-then-green, so tests cannot be fake)
+- [ ] 14b. Re-plan a failing step: retry with the error, then split it or fix an earlier step, then "needs help"
+- [ ] 14c. Planner experiment: level 02 with the hand-written plan vs Mitra's own plan (hidden tests decide)
+- [ ] 14d. Planning numbers on the dashboard: first-try tasks, re-plans, needs help, plan edited before approval
+
 **B. Memory that lasts** ([HANDOFF_VAULT_PLAN.md](HANDOFF_VAULT_PLAN.md), I-10, I-9, D-043)
 - [ ] 8. Vault basics: `MitraVault`, `Mitra/` layout, safe writes, import of old `.mitra/` memory
 - [ ] 9. Startup context from the vault + `recall` / `remember` / `read_note`
@@ -37,8 +44,6 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 - [ ] 12. Plans and lessons in the vault
 
 **C. Mitra plans and builds by itself** (M3, I-12)
-- [ ] 13. `/plan`: Mitra writes plan.md with a test per task (9B, thinking on); you approve or edit it
-- [ ] 14. Plan check: every task has a test, and each test **fails before** the task and **passes after** (red-then-green, so tests cannot be fake)
 - [ ] 15. Runner tools: `start_program` / `stop_program` (games, servers in the background), `setup_env` (project venv via uv)
 - [ ] 16. `mitra run plan.md` unattended: branch, commit per task, RAM guard, stop/resume, "needs help" briefs, report
 

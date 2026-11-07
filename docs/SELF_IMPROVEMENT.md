@@ -97,6 +97,19 @@ To add (with item 0, A4, A5 and trends):
 - File: **`C:\Users\prash\.mitra\dashboard.html`**, always the same, rebuilt when a Mitra session ends.
 - Option (not decided): start `mitra dashboard` at Windows login (a scheduled task, a few MB of RAM).
 
+## 10. Breaking work down is the key differentiator (user, 2026-11-07)
+Evidence: the same 4B scored 71/72 on Level 01 with a good plan and tests, and looped on crashes free-form
+(brick breaker). Four parts, all needed:
+1. **A good plan** (the weakest spot for a small model): you approve it; plan templates per kind of project from
+   levels that passed (experience recall, I-13); a plan of plans for big projects.
+2. **Small steps**: each task fits one short context (a few files, one test).
+3. **Every step checked**: red-then-green (the test fails before, passes after), so "done" is proven.
+4. **Recovery**: retry with the error, then re-plan the step (split it, or fix an earlier one), then "needs help".
+Today: 2-4 partly work (`run_plan`, tests decide, fresh rounds). Missing: the planner (`/plan`, plan check) and
+re-planning, now first after item 0 and A1-A5 ([FIRST_TWO_WEEKS.md](FIRST_TWO_WEEKS.md)). Measured per kind of
+project: tasks passed first try, re-plans, needs help, plan edited by you before approval, and the planner
+experiment (hand-written plan vs Mitra's own plan on the same level).
+
 ## 9. Does the model's reasoning improve with use? And training on usage (brainstorm 2026-11-07)
 **The model's own reasoning does not change with use**: Ollama runs fixed weights. What improves with use is
 everything around it, so its *effective* reasoning (model + what it is told) gets better:
