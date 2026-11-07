@@ -97,6 +97,30 @@ To add (with item 0, A4, A5 and trends):
 - File: **`C:\Users\prash\.mitra\dashboard.html`**, always the same, rebuilt when a Mitra session ends.
 - Option (not decided): start `mitra dashboard` at Windows login (a scheduled task, a few MB of RAM).
 
+## 9. Does the model's reasoning improve with use? And training on usage (brainstorm 2026-11-07)
+**The model's own reasoning does not change with use**: Ollama runs fixed weights. What improves with use is
+everything around it, so its *effective* reasoning (model + what it is told) gets better:
+1. the harness (learned rules, tool texts, limits from `mitra improve`);
+2. memory (project facts, handoffs, lessons in the vault);
+3. when it thinks (adaptive thinking, E2);
+4. **experience recall (new idea, I-13):** for a task like one solved before (tests passed or 👍, not corrected),
+   a short "how it was solved" note is put in the prompt. Learning from examples, no training; uses the vault;
+5. a better base model when one comes out (model screen, one command to switch).
+
+**Training on usage data (M7, rules in SCOPE / D-022): yes, planned.**
+- Data: only verified turns (tests passed or 👍, no corrections, all Mitra, traced), with the thinking.
+- Methods: fine-tune on its own verified trajectories (rejection-sampling fine-tuning / STaR style) + learning
+  what to avoid from 👍/👎 (KTO, which needs no matched pairs) and before/after pairs (DPO, S3).
+- Then: GGUF into Ollama as a new model, model screen + playground hidden tests vs the base model; **kept only if
+  it wins on held-out tasks**.
+- Limits: mostly teaches behaviour (tool choice, your style, fewer format mistakes); deep reasoning gains need far
+  more data than a few hundred turns. The 4B fits a QLoRA run on the 8 GB GPU with sequences cut to ~4-8K tokens;
+  the 9B on long traces likely needs a rented GPU (to decide later; D-025 local-only is about running Mitra).
+  Training on its own outputs can amplify mistakes, hence verified turns only and the held-out test. Check the
+  Qwen licence before training (believed Apache 2.0).
+- What to do now: restart Mitra after updates, use it on tasks with tests, mark turns 👍/👎: every verified turn
+  becomes a training example.
+
 ## 8. Open questions (for the brainstorm)
 1. `/good` makes an untested turn usable for training, or only tested turns ever count?
 2. Trends by day, by week, or both?
@@ -104,3 +128,5 @@ To add (with item 0, A4, A5 and trends):
    changed, N lines"?
 4. Auto-start `mitra dashboard` at login: yes / no?
 5. Anything else you want to see trending (e.g. per project, per kind of task: game / site / DB / app)?
+6. Experience recall (I-13): worth planning, and before or after the vault?
+7. Training: 4B locally first, and is a rented GPU for the 9B acceptable later?

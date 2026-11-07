@@ -106,6 +106,9 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   per task, red-then-green plan check, unattended runner, one ladder level per kind (new DB-design level) with
   hidden tests, overnight self-improvement on them; real projects of a kind only after its level passes. Honest
   limit: bigger web apps will finish only partly at first ("needs help" briefs). In PLAN "Next up".
+- **I-13 Experience recall** (2026-11-07): for a task like one solved before (tests passed or 👍, not corrected), a
+  short "how it was solved" note goes into the prompt; learning from examples without training, via the vault.
+  Impact: better first attempts on repeat kinds of work; costs prompt tokens. See SELF_IMPROVEMENT.md section 9.
 
 ## Later (not milestones)
 Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,
