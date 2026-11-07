@@ -92,6 +92,11 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   together. Only after I-7's prompt-processing measure shows re-reading the history is cheap (Ollama keeps one
   prompt cache, so a sub-agent call makes the main chat re-process its history). Test: a playground level with vs
   without; kept only if faster or more tests pass. Agreed as the order 2026-11-07.
+- **I-9 Handoff report + "start fresh" pop-up** ([HANDOFF_VAULT_PLAN.md](HANDOFF_VAULT_PLAN.md)). Impact: no
+  more summaries of summaries; a long session continues in a clean, small context from a fact-based report.
+- **I-10 Obsidian vault as the center of Mitra's memory and context** (same plan, D-043). Impact: projects,
+  sessions, compaction summaries, handoffs, plans and lessons in one linked vault (`MitraVault`), with recall /
+  remember tools; `.mitra/` is hidden from Obsidian today. Code stays in the projects. Plan agreed, build pending go.
 
 ## Later (not milestones)
 Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,
