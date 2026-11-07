@@ -121,6 +121,41 @@ everything around it, so its *effective* reasoning (model + what it is told) get
 - What to do now: restart Mitra after updates, use it on tasks with tests, mark turns 👍/👎: every verified turn
   becomes a training example.
 
+## 8. Answers (user, 2026-11-07)
+| # | Question | Answer |
+|---|---|---|
+| 1 | `/good` on an untested turn | **Usable for training**, marked `untested` in the export so a training run can leave such turns out or give them less weight |
+| 2 | Trends | **Day by day** |
+| 3 | Your corrections | **Store the diffs**: capped ~4K chars per file, secrets scrubbed, never for `.env`-like or binary files, local only (the diff is the "after" half of a before/after pair) |
+| 4 | Dashboard start | **Only when you run `mitra dashboard`** (no auto-start at login) |
+| 5 | More trends | By **project**, **model**, **kind of task** (game / site / DB / app / other, from the project's files); two headline numbers: **first-try success** (tests pass, no correction from you) and **time to green** (first code edit to tests passing) |
+| 6 | Experience recall (I-13) | **Open, think it through**: how "similar" is judged, stale solutions, a wrong lesson repeated, token budget |
+| 7 | Training and domain reasoning | Corrected together: Research Desk MCP + the vault add **knowledge and context** (better in the domain from day one, no change to the model); training on verified usage changes **behaviour in the domain** (stack, conventions, tool choice, fewer repeat mistakes: a narrow reasoning gain); much harder tasks than the base model can do are not expected from a 4B/9B and a few hundred examples: they come from `/plan` breaking work into tested steps. Knowledge + behaviour + structure together; held-out domain tests show what each adds |
+
+## 9. Does the model's reasoning improve with use? And training on usage (brainstorm 2026-11-07)
+**The model's own reasoning does not change with use**: Ollama runs fixed weights. What improves with use is
+everything around it, so its *effective* reasoning (model + what it is told) gets better:
+1. the harness (learned rules, tool texts, limits from `mitra improve`);
+2. memory (project facts, handoffs, lessons in the vault);
+3. when it thinks (adaptive thinking, E2);
+4. **experience recall (new idea, I-13):** for a task like one solved before (tests passed or 👍, not corrected),
+   a short "how it was solved" note is put in the prompt. Learning from examples, no training; uses the vault;
+5. a better base model when one comes out (model screen, one command to switch).
+
+**Training on usage data (M7, rules in SCOPE / D-022): yes, planned.**
+- Data: only verified turns (tests passed or 👍, no corrections, all Mitra, traced), with the thinking.
+- Methods: fine-tune on its own verified trajectories (rejection-sampling fine-tuning / STaR style) + learning
+  what to avoid from 👍/👎 (KTO, which needs no matched pairs) and before/after pairs (DPO, S3).
+- Then: GGUF into Ollama as a new model, model screen + playground hidden tests vs the base model; **kept only if
+  it wins on held-out tasks**.
+- Limits: mostly teaches behaviour (tool choice, your style, fewer format mistakes); deep reasoning gains need far
+  more data than a few hundred turns. The 4B fits a QLoRA run on the 8 GB GPU with sequences cut to ~4-8K tokens;
+  the 9B on long traces likely needs a rented GPU (to decide later; D-025 local-only is about running Mitra).
+  Training on its own outputs can amplify mistakes, hence verified turns only and the held-out test. Check the
+  Qwen licence before training (believed Apache 2.0).
+- What to do now: restart Mitra after updates, use it on tasks with tests, mark turns 👍/👎: every verified turn
+  becomes a training example.
+
 ## 8. Open questions (for the brainstorm)
 1. `/good` makes an untested turn usable for training, or only tested turns ever count?
 2. Trends by day, by week, or both?
