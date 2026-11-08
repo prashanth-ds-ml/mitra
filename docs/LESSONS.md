@@ -45,6 +45,7 @@ local-codex review and this project's planning. Add a lesson whenever an error c
 | L-025 | Editing | When a scripted edit targets a line that appears more than once, anchor it inside the target function (find the function first, then the line) and assert the count; and treat the user's own typed input differently from model requests: the user is the author | E-014, E-015 |
 | L-024 | Protocols | Never hand-write a protocol client that has an official SDK; and test any client against a server you did not write, or it only proves it talks to itself | E-012 |
 | L-023 | Benchmarks | Fakes only prove what they imitate. Before a benchmark, run every agent config once for real (one call) and read its log: real agents call lookup endpoints, send title calls first, use other APIs (Responses) and need their own folders | E-010, E-011 |
+| L-041 | Process | A running Mitra keeps the code it started with, but `/run` starts a child process that loads the code on disk: editing Mitra while it runs gives two versions at once (the chat's old plan check said ✓, the night's new one refused). Change code only with Mitra and nights stopped; restart Mitra after every change; the header shows the commit it runs | E-049, E-050 |
 | L-040 | Model | A model or server error the model caused (a broken or cut-off tool call) goes back to the model as a note and a retry, like a failed tool, never a crashed turn; cap the retries. Small models write huge single tool calls: steer long files into parts (E-044) |
 
 ## Template

@@ -5,6 +5,13 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next session starts here (handoff 2026-11-08)
+00. **Later 2026-11-08 (docs only, no code: Mitra was running):** the user's mitra-try session ran Mitra 83f6245
+   while E-049 (6a64ae6) was committed, so the chat's old plan check said ✓ and the night's new one refused (L-041).
+   **Restart Mitra first.** Then, with Mitra stopped, build in order: E-050 (chat `run_plan` skips the check, wrong
+   folder, model's test command, re-runs), E-051 (trailing `.` in args), E-052 (`/good`/`/bad` turn), then the
+   [PLAN block "M2 UI polish"](PLAN.md) (D-056, all 40 items, one at a time, passes A → B → C). Restart Mitra after
+   each batch so the changes show. mitra-try/brick-breaker/plan.md still fails the new check (T1 needs itself,
+   `brick-breaker/` paths, bare pytest): ask Mitra to rewrite it after the restart.
 0. 02:00 note: the user's first `/run` attempts ran an old Mitra in mitra-try with a plan that had 0 tasks
    (a Mitra-written test document, not the `### T1:` format): nothing ran. Fixed (D-054): plan check, background
    run, live view in the chat, `/night`. Verified with a real 1-minute background run in brick-breaker-night

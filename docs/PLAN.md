@@ -165,6 +165,62 @@ Design, ability list and what happens to local-codex's code: [M2_PLAN.md](M2_PLA
 - [ ] Used for a week on small real tasks in my projects; problems logged in ERROR_LOG and fixed
 - [ ] Release v0.2 + post: "A coding assistant that actually works on a 4B model"
 
+## M2 UI polish (D-056, agreed 2026-11-08)
+One item at a time, each with a test (prompt_toolkit test input/output or rich capture) and its own commit. Build only
+with Mitra and nights stopped (L-041); restart Mitra afterwards. A short check in a real tall terminal per pass goes
+to USER_TESTS.md.
+
+**First: the /run fixes**
+- [ ] E-050: chat `run_plan` uses the plan check, runs in the plan's folder, full tests = `python -m pytest -q`, refuses to re-run an unchanged plan in the same turn
+- [ ] E-051: trailing `.` stripped from `/run` and `/plan` arguments
+- [ ] E-052: `/good` / `/bad` go to the right turn or night and say which ("night 20261108-022802 marked 👎")
+
+**Pass A: layout (frame, width, alignment)**
+- [ ] A1 Full frame around the input: rule, `›` input, rule, status line right under it (not a bottom toolbar; closes E-048)
+- [ ] A2 The frame stays in the scrollback after enter (bottom rule + status as they were)
+- [ ] A3 Two-sided status line: hints + mode left; model, context bar `▰▰▰▱▱▱ 34%` (amber, then red), branch, tokens right
+- [ ] A9 One content width (terminal width, capped ~120) for header, rules, markdown, tool output, reports; no hard wrap at 80
+- [ ] A10 Headings left-aligned (rich centres H1/H2), bold, thin rule under H1
+- [ ] A11 One indent system: `●` at 0, `⎿` at 2, nested output at 4 (night lines, `record:` included)
+- [ ] A12 Paths never broken mid-way: shortened with `…` and clickable (OSC 8)
+- [ ] A22 Clear end of a turn: summary line, one blank line, then the new frame
+
+**Pass B: live feel**
+- [ ] B17 One live status line during a turn with a verb that follows the tool (`✻ Reading brick_breaker.py · step 3 · 27s · ↓ 1.2K · esc to stop`)
+- [ ] B18 Tool lines replaced in place: `○ Running…` → `● done` / `✗ failed`
+- [ ] B29 Night run as one live panel: per task ✓ / ◐ / ○ / ⊘ with title, commits, time, waiting-on; progress bar
+- [ ] B30 Skipped tasks say why in amber with a one-line fix (`T1 ⊘ skipped: needs itself`)
+- [ ] B31 Night report always rendered as markdown (also when it stopped right away); empty sections left out
+- [ ] B32 Night ends with a big ✓/✗ result line ("0/5 tasks · tests 36/37 · 0 commits") and the next step
+- [ ] B34 One error shape: `✗ what failed` + `→ what to do`
+
+**Pass C: details**
+- [ ] C4 Mode as a coloured badge (ask / auto-edit / plan)
+- [ ] C5 Placeholder in the empty input ("Ask Mitra · / commands · @ files")
+- [ ] C6 `/` menu: name left, description right, sized to content, matched letters highlighted
+- [ ] C7 Paste chips `[pasted text #1 · 14 lines]` in their own colour
+- [ ] C8 One-line hint while a night is live ("night running · /night to watch · ctrl+c stops watching")
+- [ ] C13 Header as wide as the content; the RAM/GPU fit line moves into it as a `memory` row
+- [ ] C14 Status dots by state: green connected, dim off, red failing (MCP servers, dashboard)
+- [ ] C15 3-4 tips, chosen by context (e.g. "plan.md here · /run plan.md")
+- [ ] C16 Model picker as an arrow-key list with highlight
+- [ ] C19 Runs of reads grouped ("● Read 4 files", ctrl+o expands)
+- [ ] C20 Blocked commands shown as `⊘ blocked` in amber, not a red failure
+- [ ] C21 Known noise folded (pip upgrade notice, pytest deprecation warnings)
+- [ ] C23 Tighter markdown: no double blank lines, compact lists, code blocks with a gutter or soft background + syntax colours
+- [ ] C24 Inline code and file paths styled; `file:line` clickable
+- [ ] C25 Long replies folded after ~60 lines (ctrl+o)
+- [ ] C26 Diffs with line numbers, a file header, word-level highlights
+- [ ] C27 One approval card for Bash / Edit / Run plan with keys y / a / n
+- [ ] C28 Always "No, and tell Mitra why" in approvals
+- [ ] C33 `/good` / `/bad` as a toast in the status line, right turn number
+- [ ] C35 Unknown command → closest match ("did you mean /plan check?")
+- [ ] C36 Layered ctrl+c: stop model → clear input → quit, each with a hint
+- [ ] C37 Terminal title shows the state ("Mitra · working…", "waiting for you", "night 2/5")
+- [ ] C38 Fewer greens: green stays the brand; success / warning (new amber) / error / info clearly apart
+- [ ] C39 `--plain` / `NO_COLOR` and an ASCII fallback for terminals without good Unicode
+- [ ] C40 Light theme option (`/theme`)
+
 ## I-6 Dashboard (D-041, [DASHBOARD_PLAN.md](DASHBOARD_PLAN.md))
 - [x] Step 0: central append-only store `~/.mitra/data/` + `projects.json`; old records merged on every build (2026-11-07)
 - [x] Step 1: full traces (messages, reply, thinking, tool calls, model, context; prompt once, deltas) + turn outcome (2026-11-07)
