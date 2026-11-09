@@ -41,5 +41,6 @@ def test_context_command_is_wired_in_the_chat():
     src = inspect.getsource(main._chat)
     block = src[src.index('if cmd.startswith("/context "):'):]
     block = block[: block.index('if cmd == "/context":')]
-    for needed in ("save_context_choice", "compact_threshold", "chat.llm, chat.num_ctx", "_print_memory_fit"):
+    # roles_mod.choose_context saves the choice (E-061)
+    for needed in ("roles_mod.choose_context", "compact_threshold", "chat.llm, chat.num_ctx", "_print_memory_fit"):
         assert needed in block

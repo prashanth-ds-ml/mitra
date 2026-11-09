@@ -84,6 +84,18 @@ def context_for(model: str, cfg: dict | None = None) -> int:
     return native or config.context_for_model(model)
 
 
+def choose_context(model: str, text: str, cfg: dict | None = None) -> tuple[int, str]:
+    """`/context <size>|auto`: save the choice and return (num_ctx, "") by the same rule as startup and /role, or
+    (0, error). E-061: the handler used config.context_for_model, so `auto` gave the measured 128K now and the
+    model's 256K maximum after a restart."""
+    native = int((config.get_model_facts(model) or {}).get("context") or 0)
+    n, err = config.parse_context_choice(text, native)
+    if err:
+        return 0, err
+    config.save_context_choice(model, n)
+    return context_for(model, cfg), ""
+
+
 def route(role: str, cfg: dict | None = None, have: set[str] | None = None) -> dict:
     """Everything a role switches at once: model, context, tools, MCP servers, thinking, read-only paths."""
     model, source = resolve(role, cfg, have)
@@ -123,6 +135,13 @@ def save_choice(role: str, model: str | None) -> None:
     f = _file()
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(json.dumps(data, indent=1), encoding="utf-8")
+
+
+def use_for_chat(model: str) -> None:
+    """`/model use X`: X becomes the chat model now and next time. Saved as the chat role's choice too, because a
+    choice beats mitra.toml `local_model` and the last model in `resolve` (E-054: the switch silently did nothing)."""
+    config.save_last_model(model)
+    save_choice("chat", model)
 
 
 def installed() -> set[str]:

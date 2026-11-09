@@ -77,16 +77,21 @@ def check_text(text: str, folder: str = "") -> tuple[int, str]:
     missing = [t.id for t in tasks if not t.test_command]
     if missing:
         problems.append(f"{', '.join(missing)} have no 'Done when' test command in backticks")
+    per_task: dict[str, list[str]] = {}  # the same problem in many tasks is named once with its tasks (E-063)
     for t in tasks:
         cmd = t.test_command or ""
+        found = []
         if any(op in cmd for op in ("&&", "||", ";", "|")):
-            problems.append(f"{t.id}: one command per task, no && / ; / | (pytest takes several tests at once: "
-                            "python -m pytest -q tests/a.py::test_x tests/b.py::test_y)")
+            found.append("one command per task, no && / ; / | (pytest takes several tests at once: "
+                         "python -m pytest -q tests/a.py::test_x tests/b.py::test_y)")
         if cmd.split()[:1] == ["pytest"]:
-            problems.append(f"{t.id}: write `python -m pytest ...` (not `pytest ...`) so the project's own Python runs it")
+            found.append("write `python -m pytest ...` (not `pytest ...`) so the project's own Python runs it")
         if folder and any(w.replace("\\", "/").startswith(folder + "/") for w in cmd.split()):
-            problems.append(f"{t.id}: paths are relative to the plan's folder '{folder}': write tests/... "
-                            f"not {folder}/tests/...")
+            found.append(f"paths are relative to the plan's folder '{folder}': write tests/... not {folder}/tests/...")
+        for msg in found:
+            per_task.setdefault(msg, []).append(t.id)
+    problems += [f"{', '.join(ids)}: {msg}" for msg, ids in per_task.items()]
+    for t in tasks:
         if t.id in t.needs:
             problems.append(f"{t.id} needs itself (write '- Needs: -' for a first task)")
     unknown = sorted({n for t in tasks for n in t.needs} - {t.id for t in tasks})

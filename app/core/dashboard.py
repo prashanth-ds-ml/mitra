@@ -165,11 +165,16 @@ def render_more(sess, tools, models, versions, tr, *, days=None, by_code=None, b
     pool = lambda attr: sum(getattr(g, attr) for g in last)  # noqa: E731
     tested, ft, turns7 = pool("tested"), pool("first_try"), pool("turns")
     greens = [x for g in last for x in g.green]
+    last_days = {g.label for g in last}
+    nights7 = [m for s in sess for m in getattr(s, "night_marks", []) if I._day(m["t"]) in last_days]  # E-056
+    n_good = sum(m["verdict"] == "good" for m in nights7)
+    n_bad = sum(m["verdict"] == "bad" for m in nights7)
     headline = [
         ("turns", turns7, f"{len({x for g in last for x in g.sessions})} sessions"),
         ("first try", f"{round(100 * ft / tested)}%" if tested else "–", f"{ft} of {tested} tested turns"),
         ("time to green", f"{I._median(greens):g}s" if greens else "–", f"median of {len(greens)}"),
-        ("👍 / 👎", f"{pool('good')} / {pool('bad')}", "your marks"),
+        ("👍 / 👎", f"{pool('good') + n_good} / {pool('bad') + n_bad}",
+         f"your marks ({len(nights7)} on night runs)" if nights7 else "your marks"),
         ("your fixes", pool("corrections"), f"declined {pool('declines')}"),
         ("crashes", pool("crashes"), "Mitra errors"),
         ("usable for training", tr.usable, f"of {I.TRAINING_TARGET} needed"),
@@ -224,6 +229,12 @@ def render_more(sess, tools, models, versions, tr, *, days=None, by_code=None, b
                 mark = "👍" if t.verdict == "good" else "👎"
                 judged.append((when, f"<tr><td>{e(_when(when))}</td><td>{e(s.project)}</td><td>turn {t.no}</td>"
                                      f"<td class='wide'>{mark} {e(t.verdict_note)}</td></tr>"))
+        for m in getattr(s, "night_marks", []):  # your verdict on a /run night (E-056)
+            mark = "👍" if m["verdict"] == "good" else "👎"
+            plan = Path(m.get("plan") or "").name or "plan"
+            judged.append((m["t"], f"<tr><td>{e(_when(m['t']))}</td><td>{e(s.project)}</td><td>night</td>"
+                                   f"<td class='wide'>{mark} night run {e(plan)}"
+                                   f"{' — ' + e(m['note']) if m.get('note') else ''}</td></tr>"))
         for c in s.crashes:
             crashes.append((c["t"], f"<tr><td>{e(_when(c['t']))}</td><td>{e(s.project)}</td>"
                                     f"<td class='wide'>{e(c['error'])}</td></tr>"))

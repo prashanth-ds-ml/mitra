@@ -130,6 +130,16 @@ def solve_command(plan: Path, workspace: Path, model: str, write_tests: bool) ->
     return cmd
 
 
+def _git_run(workspace: Path, *args: str) -> tuple[int, str]:
+    """(exit code, stdout + stderr) of a git command; (-1, why) when git cannot run."""
+    try:
+        p = subprocess.run(["git", *args], cwd=workspace, capture_output=True, text=True, timeout=60,
+                           encoding="utf-8", errors="replace")
+        return p.returncode, ((p.stdout or "") + (p.stderr or "")).strip()
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return -1, str(exc)
+
+
 def _git(workspace: Path, *args: str) -> str:
     try:
         p = subprocess.run(["git", *args], cwd=workspace, capture_output=True, text=True, timeout=30,
@@ -139,8 +149,68 @@ def _git(workspace: Path, *args: str) -> str:
         return ""
 
 
+def kill_tree(proc) -> None:
+    """Stop the child and everything it started (pytest, the app under test, a shell command) (E-053).
+    Windows: taskkill /T; POSIX: the child runs in its own session, so its whole process group is killed."""
+    if os.name == "nt":
+        try:
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True, timeout=30)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    else:
+        try:
+            import signal
+            os.killpg(proc.pid, signal.SIGKILL)
+        except (OSError, AttributeError):
+            pass
+    try:
+        proc.kill()
+    except OSError:
+        pass
+    try:
+        proc.wait(timeout=60)
+    except subprocess.TimeoutExpired:
+        pass
+
+
+STASH_MESSAGE = "mitra night: task cut off at the time limit"
+
+
+def save_cut_off(workspace: Path) -> str:
+    """Keep the unfinished work of a task cut off at the time limit (E-053): killing the run skips its rollback.
+    Returns "stash" (saved in git stash), "nothing" (no unfinished changes), "no git", or "left: <why>"."""
+    code, out = _git_run(workspace, "rev-parse", "--is-inside-work-tree")
+    if code != 0 or out.strip() != "true":
+        return "no git"
+    # the night's logs live in .mitra and must stay; NIGHT_REPORT.md is rewritten right after (a pop would clash)
+    spec = ("--", ".", ":(exclude).mitra", ":(exclude)NIGHT_REPORT.md")
+    code, out = _git_run(workspace, "status", "--porcelain", "--untracked-files=all", *spec)
+    if code != 0:
+        return f"left: {out[:200]}"
+    if not out.strip():
+        return "nothing"
+    code, out = _git_run(workspace, "stash", "push", "-u", "-m", STASH_MESSAGE, *spec)
+    if code != 0:
+        return f"left: {out[:200]}"
+    return "stash"
+
+
+def _cut_off_text(cut_off: str) -> str:
+    if cut_off == "stash":
+        return ("its unfinished changes are in `git stash` (`git stash list` shows them, `git stash pop` brings them "
+                "back).")
+    if cut_off == "nothing":
+        return "it had no unfinished changes to save."
+    if cut_off == "no git":
+        return "its unfinished changes are left in the folder (no git)."
+    if cut_off.startswith("left"):
+        why = cut_off.split(":", 1)[1].strip() if ":" in cut_off else ""
+        return f"its unfinished changes are left in the folder (git stash failed{': ' + why if why else ''})."
+    return "its unfinished changes are left in the folder."
+
+
 def report(workspace: Path, plan: Path, model: str, hours: float, started: float, ended: float,
-           result: dict | None, stopped_at_limit: bool, log: Path) -> str:
+           result: dict | None, stopped_at_limit: bool, log: Path, cut_off: str = "") -> str:
     mins = round((ended - started) / 60)
     lines = [f"# Night report: {plan.name}", "",
              f"- When: {time.strftime('%Y-%m-%d %H:%M', time.localtime(started))} → "
@@ -148,7 +218,7 @@ def report(workspace: Path, plan: Path, model: str, hours: float, started: float
              f"- Model: {model or 'the builder role default'}",
              f"- Log: `{log}`"]
     if stopped_at_limit:
-        lines.append("- **Stopped at the time limit**: the last task was cut off (its changes were rolled back).")
+        lines.append(f"- **Stopped at the time limit**: the last task was cut off; {_cut_off_text(cut_off)}")
     if result:
         lines += ["", f"## Tasks: {result.get('passed_tasks', 0)}/{result.get('total_tasks', 0)} passed", ""]
         for tid, r in (result.get("tasks") or {}).items():
@@ -200,24 +270,27 @@ def run(plan: str, workspace: str = ".", hours: float = 4.0, model: str = "", wr
     echo(f"  log: {log}")
     started = time.time()
     stopped_at_limit = False
+    cut_off = ""
     result = None
     mitra_root = Path(__file__).resolve().parents[2]
     try:
         with log.open("w", encoding="utf-8") as fh:
             env = {**os.environ, "PYTHONIOENCODING": "utf-8", "NO_COLOR": "1"}
             proc = subprocess.Popen(solve_command(plan_path, ws, model, write_tests), cwd=mitra_root, stdout=fh,
-                                    stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", env=env)
+                                    stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", env=env,
+                                    **({} if os.name == "nt" else {"start_new_session": True}))
             try:
                 proc.wait(timeout=hours * 3600)
             except subprocess.TimeoutExpired:
                 stopped_at_limit = True
-                proc.kill()
-                proc.wait(timeout=60)
+                kill_tree(proc)  # the whole tree: a killed solve leaves pytest / the app running otherwise (E-053)
+        if stopped_at_limit:
+            cut_off = save_cut_off(ws)  # killing skips the task's rollback: keep its work, out of the way (E-053)
         result = _latest_result(ws, started)
     finally:
         keep_awake(False)
     ended = time.time()
-    md = report(ws, plan_path, model, hours, started, ended, result, stopped_at_limit, log)
+    md = report(ws, plan_path, model, hours, started, ended, result, stopped_at_limit, log, cut_off=cut_off)
     (ws / "NIGHT_REPORT.md").write_text(md, encoding="utf-8")
     try:
         from app.core import dashboard as D

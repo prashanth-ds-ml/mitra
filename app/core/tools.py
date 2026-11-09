@@ -237,6 +237,12 @@ def check_code(ws: Workspace, path: str = ".") -> str:
     return f"Found {len(found)} likely run-time error(s):\n" + "\n".join(found[:40]) + more
 
 
+# Frames outside the project: installed packages, the standard library (Windows: ...\Python312\Lib\json\...,
+# uv: ...\cpython-3.12-windows-x86_64-none\Lib\...; POSIX: /usr/lib/python3.12/...), frozen modules (E-059).
+_LIBRARY_FRAME = re.compile(r"site-packages|dist-packages|python[^\\/]*[\\/]lib[\\/]|[\\/]lib[\\/]python|<frozen",
+                            re.IGNORECASE)
+
+
 def crash_hint(output: str) -> str:
     """When a program crashed with a traceback: where and why, and what to do next (E4)."""
     if "Traceback (most recent call last)" not in (output or ""):
@@ -246,7 +252,7 @@ def crash_hint(output: str) -> str:
                  if re.match(r"^[A-Za-z_][\w.]*(Error|Exception|Exit|Interrupt)\b", ln.strip())), "")
     where = ""
     for f, n in reversed(locs):  # the deepest frame in the project, not in a library
-        if "site-packages" not in f and "lib\\python" not in f.lower() and "/lib/python" not in f:
+        if not _LIBRARY_FRAME.search(f):
             where = f"{os.path.basename(f)} line {n}"
             break
     return (f"\n\n⚠ It crashed ({where + ': ' if where else ''}{last or 'see the traceback'}). Fix this before running "
@@ -268,9 +274,9 @@ def append_file(ws: Workspace, path: str, content: str) -> str:
     sep = "" if (not old or old.endswith("\n")) else "\n"
     text = old + sep + str(content)
     _commit(ws, full, text)
-    from app.core import plans
-    note = plans.write_note(rel, text) if plans.is_plan_file(rel) else ""
-    return f"Appended {len(str(content).splitlines())} lines to {rel} (now {len(text.splitlines())} lines)." + note
+    # the whole file, as write_file does: syntax / run-time errors for .py, the /run check for plans (E-060)
+    return (f"Appended {len(str(content).splitlines())} lines to {rel} (now {len(text.splitlines())} lines)."
+            + syntax_note(rel, text))
 
 
 def write_file(ws: Workspace, path: str, content: str) -> str:

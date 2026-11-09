@@ -273,6 +273,15 @@ class ChatSession:
         said = f' ("{self._last_user}")' if self._last_user else ""
         return f"Turn {self.turn_no}{said} marked {mark}{tail}"
 
+    def night_started(self, plan: Path, started: float) -> None:
+        """/run started a night: /good /bad judge it (E-052), and the files it may change are no longer watched for
+        your corrections, since the night changes them, not you (E-057)."""
+        self.last_night = {"plan": str(plan), "started": started}
+        project = Path(plan).resolve().parent
+        for path in list(self._left):
+            if Path(path).resolve().is_relative_to(project):
+                del self._left[path]
+
     def _remember_left(self, journal: list) -> None:
         for entry in journal:
             path = entry.get("path")
@@ -322,6 +331,9 @@ class ChatSession:
     def _run(self, name: str, args: dict, plan_runner) -> tuple[str, bool]:
         if self.mode in ("plan", "read-only") and name not in READ_ONLY_TOOLS:
             return f"✗ {name} is not available in plan mode (read-only). Describe the change instead.", False
+        if self.allowed_tools is not None and name not in self.allowed_tools:  # the role's promise, enforced (E-055)
+            return (f"✗ {name} is not available to the {self.role} role. "
+                    f"Available: {', '.join(self.allowed_tools) or 'none'}."), False
         try:
             if name == "run_command":
                 out, ok = self.hooks.run_shell(str(args.get("command", "")))
@@ -387,8 +399,11 @@ class ChatSession:
                 f"Run plan {self.ws.rel(path)}", "\n".join(f"{t.id}: {t.title}" for t in tasks),
                 f"Build {len(tasks)} tasks in {folder}? Mitra edits files without asking during the run."):
             return "✗ The user declined to run the plan.", False
+        if self.ws.journal is None:
+            self.ws.journal = []
+        # the same journal (absolute paths): /undo and the corrections check see the plan's changes too (E-064)
         ws = self.ws if folder == self.ws.root else T.Workspace(folder, read_only=self.ws.read_only,
-                                                                  spill_dir=self.ws.spill_dir)
+                                                                  spill_dir=self.ws.spill_dir, journal=self.ws.journal)
         saved_hook, ws.before_write = ws.before_write, None
         try:
             out = core_loop.run_plan(text, ws, self.llm,

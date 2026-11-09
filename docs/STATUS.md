@@ -5,6 +5,7 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next session starts here (handoff 2026-11-08)
+0000. **2026-11-09 deep dive (code review of the 22 unpushed commits + own debugging, 1 main + 1 sub agent):** 13 issues fixed, each with a regression test that fails without it (E-053..E-064, E-045; F-rows in FIX_LOG; L-042, L-043); 691 tests pass. Open: E-048 (in UI polish), and a decision for the user: `/run` builds with the chat's model, not the builder role (D-051 mimo-v2.6:9b, unscreened). Next unchanged: restart Mitra, rewrite brick-breaker/plan.md, UI polish pass A.
 000. **2026-11-09: E-050, E-051, E-052 fixed** (Mitra was not running; F-050..F-052, 6 new tests). Chat `run_plan` now uses the /run plan check, runs in the plan's folder, always `python -m pytest -q`, and runs an unchanged plan once per turn; `/run plan.md 4.` drops the final period; `/good` `/bad` after a `/run` judge that night and name what they marked. **Next: restart Mitra**, ask it to rewrite mitra-try/brick-breaker/plan.md, then PLAN block "M2 UI polish" pass A (one item at a time).
 00. **Later 2026-11-08 (docs only, no code: Mitra was running):** the user's mitra-try session ran Mitra 83f6245
    while E-049 (6a64ae6) was committed, so the chat's old plan check said ✓ and the night's new one refused (L-041).

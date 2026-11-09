@@ -29,6 +29,19 @@ from app import config, logs as app_logs, memory, skills as skills_registry, mcp
 cli = typer.Typer(invoke_without_command=True, add_completion=False)
 
 
+def _utf8_streams(streams=None) -> None:
+    """E-062: output redirected to a file or pipe on Windows is cp1252, so `mitra night ... > night.log` crashed on
+    the first ✗ / ✓ before anything ran. Such streams are switched to UTF-8 (unknown characters replaced)."""
+    for stream in streams if streams is not None else (sys.stdout, sys.stderr):
+        enc = (getattr(stream, "encoding", "") or "").lower().replace("-", "").replace("_", "")
+        if enc != "utf8" and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
+_utf8_streams()
 console = ui.apply(Console())
 
 
@@ -2448,14 +2461,11 @@ def _chat():
             if cfg.get("num_ctx"):
                 _say(f"`num_ctx = {cfg['num_ctx']}` is set in mitra.toml; change it there (it wins over /context).")
                 continue
-            facts = config.get_model_facts(model) or {}
-            new_ctx, err = config.parse_context_choice(user_input.strip()[len("/context "):],
-                                                       int(facts.get("context") or 0))
+            new_ctx, err = roles_mod.choose_context(model, user_input.strip()[len("/context "):], cfg)
             if err:
                 _say(err)
                 continue
-            config.save_context_choice(model, new_ctx)
-            num_ctx = config.context_for_model(model)
+            num_ctx = new_ctx
             auto_compact_threshold = config.compact_threshold(cfg, num_ctx)
             local_llm = get_local_llm(model, temperature, base_url=cfg.get("ollama_local_base_url"), num_ctx=num_ctx,
                                       num_gpu=num_gpu, reasoning=thinking_setting(cfg.get("thinking")))
@@ -2588,7 +2598,10 @@ def _chat():
             if target not in roles_mod.installed():
                 _say(f"`{target}` is not one of Mitra's installed models. `/model list` shows them.")
                 continue
-            config.save_last_model(target)  # the chat role follows the model you pick
+            roles_mod.use_for_chat(target)  # beats mitra.toml local_model and an older chat choice (E-054)
+            toml_chat = (cfg.get("roles") or {}).get("chat") if isinstance(cfg.get("roles"), dict) else None
+            if toml_chat and toml_chat != target:
+                _say(f"mitra.toml sets `[roles] chat = \"{toml_chat}\"`, which wins over `/model use`: change it there.")
             _apply_role("chat")
             continue
 
@@ -2734,7 +2747,7 @@ def _chat():
                                    "commits. First run e.g. `! git init` then `! git add -A` and `! git commit -m start`.",
                                    style="m.info"))
             info = night_mod.launch(plan_path, project, float(hours), model)
-            chat.last_night = {"plan": str(plan_path), "started": info["started"]}  # /good /bad now judge it (E-052)
+            chat.night_started(plan_path, info["started"])  # /good /bad judge it; its edits are not yours (E-052, E-057)
             console.print(Text(f"  ⏾ night run started: {plan_path.name} ({n_tasks} tasks) in {project} · {model} · "
                                f"up to {hours} h", style="m.tool"))
             import time as _t

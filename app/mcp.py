@@ -432,7 +432,10 @@ class _Connection:
             async with AsyncExitStack() as stack:
                 read, write = await self._open(stack)
                 session = await stack.enter_async_context(
-                    ClientSession(read, write, read_timeout_seconds=self.spec.timeout_s)
+                    # the session-wide read timeout also caps initialize / list_tools: give it the start time
+                    # (a slow server start is not a slow call); each call keeps its own wait_for(timeout_s) (E-045)
+                    ClientSession(read, write,
+                                  read_timeout_seconds=max(self.spec.timeout_s, self.spec.connect_timeout_s))
                 )
                 await asyncio.wait_for(session.initialize(), self.spec.connect_timeout_s)
                 self.tools = await asyncio.wait_for(self._list_tools(session), self.spec.connect_timeout_s)

@@ -117,6 +117,7 @@ class Session:
     machine: dict = field(default_factory=dict)       # the `session` row: model, context, fit, free RAM / VRAM
     code_version: str = ""
     crashes: list = field(default_factory=list)       # {t, error}
+    night_marks: list = field(default_factory=list)   # your /good /bad on a /run night: {t, plan, started, verdict, note}
 
 
 def _args_text(args) -> str:
@@ -178,6 +179,11 @@ def sessions(files: list[Path]) -> list[Session]:
                 continue
             # your judgment attaches to the turn it judges
             if k == "feedback":
+                if r.get("of_turn") is None and r.get("of_night"):  # a verdict on a /run night, not a turn (E-056)
+                    s.night_marks.append({"t": t, "plan": str(r.get("of_night") or ""),
+                                          "started": r.get("night_started"), "verdict": str(r.get("verdict") or ""),
+                                          "note": str(r.get("note") or "")})
+                    continue
                 tt = _turn_by_no(s, r.get("of_turn"))
                 if tt:
                     tt.verdict, tt.verdict_note = str(r.get("verdict") or ""), str(r.get("note") or "")
@@ -582,6 +588,23 @@ def _turn_calls(record: Path) -> dict[int, list[dict]]:
     return by
 
 
+def _sessions_with_calls(record: Path) -> list[tuple[Session, dict[int, list[dict]]]]:
+    """Each session of a record with its own trace calls by turn (E-058). A daily chat file holds several sessions
+    whose turn numbers all start at 1, so a call belongs to a turn by number AND by time: from its session's start
+    to the next session's start."""
+    calls = _turn_calls(record)
+    sess = sorted(sessions([record]), key=lambda s: s.started)
+    if len(sess) <= 1:
+        return [(s, calls) for s in sess]
+    out = []
+    for i, s in enumerate(sess):
+        end = sess[i + 1].started if i + 1 < len(sess) else float("inf")
+        start = s.started if i else float("-inf")
+        mine = {no: [c for c in cs if start <= float(c.get("t") or 0) < end] for no, cs in calls.items()}
+        out.append((s, {no: cs for no, cs in mine.items() if cs}))
+    return out
+
+
 def _why_out(turn: Turn, calls: list[dict]) -> str:
     if turn.authors - {"mitra"}:
         return "written partly by someone else (D-022)"
@@ -602,8 +625,7 @@ def _why_out(turn: Turn, calls: list[dict]) -> str:
 def training(files: list[Path]) -> Training:
     tr = Training()
     for f in files:
-        calls = _turn_calls(f)
-        for s in sessions([f]):
+        for s, calls in _sessions_with_calls(f):
             for t in s.turns:
                 tr.turns += 1
                 why = _why_out(t, calls.get(t.no, []))
@@ -624,8 +646,7 @@ def export_training(files: list[Path], out: Path) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w", encoding="utf-8") as fh:
         for f in files:
-            calls = _turn_calls(f)
-            for s in sessions([f]):
+            for s, calls in _sessions_with_calls(f):
                 for t in s.turns:
                     tc = calls.get(t.no, [])
                     if _why_out(t, tc):

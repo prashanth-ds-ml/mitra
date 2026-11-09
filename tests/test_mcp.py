@@ -172,6 +172,20 @@ def test_timeout_is_reported_and_the_server_keeps_working(workspace):
     assert after.ok and after.text == "echo:still here"
 
 
+def test_slow_server_start_is_not_capped_by_the_call_timeout(workspace):
+    """E-045: a server that needs longer than timeout_s to answer initialize, but less than connect_timeout_s,
+    still starts; calls keep their own timeout_s."""
+    slow_start = ("import runpy, sys, time; time.sleep(4); sys.argv = [sys.argv[0]]; "
+                  f"runpy.run_path({str(FAKE_SERVER)!r}, run_name='__main__')")
+    write_user_servers({"fake": {**fake_entry(timeout_s=2, connect_timeout_s=30), "args": ["-c", slow_start]}})
+
+    result = mcp.call_tool(workspace, "fake", "echo", {"text": "late"})
+    slow = mcp.call_tool(workspace, "fake", "slow", {"seconds": 8})
+
+    assert result.ok and result.text == "echo:late"
+    assert not slow.ok and "timed out" in slow.text
+
+
 def test_big_result_is_trimmed_with_the_full_text_saved(workspace):
     write_user_servers({"fake": fake_entry()})
 
