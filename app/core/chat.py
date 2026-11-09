@@ -136,9 +136,8 @@ EXTRA_SPECS = [
                                                      "arguments": {"type": "object"}},
                     "required": ["server", "tool"]}},
     {"name": "run_plan", "description": "Build a plan file task by task: implement each task until its "
-                                        "'Done when' tests pass, then run all tests.",
-     "parameters": {"type": "object", "properties": {"plan_path": {"type": "string"},
-                                                     "test_command": {"type": "string"}},
+                                        "'Done when' tests pass, then run all tests. Runs in the plan's folder.",
+     "parameters": {"type": "object", "properties": {"plan_path": {"type": "string"}},
                     "required": ["plan_path"]}},
 ]
 
@@ -226,6 +225,9 @@ class ChatSession:
         self.rec = core_loop.Recorder(self.ws.root / ".mitra" / "runs" / f"chat-{time.strftime('%Y%m%d')}.jsonl",
                                       traces=traces)  # + full model calls for the fine-tune (D-041)
         self.turn_no = 0
+        self._plans_run: dict = {}  # (plan path, text hash) -> result, reset every turn (E-050)
+        self._last_user = ""  # start of the last turn's message, named when you mark it (E-052)
+        self.last_night: dict | None = None  # a /run started after the last turn: /good /bad judge it (E-052)
         self.approve_all = False  # "yes to all" for the rest of this turn
         self._left: dict[str, str | None] = {}  # file -> content Mitra left at the end of a turn (corrections, item 0)
         # role routing (D-049..D-051): which tools and MCP servers this role may use; None = all
@@ -256,11 +258,20 @@ class ChatSession:
         self.rec.write("session", code_version=runinfo.code_version(), workspace=str(self.ws.root), **info)
 
     def feedback(self, verdict: str, note: str = "") -> str:
-        """`/good` / `/bad`: your verdict on the last turn (the last one given counts)."""
+        """`/good` / `/bad`: your verdict on the last thing Mitra did: a /run night started after the last turn, else
+        the last turn (the last verdict given counts). The reply names what was marked (E-052)."""
+        mark = "👍 good" if verdict == "good" else "👎 bad"
+        tail = f": {note}" if note else ""
+        if self.last_night:
+            n = self.last_night
+            self.rec.write("feedback", of_turn=None, of_night=n.get("plan", ""), night_started=n.get("started"),
+                           verdict=verdict, note=note[:1000], author="user")
+            return f"Night run {Path(n.get('plan', '')).name} marked {mark}{tail}"
         if not self.turn_no:
             return "No turn yet to mark."
         self.rec.write("feedback", of_turn=self.turn_no, verdict=verdict, note=note[:1000], author="user")
-        return f"Turn {self.turn_no} marked {'👍 good' if verdict == 'good' else '👎 bad'}" + (f": {note}" if note else "")
+        said = f' ("{self._last_user}")' if self._last_user else ""
+        return f"Turn {self.turn_no}{said} marked {mark}{tail}"
 
     def _remember_left(self, journal: list) -> None:
         for entry in journal:
@@ -341,8 +352,7 @@ class ChatSession:
                 out = self.hooks.mcp_call(str(args.get("server", "")), str(args.get("tool", "")), raw)
                 return out, not out.startswith("✗")
             if name == "run_plan":
-                return plan_runner(str(args.get("plan_path", "plan.md")),
-                                   str(args.get("test_command") or "python -m pytest -q"))
+                return plan_runner(str(args.get("plan_path", "plan.md")))  # never the model's test command (E-050)
         except Exception as exc:
             return f"✗ {name} failed: {type(exc).__name__}: {exc}", False
         label = {"run_tests": "Running tests"}.get(name)
@@ -354,26 +364,41 @@ class ChatSession:
         ok = run.passed if run is not None else not out.startswith("✗")
         return out, ok
 
-    def _run_plan(self, plan_path: str, test_command: str) -> tuple[str, bool]:
+    def _run_plan(self, plan_path: str, test_command: str = "python -m pytest -q") -> tuple[str, bool]:
+        """E-050: the same check as /run, run inside the plan's folder (its git, its paths), the project's test
+        command (never the model's), and one run per unchanged plan per turn."""
+        from app.core import plans
         path = self.ws.path(plan_path)
         if not path.is_file():
             return f"✗ No plan file at {plan_path}.", False
-        _, tasks = core_loop.parse_plan(path.read_text(encoding="utf-8"))
-        if not tasks:
-            return f"✗ {plan_path} has no tasks in the plan format (### T1: ... with a 'Done when' line).", False
+        text = path.read_text(encoding="utf-8")
+        folder = path.resolve().parent
+        _, problem = plans.check_text(text, folder.name)
+        if problem:
+            return (f"✗ {plan_path} cannot run: {problem} Fix the plan first (format: `### T1: title`, `- Files:`, "
+                    "`- Do:`, `- Done when: `<test command>` passes`, `- Needs: T1` or -)."), False
+        key = (str(path.resolve()), hash(text))
+        if key in self._plans_run:
+            return (f"✗ {plan_path} already ran in this turn and has not changed since ({self._plans_run[key]}). "
+                    "Running it again gives the same result: tell the user what failed, or change the plan or the "
+                    "code first."), False
+        _, tasks = core_loop.parse_plan(text)
         if self.mode == "approve" and not self.hooks.confirm(
                 f"Run plan {self.ws.rel(path)}", "\n".join(f"{t.id}: {t.title}" for t in tasks),
-                f"Build {len(tasks)} tasks? Mitra edits files without asking during the run."):
+                f"Build {len(tasks)} tasks in {folder}? Mitra edits files without asking during the run."):
             return "✗ The user declined to run the plan.", False
-        saved_hook, self.ws.before_write = self.ws.before_write, None
+        ws = self.ws if folder == self.ws.root else T.Workspace(folder, read_only=self.ws.read_only,
+                                                                  spill_dir=self.ws.spill_dir)
+        saved_hook, ws.before_write = ws.before_write, None
         try:
-            out = core_loop.run_plan(path.read_text(encoding="utf-8"), self.ws, self.llm,
+            out = core_loop.run_plan(text, ws, self.llm,
                                      full_test_command=test_command, on_event=self.hooks.on_plan_event,
-                                     record_dir=self.ws.root / ".mitra" / "runs" / "plan", num_ctx=self.num_ctx,
+                                     record_dir=ws.root / ".mitra" / "runs" / "plan", num_ctx=self.num_ctx,
                                      harness=self.harness)
         finally:
-            self.ws.before_write = saved_hook
-        lines = [f"Plan: {out['passed_tasks']}/{out['total_tasks']} tasks passed; all tests: {out['final_tests']}"]
+            ws.before_write = saved_hook
+        self._plans_run[key] = f"{out['passed_tasks']}/{out['total_tasks']} tasks passed"
+        lines =[f"Plan: {out['passed_tasks']}/{out['total_tasks']} tasks passed; all tests: {out['final_tests']}"]
         for tid, res in out["tasks"].items():
             lines.append(f"- {tid}: {res['status']} ({res['tests']}) {res['summary'][:120]}")
         return "\n".join(lines), out["final_tests_passed"]
@@ -383,8 +408,12 @@ class ChatSession:
         res = TurnResult()
         max_steps = max_steps or self.harness.limit("chat_max_steps")
         self.turn_no += 1
+        self._plans_run = {}
+        self.last_night = None
         t0 = time.monotonic()
         user = next((m.content for m in reversed(messages) if isinstance(m, HumanMessage)), "")
+        said = " ".join(str(user).split())
+        self._last_user = said if len(said) <= 50 else said[:49] + "…"
         from app.core import runinfo
         self._check_corrections(of_turn=self.turn_no - 1)  # attributed to the turn they correct
         self.rec.write("turn_start", turn=self.turn_no, mode=self.mode, user=str(user)[:2000],

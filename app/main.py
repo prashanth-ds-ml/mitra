@@ -882,6 +882,15 @@ def _ps_path(relative) -> str:
 
 
 
+def _strip_sentence_dot(user_input: str) -> str:
+    """E-051: a slash command typed like a sentence (`/run plan.md 4.`) loses its final period, so it is not read as
+    part of the last argument. `..` and paths ending in `/` are left alone; chat messages are never changed."""
+    text = user_input.rstrip()
+    if text.startswith("/") and text.endswith(".") and not text.endswith(".."):
+        return text[:-1].rstrip()
+    return user_input
+
+
 def _is_bang_command(user_input: str) -> bool:
     return user_input.strip().startswith("!")
 
@@ -2406,6 +2415,7 @@ def _chat():
             continue
 
         # ── Slash commands ────────────────────────────────────────────────────
+        user_input = _strip_sentence_dot(user_input)
         cmd = user_input.strip().lower()
 
         if cmd in ("/help", "help"):
@@ -2724,6 +2734,7 @@ def _chat():
                                    "commits. First run e.g. `! git init` then `! git add -A` and `! git commit -m start`.",
                                    style="m.info"))
             info = night_mod.launch(plan_path, project, float(hours), model)
+            chat.last_night = {"plan": str(plan_path), "started": info["started"]}  # /good /bad now judge it (E-052)
             console.print(Text(f"  ⏾ night run started: {plan_path.name} ({n_tasks} tasks) in {project} · {model} · "
                                f"up to {hours} h", style="m.tool"))
             import time as _t

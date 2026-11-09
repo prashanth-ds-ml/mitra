@@ -5,6 +5,7 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next session starts here (handoff 2026-11-08)
+000. **2026-11-09: E-050, E-051, E-052 fixed** (Mitra was not running; F-050..F-052, 6 new tests). Chat `run_plan` now uses the /run plan check, runs in the plan's folder, always `python -m pytest -q`, and runs an unchanged plan once per turn; `/run plan.md 4.` drops the final period; `/good` `/bad` after a `/run` judge that night and name what they marked. **Next: restart Mitra**, ask it to rewrite mitra-try/brick-breaker/plan.md, then PLAN block "M2 UI polish" pass A (one item at a time).
 00. **Later 2026-11-08 (docs only, no code: Mitra was running):** the user's mitra-try session ran Mitra 83f6245
    while E-049 (6a64ae6) was committed, so the chat's old plan check said ✓ and the night's new one refused (L-041).
    **Restart Mitra first.** Then, with Mitra stopped, build in order: E-050 (chat `run_plan` skips the check, wrong

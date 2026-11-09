@@ -88,7 +88,7 @@ def test_feedback_marks_the_last_turn(tmp_path):
     s = _session(tmp_path, _Model([AIMessage(content="hi")]))
     assert s.feedback("good") == "No turn yet to mark."
     s.turn([SystemMessage(content="s"), HumanMessage(content="hello")])
-    assert s.feedback("bad", "wrong file").startswith("Turn 1 marked 👎 bad")
+    assert s.feedback("bad", "wrong file").startswith('Turn 1 ("hello") marked 👎 bad')  # names the turn (E-052)
     fb = [r for r in _rows(_record(tmp_path)) if r["kind"] == "feedback"]
     assert fb[0]["of_turn"] == 1 and fb[0]["verdict"] == "bad" and fb[0]["note"] == "wrong file"
 

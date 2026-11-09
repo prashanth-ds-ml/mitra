@@ -155,6 +155,62 @@ def test_run_plan_from_the_chat(tmp_path, monkeypatch):
     assert res.text == "Plan built: 1/1 tasks."
 
 
+GOOD_PLAN = ("# Feature: calc\n\n## Tasks\n\n### T1: add\n- Do: add\n"
+             "- Done when: `python -m pytest -q tests/test_calc.py` passes\n- Needs: -\n")
+
+
+def _fake_plan_runner(calls):
+    def fake_run_plan(text, ws, llm, **kw):
+        calls.append({"root": ws.root, "tests": kw["full_test_command"], "record_dir": kw["record_dir"]})
+        return {"tasks": {"T1": {"status": "failed", "tests": "1 failed", "summary": "no"}}, "passed_tasks": 0,
+                "total_tasks": 1, "final_tests_passed": False, "final_tests": "1 failed"}
+    return fake_run_plan
+
+
+def test_chat_run_plan_refuses_a_plan_the_check_refuses(tmp_path, monkeypatch):
+    """E-050: the chat tool skipped the /run plan check, so a plan where T1 needed itself ran with every task skipped."""
+    (tmp_path / "plan.md").write_text(GOOD_PLAN.replace("- Needs: -", "- Needs: T1"), encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(C.core_loop, "run_plan", _fake_plan_runner(calls))
+    model = Model(call(tc("run_plan", 1, plan_path="plan.md")), AIMessage(content="The plan needs fixing."))
+    hooks, shown = fake_hooks()
+    C.ChatSession(workspace=tmp_path, llm=model, hooks=hooks, mode="auto").turn(msgs("run the plan"))
+    assert calls == []
+    assert shown[0][1] is False and "T1 needs itself" in shown[0][2]
+
+
+def test_chat_run_plan_runs_in_the_plans_folder_with_the_project_test_command(tmp_path, monkeypatch):
+    """E-050: it ran in the session folder (no git branch, paths wrong) and took the model's `pytest brick-breaker/...`."""
+    (tmp_path / "game").mkdir()
+    (tmp_path / "game" / "plan.md").write_text(GOOD_PLAN, encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(C.core_loop, "run_plan", _fake_plan_runner(calls))
+    model = Model(call(tc("run_plan", 1, plan_path="game/plan.md", test_command="pytest game/tests")),
+                  AIMessage(content="done"))
+    hooks, _ = fake_hooks()
+    C.ChatSession(workspace=tmp_path, llm=model, hooks=hooks, mode="auto").turn(msgs("run the plan"))
+    assert calls[0]["root"] == (tmp_path / "game").resolve()
+    assert calls[0]["tests"] == "python -m pytest -q"
+    assert calls[0]["record_dir"] == (tmp_path / "game").resolve() / ".mitra" / "runs" / "plan"
+
+
+def test_chat_run_plan_does_not_rerun_an_unchanged_plan_in_one_turn(tmp_path, monkeypatch):
+    """E-050: the model re-ran the same unchanged plan 3-4 times in one turn; a changed plan or a new turn may run."""
+    (tmp_path / "plan.md").write_text(GOOD_PLAN, encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(C.core_loop, "run_plan", _fake_plan_runner(calls))
+    model = Model(call(tc("run_plan", 1, plan_path="plan.md")), call(tc("run_plan", 2, plan_path="plan.md")),
+                  AIMessage(content="T1 fails."))
+    hooks, shown = fake_hooks()
+    session = C.ChatSession(workspace=tmp_path, llm=model, hooks=hooks, mode="auto")
+    session.turn(msgs("run the plan"))
+    assert len(calls) == 1
+    assert shown[1][1] is False and "already ran in this turn" in shown[1][2]
+    model.replies = [call(tc("run_plan", 3, plan_path="plan.md")), AIMessage(content="again")]
+    session.turn(msgs("run it again"))
+    assert len(calls) == 2
+
+
 def test_undo_restores_files_changed_by_the_loop(tmp_path):
     """/undo works on core-loop changes: the journal is in the format undo_last_change_set reads."""
     from app import memory
