@@ -137,7 +137,7 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
 - **I-20 Experiments registry + dashboard section** ([EXPERIMENTS.md](EXPERIMENTS.md), plan 2026-11-08): one result
   file per experiment run (question, setup, numbers, verdict, decision), written by `mitra night`, a new
   `mitra judge`, the screen and level runs; an Experiments section with comparisons and "what chose this default".
-- **I-21 `/free`: make room for the model** (user, 2026-11-10; RAM was 3.7 GB free, mimo 128K needs ~5.2 GB):
+- **I-21 `/free`: make room for the model — BUILT 2026-11-10 (D-059)** (user, 2026-11-10; RAM was 3.7 GB free, mimo 128K needs ~5.2 GB):
   shows need vs free, a tick list of programs (grouped, never-close list and Mitra's own terminal excluded, biggest
   pre-ticked by `fit.pick_to_close`), closes the ticked ones politely (like ✕; force only on a second yes), offers
   to unload other Ollama models and the smaller options, then re-checks. Offered at start (⚠/✗), before `/run`,

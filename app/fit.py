@@ -32,6 +32,7 @@ _NEVER = {
     "fontdrvhost.exe", "sihost.exe", "ctfmon.exe", "audiodg.exe", "conhost.exe", "openconsole.exe",
     "windowsterminal.exe", "ollama.exe", "ollama", "ollama app.exe", "llama-server.exe", "llama-server",
     "systemd", "init", "kthreadd", "xorg", "gnome-shell",
+    "vmmemwsl", "vmmem", "vmmemwsl.exe", "vmmem.exe",  # WSL: `wsl --shutdown` frees it, closing the process cannot
 }
 
 
@@ -41,6 +42,7 @@ class Program:
     gb: float
     count: int = 1
     hint: str = ""  # e.g. "langgraph dev" for a python process
+    pids: list[int] = field(default_factory=list)  # every process of the program: /free closes them (I-21)
 
 
 @dataclass
@@ -147,6 +149,7 @@ def group_programs(procs, *, skip_pids: set[int] = frozenset()) -> list[Program]
         g = groups.setdefault(key, Program(name.removesuffix(".exe"), 0.0, 0, hint))
         g.gb += rss / GIB
         g.count += 1
+        g.pids.append(pid)
     progs = list(groups.values())
     for p in progs:
         p.gb = round(p.gb, 1)
@@ -239,7 +242,7 @@ def advice(fit: Fit) -> list[str]:
         lines.append("Ollama will unload " + ", ".join(fit.unload) + " (counted as free)")
     if fit.close:
         names = [f"{p.name}{' (' + p.hint + ')' if p.hint else ''} {p.gb:.1f} GB" for p in fit.close]
-        lines.append("Close to free RAM: " + " · ".join(names))
+        lines.append("Close to free RAM: " + " · ".join(names) + " · /free closes the ones you pick")
     if fit.alternatives:
         lines.append("Or: " + " · ".join(fit.alternatives) + " — both work right away")
     return lines
@@ -253,3 +256,110 @@ def markdown(fit: Fit) -> str:
         out.append(f"- **RAM left after loading:** {fit.left_gb:.1f} GB (comfortable at {COMFORT_GB:.0f} GB or more)")
     out += [f"- {line}" for line in advice(fit)]
     return "\n".join(out)
+
+
+# ── /free: make room for the model (I-21) ─────────────────────────────────────
+
+LIST_MAX = 8  # programs shown in /free
+_NOTES = {
+    "msedge": "reopens your tabs on restart if 'continue where you left off' is on",
+    "chrome": "reopens your tabs on restart if 'continue where you left off' is on",
+    "firefox": "restores the session on restart",
+    "code": "asks to save unsaved files",
+    "claude": "ends that Claude session",
+    "chatgpt": "closes the ChatGPT app",
+    "msedgewebview2": "runs inside other apps (Widgets, Teams, ...): closing can break them",
+}
+_NEVER_PRETICK = {"claude", "code", "msedgewebview2"}  # your tools: listed, but you tick them yourself
+
+
+def note_for(p: Program) -> str:
+    return _NOTES.get(p.name.lower(), "")
+
+
+def free_choices(fit: Fit, programs: list[Program]) -> tuple[list[Program], set[int]]:
+    """(the programs to list, indexes to pre-tick): the biggest worth closing; when the fit is not comfortable the
+    ones covering the shortfall are pre-ticked (never your editor or Claude)."""
+    shown = [p for p in programs if p.gb >= MIN_PROGRAM_GB][:LIST_MAX]
+    if fit.verdict not in ("tight", "no"):
+        return shown, set()
+    short = COMFORT_GB - (fit.left_gb or 0.0)
+    pick = {id(p) for p in pick_to_close([p for p in shown if p.name.lower() not in _NEVER_PRETICK], short)}
+    return shown, {i for i, p in enumerate(shown) if id(p) in pick}
+
+
+def label(p: Program) -> str:
+    many = f" ({p.count} processes)" if p.count > 1 else ""
+    hint = f" ({p.hint})" if p.hint else ""
+    note = note_for(p)
+    return f"{p.name}{hint}{many} · {p.gb:.1f} GB" + (f" · {note}" if note else "")
+
+
+def _alive_pids(pids: list[int]) -> list[int]:
+    try:
+        import psutil
+    except ImportError:
+        return []
+    out = []
+    for pid in pids:
+        try:
+            if psutil.pid_exists(pid) and psutil.Process(pid).status() != "zombie":
+                out.append(pid)
+        except Exception:
+            continue
+    return out
+
+
+def _signal(pids: list[int], force: bool, run) -> None:
+    """Windows: taskkill without /F asks each window to close (like ✕: save prompts, tab restore); /F /T ends it.
+    POSIX: SIGTERM, or SIGKILL when forced."""
+    if os.name == "nt":
+        for i in range(0, len(pids), 40):  # taskkill takes many /PID at once; keep the command line short
+            args = ["taskkill"] + (["/F", "/T"] if force else [])
+            for pid in pids[i:i + 40]:
+                args += ["/PID", str(pid)]
+            try:
+                run(args, capture_output=True, timeout=30)
+            except Exception:
+                pass
+        return
+    import signal
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGKILL if force else signal.SIGTERM)
+        except OSError:
+            pass
+
+
+def close_programs(programs: list[Program], *, force: bool = False, wait_s: float = 10.0, run=None, alive=None,
+                   sleep=None) -> dict[str, bool]:
+    """Close each program (all its processes); {name: closed}. Polite unless `force`; waits up to `wait_s`.
+    Never touches Mitra, its terminal or the never-close list: those are not in `programs` (group_programs)."""
+    import subprocess
+    import time
+    run = run or subprocess.run
+    alive = alive or _alive_pids
+    sleep = sleep or time.sleep
+    for p in programs:
+        _signal(list(p.pids), force, run)
+    waited = 0.0
+    while waited < wait_s and any(alive(p.pids) for p in programs):
+        sleep(0.5)
+        waited += 0.5
+    return {p.name: not alive(p.pids) for p in programs}
+
+
+def unload_models(names: list[str], base_url: str = "http://127.0.0.1:11434") -> list[str]:
+    """Ask Ollama to unload these models now (keep_alive 0); returns the ones it accepted."""
+    done = []
+    for name in names:
+        model = name.split(" (")[0]
+        body = json.dumps({"model": model, "keep_alive": 0}).encode("utf-8")
+        req = urllib.request.Request(base_url.rstrip("/") + "/api/generate", data=body,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=30):
+                done.append(model)
+        except OSError:
+            continue
+    return done

@@ -636,6 +636,7 @@ _COMMAND_HELP = [
         ("/init",          "Create MITRA.md + mitra.toml in this folder"),
         ("/status",        "Workspace, model, mode and session status"),
         ("/doctor",        "Machine and setup check: RAM, GPU, Ollama, permissions, MCP"),
+        ("/free",          "Make RAM room for the model: tick programs, Mitra closes them"),
         ("/report",        "Rebuild the dashboard (sessions, tools, improvement, training data) and open it"),
         ("/role [name]",   "Show roles, or switch role: model, tools and MCP servers at once"),
         ("/model use <m>", "Switch the chat model now (no restart)"),
@@ -1925,6 +1926,60 @@ def _follow_night() -> None:
             console.print(Text(f"  no report was written: see {st['console_log']}", style="m.err"))
 
 
+def _cmd_free(model: str, num_ctx: int, base_url: str, *, fit_mod=None, tick=None, choose=None) -> None:
+    """/free (I-21): what the model needs vs what is free, a tick list of programs (the ones covering the shortfall
+    ticked), close the ticked ones politely, force only on a second yes, unload other Ollama models, check again."""
+    from app import fit as _fit
+    from app.ui import menu
+    fit_mod = fit_mod or _fit
+    tick = tick or menu.tick
+    choose = choose or menu.choose
+    before = fit_mod.check(model, num_ctx, base_url=base_url)
+    style = {"ok": "m.ok", "tight": "m.info", "no": "m.err"}.get(before.verdict, "m.faint")
+    console.print(Text(f"  {model} · {num_ctx // 1024}K · " + fit_mod.summary(before), style=style))
+    programs, pre = fit_mod.free_choices(before, fit_mod.live_programs())
+    unload = [m.split(" (")[0] for m in before.unload]
+    options = [fit_mod.label(p) for p in programs] + [f"unload {m} from Ollama" for m in unload]
+    pre = pre | {len(programs) + i for i in range(len(unload))}
+    if not options:
+        console.print(Text("    nothing big enough to close (Mitra's terminal, Ollama and Windows are never listed)",
+                           style="m.faint"))
+        return
+    picked = tick(console, "Close which programs to make room? (Mitra's terminal, Ollama and Windows are never "
+                           "listed)", options, pre)
+    if not picked:
+        if picked is not None:
+            console.print(Text("    nothing ticked: nothing closed", style="m.faint"))
+        return
+    chosen = [programs[i] for i in picked if i < len(programs)]
+    models = [unload[i - len(programs)] for i in picked if i >= len(programs)]
+    if models:
+        done = fit_mod.unload_models(models, base_url)
+        console.print(Text(f"    unloaded from Ollama: {', '.join(done) or 'none (Ollama did not answer)'}",
+                           style="m.tool"))
+    if chosen:
+        console.print(Text(f"    closing {', '.join(p.name for p in chosen)} (like clicking ✕, up to 10 s) …",
+                           style="m.dim"))
+        result = fit_mod.close_programs(chosen)
+        still = [p for p in chosen if not result.get(p.name)]
+        if still:
+            names = ", ".join(p.name for p in still)
+            answer = choose(console, f"{names} did not close (a save prompt or a hidden window?). Force it?",
+                            [("no", "No, leave it open (finish its prompts yourself, then /free again)"),
+                             ("yes", "Yes, force it now: unsaved work in it is lost")], default="no")
+            if answer == "yes":
+                result.update(fit_mod.close_programs(still, force=True, wait_s=5.0))
+        closed = [n for n, ok in result.items() if ok]
+        left = [n for n, ok in result.items() if not ok]
+        console.print(Text("    " + (f"✓ closed {', '.join(closed)}" if closed else "nothing closed")
+                           + (f" · still open: {', '.join(left)}" if left else ""),
+                           style="m.ok" if closed else "m.info"))
+    after = fit_mod.check(model, num_ctx, base_url=base_url)
+    gained = (after.free_ram_gb or 0.0) - (before.free_ram_gb or 0.0)
+    style = {"ok": "m.ok", "tight": "m.info", "no": "m.err"}.get(after.verdict, "m.faint")
+    console.print(Text(f"  freed {max(gained, 0.0):.1f} GB · " + fit_mod.summary(after), style=style))
+
+
 def _print_memory_fit(model: str, num_ctx: int, base_url: str) -> None:
     """Startup line: can this machine run the model at this context, and what to close if not (D-040).
     Only warns; never blocks the start."""
@@ -2716,6 +2771,10 @@ def _chat():
                 "## MCP\n\n" + mcp_registry.summarize(mcp_registry.discover(cfg["workspace"])),
             ])
             _say(ai_reply)
+            continue
+
+        if cmd == "/free":  # make RAM room for the model: tick programs, Mitra closes them (I-21)
+            _cmd_free(model, num_ctx, cfg.get("ollama_local_base_url") or "http://127.0.0.1:11434")
             continue
 
         if cmd == "/run" or cmd.startswith("/run "):

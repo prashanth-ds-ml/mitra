@@ -12,6 +12,15 @@ machine or your judgment. Updated every release.
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
 
+## 2026-11-10 · `/free` (D-059)
+
+Closing real programs needs you: automated tests use stand-ins and never close anything.
+
+- [ ] `/free` lists Edge, Code, Chrome, Claude ... with sizes; Edge and Chrome are pre-ticked, Code and Claude are not
+- [ ] space / 1-9 tick, enter closes: Edge closes like ✕ and reopens its tabs next time
+- [ ] a program with a save prompt stays open: Mitra asks before forcing; "No" leaves it open
+- [ ] the last line shows GB freed and a new ✓/⚠/✗, and the model then loads
+
 ## 2026-11-06 · Terminal keys (D-035)
 
 Real Windows Terminal, `python -m app.main`. Automated tests drive the same key bindings through a simulated input;
