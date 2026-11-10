@@ -3504,6 +3504,8 @@ def _chat():
             if request_kind in intent_mod.EVERYDAY:  # D-068 step 1: one call, no tools, thinking off
                 turn = chat.reply(messages, request_kind, _reply_llm(),
                                   notes=signals_mod.notes_text(pathlib.Path(cfg["workspace"])))
+            elif request_kind == "question" and chat.role == "chat":  # D-068 step 2: read only, 6 steps, an answer
+                turn = chat.explain(messages, notes=signals_mod.notes_text(pathlib.Path(cfg["workspace"])))
             else:
                 turn = chat.turn(messages)
             if chat.noticed:  # your edits since the last turn: recorded as corrections (self-improvement)

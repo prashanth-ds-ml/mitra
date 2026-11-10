@@ -12,6 +12,12 @@ machine or your judgment. Updated every release.
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
 
+## 2026-11-10 · Questions about code (D-068 step 2, v0.5.0)
+
+- [ ] In one of your projects ask "explain how X works": an answer in under a minute with file:line, no edits
+- [ ] A follow-up ("and where is Y?") builds on what it read
+- [ ] A hard question: it stops at 6 steps and still answers, saying what it could not check
+
 ## 2026-11-10 · Everyday chat (D-068 step 1, v0.4.0)
 
 - [ ] Check `~/.mitra/me.md` (seeded with your name, signature, tone, stack): change anything that is not you

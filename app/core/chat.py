@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -53,6 +54,49 @@ REPLY_NOTES = {
     "general": "This is a general question or everyday task, not about the project's files. Answer directly and "
                "briefly, with a short list or example when it helps. Do not call tools.",
 }
+
+# D-068 step 2: questions about the project's code: read only, a small budget, always an answer
+EXPLAIN_TOOLS = ("list_files", "read_file", "search")
+EXPLAIN_NOTE = (
+    "This is a question about the project's code. You may only look: list_files, search, read_file (read the part "
+    "you need, not whole big files). You have {steps} steps. Find the right files first (search for a name, or "
+    "list_files), read only what answers the question, then answer: short, plain, with path:line references for "
+    "each point. Do not change anything. Only if the question is too vague to start, ask at most 2 short questions "
+    "instead of searching.")
+LAST_STEP_NOTE = ("[Mitra: this is your last step. Answer the question now from what you have read, with path:line "
+                  "references; say what you could not check. Do not call tools.]")
+_CITE = re.compile(r"(?<![\w/.\\-])([\w./\\-]*[A-Za-z_][\w-]*\.[A-Za-z]\w*)(?![\w(])")
+_LINE_REF = re.compile(r"\.[A-Za-z]\w*:\d+|\blines? \d+")
+
+
+_SKIP_DIRS = {".git", ".mitra", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "dist", "build"}
+
+
+def _project_files(root: Path, cap: int = 20_000) -> list[str]:
+    import os
+    out: list[str] = []
+    for d, dirs, files in os.walk(root):
+        dirs[:] = [x for x in dirs if x not in _SKIP_DIRS]
+        rel = Path(d).relative_to(root).as_posix()
+        out += [f if rel == "." else f"{rel}/{f}" for f in files]
+        if len(out) >= cap:
+            break
+    return out
+
+
+def cited_files(text: str, root: Path) -> list[str]:
+    """Files an answer names (with or without :line) that exist in the workspace; a bare name matches anywhere."""
+    names = [n.replace("\\", "/").lstrip("./") for n in _CITE.findall(text or "")]
+    if not names:
+        return []
+    files = _project_files(root)
+    out: list[str] = []
+    for rel in names:
+        hit = rel if rel in files else next((f for f in files if f.endswith("/" + rel)), None)
+        if hit and hit not in out:
+            out.append(hit)
+    return out
+
 
 READ_ONLY_TOOLS = {"list_files", "read_file", "search", "web_search", "fetch_url", "mcp_find"}  # plan mode
 
@@ -277,6 +321,8 @@ class ChatSession:
         self.path = "loop"          # which path ran it: loop | plan_first | resume_brief (more in later steps)
         self.thinking: bool | None = None  # the model's thinking setting for this role (None = model default)
         self._prev_user_full = ""   # the last request in full, to notice when you ask the same thing again
+        self.answer_on_last_step = False  # D-068 step 2: the last step gets no tools, so a turn always ends answered
+        self.end_info: dict = {}    # extra fields for this turn's turn_end row (the explainer's budget, files cited)
 
     def apply_route(self, route: dict, llm=None, num_ctx: int | None = None, thinking: bool | None = None) -> None:
         """Switch role: model (if given), tools, MCP servers and read-only paths at once; recorded for the dashboard.
@@ -517,6 +563,39 @@ class ChatSession:
             messages.append(call[-1])  # the history keeps your message and the answer, not the instruction
         return res
 
+    def explain(self, messages: list, notes: str = "") -> TurnResult:
+        """A question about the project's code (D-068 step 2): read-only tools, a budget of `explain_max_steps`
+        (6), and the last step has no tools, so it always ends with an answer. The history keeps what was read, so
+        a follow-up question can build on it; the instruction itself is taken out again. Recorded as path
+        "explain" with the steps used, whether the budget ran out, the files read and the files cited."""
+        budget = self.harness.limit("explain_max_steps")
+        saved = (self.allowed_tools, self.request_kind, self.path, self.answer_on_last_step)
+        note = SystemMessage(content=(notes + "\n\n" if notes else "") + EXPLAIN_NOTE.format(steps=budget))
+        messages.insert(len(messages) - 1, note)
+        self._explain_from = len(messages) - 1
+        self.allowed_tools, self.request_kind, self.path, self.answer_on_last_step = (
+            EXPLAIN_TOOLS, "question", "explain", True)
+        self.end_info = {"budget": budget}
+        try:
+            res = self.turn(messages, max_steps=budget)
+        finally:
+            self.allowed_tools, self.request_kind, self.path, self.answer_on_last_step = saved
+            self.end_info = {}
+            messages[:] = [m for m in messages if m is not note and not (
+                isinstance(m, HumanMessage) and m.content == LAST_STEP_NOTE)]
+        return res
+
+    def _explain_info(self, messages: list, res: TurnResult) -> dict:
+        read = []
+        for m in messages[getattr(self, "_explain_from", 0):]:  # this turn only
+            for tc in getattr(m, "tool_calls", None) or []:
+                p = str((tc.get("args") or {}).get("path") or "")
+                if tc.get("name") == "read_file" and p and p not in read:
+                    read.append(p.replace("\\", "/"))
+        return {"budget_hit": res.steps >= self.end_info.get("budget", 0), "files_read": read[:20],
+                "files_cited": cited_files(res.text, self.ws.root)[:20],
+                "line_refs": bool(_LINE_REF.search(res.text or "")), "asked": res.text.rstrip().endswith("?")}
+
     def turn(self, messages: list, *, max_steps: int | None = None) -> TurnResult:
         """Run the loop on `messages` (the user's message is already the last one). Appends to `messages`."""
         res = TurnResult()
@@ -555,7 +634,8 @@ class ChatSession:
         self.rec.write("turn_end", turn=self.turn_no, steps=res.steps, stopped=res.stopped, reason=res.stop_reason,
                        text=res.text[:2000], tokens_in=res.tokens_in, tokens_out=res.tokens_out,
                        ctx_used=res.ctx_used, seconds=round(time.monotonic() - t0, 1), outcome=turn_outcome(res),
-                       changed=[e["path"] for e in res.journal], first_s=res.first_s)
+                       changed=[e["path"] for e in res.journal], first_s=res.first_s,
+                       **({**self.end_info, **self._explain_info(messages, res)} if self.end_info else {}))
         self._remember_left(res.journal)
         self.turn_log.append({"no": self.turn_no, "user": str(user)[:300], "outcome": turn_outcome(res),
                               "files": [e["path"] for e in res.journal]})
@@ -575,8 +655,11 @@ class ChatSession:
         conn_retried = False
         for step in range(1, max_steps + 1):
             res.steps = step
+            last = self.answer_on_last_step and step == max_steps and step > 1
+            if last:  # D-068 step 2: no tools on the last step, so the turn ends with an answer
+                messages.append(HumanMessage(content=LAST_STEP_NOTE))
             try:
-                streamed = self._stream(bound.stream(messages), step)
+                streamed = self._stream((self.llm if last else bound).stream(messages), step)
             except Exception as exc:  # Ollama could not read the model's tool call (E-044)
                 if self.backend_kind == "remote" and is_remote_down(exc):  # D-062 B3: a tunnel blip, or gone
                     self.rec.write("model_error", turn=self.turn_no, step=step, error=str(exc)[:500],
@@ -624,7 +707,7 @@ class ChatSession:
             res.tokens_in += int(meta.get("input_tokens", 0) or 0)
             res.tokens_out += int(meta.get("output_tokens", 0) or 0)
             res.ctx_used = int(meta.get("input_tokens", 0) or 0) or res.ctx_used
-            if not reply.tool_calls and streamed.text:
+            if not reply.tool_calls and streamed.text and not last:
                 calls, parse_error = text_tool_calls(streamed.text, {s["name"] for s in specs})
                 if calls or parse_error:
                     self.rec.write("text_tool_calls", turn=self.turn_no, calls=calls, error=parse_error)
@@ -635,6 +718,10 @@ class ChatSession:
                     messages.append(reply)
                     messages.append(HumanMessage(content=parse_error))
                     continue
+            if last and reply.tool_calls:  # asked for a tool anyway: keep only its words as the answer
+                if not (reply.content or streamed.text):
+                    return self._wrap_up(messages, res, f"step limit ({max_steps} steps)")
+                reply = AIMessage(content=reply.content or streamed.text or "")
             messages.append(reply)
             if not reply.tool_calls:
                 res.text = streamed.text

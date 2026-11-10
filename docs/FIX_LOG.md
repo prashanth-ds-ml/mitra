@@ -8,6 +8,8 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-073 | 2026-11-10 | E-074 | `cited_files` takes any file name in the answer that exists in the project (with or without :line; one walk of the tree, skipping .git/.venv/node_modules); `line_refs` records whether it gave lines | `app/core/chat.py` | `tests/test_step2_explain.py::test_cited_files_keeps_only_files_that_exist` | works (live re-run: 4 files cited) |
+| F-072 | 2026-11-10 | E-073 | `files_read` counts only the messages of this turn | `app/core/chat.py` | `tests/test_step2_explain.py::test_a_follow_up_records_only_its_own_reads` | works |
 | F-071 | 2026-11-10 | E-071 | The writing instruction says: drafting FOR the user, as the user, never sign as Mitra; the signature copied exactly from the notes; only facts the user gave, [placeholder] for the rest. Live re-run: signed as Prashanth, nothing invented, mail 7.4 s → 3.1 s (shorter) | `app/core/chat.py` (REPLY_NOTES) | live re-run (scratchpad live_step1.py); the step 3 writing checks will measure it on every run | works (still "Thanks," for "Regards,") |
 | F-070 | 2026-11-10 | E-070 | `utf-16-le` (no mark); short ASCII and Hindi text read back exactly | `app/ui/clipboard.py` | `tests/test_step1_everyday.py::test_clipboard_sends_utf16_without_a_byte_order_mark` | works |
 | F-069 | 2026-11-10 | E-069 | `note_request` merges the path's extra fields into the turn_end row instead of passing them twice | `app/core/chat.py` | `tests/test_step0_records.py::test_a_planner_error_reason_does_not_clash_with_the_record_fields`; `tests/test_backend_chat.py::test_switching_between_kaggle_and_the_laptop` | works (800 passed) |

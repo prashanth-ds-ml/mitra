@@ -21,6 +21,7 @@ from pathlib import Path
 DEFAULT_LIMITS = {
     "chat_max_steps": 40,
     "solve_max_steps": 40,
+    "explain_max_steps": 6,   # D-068 step 2: a question about the code: read only, then answer
     "max_repeats": 2,        # identical calls allowed before they are refused
     "max_failures": 4,       # failures of one tool in a row before the turn stops
     "fresh_round_after": 3,  # failing test runs in a row before solve starts a fresh round

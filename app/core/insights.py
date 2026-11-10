@@ -99,6 +99,8 @@ class Turn:
     notes_version: str = ""
     first_s: float | None = None            # time to the first answer word or tool call
     signals: list = field(default_factory=list)       # rephrase | interrupt | undo | copy (quiet signs from you)
+    budget_hit: bool | None = None          # D-068 step 2 (explain path): the step budget ran out
+    files_cited: list = field(default_factory=list)   # path:line references in the answer that exist
     _first_edit_t: float = 0.0
 
     @property
@@ -251,6 +253,9 @@ def sessions(files: list[Path]) -> list[Session]:
                 cur.tokens_in, cur.tokens_out = int(r.get("tokens_in") or 0), int(r.get("tokens_out") or 0)
                 cur.ctx_used = int(r.get("ctx_used") or 0)
                 cur.first_s = r.get("first_s")
+                if "budget_hit" in r:
+                    cur.budget_hit = bool(r.get("budget_hit"))
+                    cur.files_cited = list(r.get("files_cited") or [])
                 if kind == "chat":
                     cur = None
         out.append(s)

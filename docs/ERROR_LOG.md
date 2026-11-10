@@ -8,6 +8,8 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-074 | 2026-11-10 | D-068 step 2 | Low | live check (snake, mimo-v2.6:9b) | The explainer's record missed files an answer named without a line ("**Board** (`snake/game.py`)"): `files_cited` was [] for a 4-file answer | closed | F-073 |
+| E-073 | 2026-11-10 | D-068 step 2 | Low | live check (snake, mimo-v2.6:9b) | A follow-up question's record listed every file read in earlier turns (`files_read` scanned the whole history) | closed | F-072 |
 | E-072 | 2026-11-10 | D-068 step 1 | Low | full test run | `tests/test_kaggle.py::test_the_librarys_own_sign_in_help_is_not_printed` (and one more) failed once in a full run while the clipboard was being checked from the same shell; passed alone and in the next full run (809 passed). Not reproduced: watching | open | - |
 | E-071 | 2026-11-10 | D-068 step 1 | Medium | live check (mimo-v2.6:9b) | Mails from the reply path were signed "Thanks, Mitra" (the model is called Mitra in the system prompt) and added claims the user never gave ("use the paid option or request a larger allocation") | closed | F-071 |
 | E-070 | 2026-11-10 | D-068 step 1 | Medium | live check (clipboard read back) | `/copy` put an invisible U+FEFF byte-order mark at the start of the copied text: `str.encode("utf-16")` adds one and clip.exe keeps it | closed | F-070 |

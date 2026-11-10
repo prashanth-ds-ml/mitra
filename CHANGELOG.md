@@ -4,6 +4,12 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-10 · questions about code (D-068 step 2)
+- A question about the project ("explain the game logic", "where is the API defined?") gets read-only tools
+  (list_files, search, read_file) and 6 steps; the last step has no tools, so there is always an answer, with
+  path:line references. A vague one may be answered with up to 2 short questions. Live: 8-22 s on a small project.
+- Recorded per question: steps used, budget hit, files read, files cited, line references, asked back.
+
 ## [0.4.0] - 2026-11-10 · everyday chat + records for self-improvement (D-068, docs/BUILD_ORDER.md)
 - Small talk, writing (mails, messages, summaries, rewrites, translations, "make it shorter" after one) and general
   questions are sorted without a model and answered in one call with no tools and thinking off. Live on mimo-v2.6:9b:

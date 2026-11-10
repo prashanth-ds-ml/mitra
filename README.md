@@ -68,6 +68,9 @@ too small, it can borrow a free Kaggle GPU for a few hours.
 stack in `~/.mitra/me.md` (created on the first start) and project facts in `.mitra/notes.md`: Mitra reads both every
 turn. `/copy` puts the last answer on the clipboard.
 
+**Questions about your code** (*"explain the game logic"*, *"where is the API defined?"*) are answered read-only
+in at most 6 steps, with file:line references; nothing is changed.
+
 Just type what you want, e.g. *"what does this project do?"*, *"add a --verbose flag to cli.py and a test for it"*,
 *"the tests in tests/test_api.py fail, fix them"*. Mitra asks before every file change and command (shift+tab
 switches between asking, auto-edit and plan-only).
