@@ -217,7 +217,7 @@ def test_no_api_key_gives_the_steps_without_noise(monkeypatch, tmp_path):
     monkeypatch.delenv("KAGGLE_API_TOKEN", raising=False)
     with pytest.raises(kaggle.KaggleError) as err:
         kaggle.client()
-    assert "Create New Token" in str(err.value) and not str(err.value).rstrip().endswith("(1)")
+    assert "Generate New Token" in str(err.value) and not str(err.value).rstrip().endswith("(1)")
 
 
 @pytest.fixture
@@ -226,6 +226,7 @@ def fake_home(tmp_path, monkeypatch):
     (home / "Downloads").mkdir(parents=True)
     monkeypatch.setattr(kaggle.Path, "home", classmethod(lambda cls: home))
     monkeypatch.setenv("KAGGLE_CONFIG_DIR", str(tmp_path / "kcfg"))
+    monkeypatch.setattr(kaggle, "token_path", lambda: tmp_path / "kdot" / "access_token")
     return home
 
 
@@ -257,7 +258,7 @@ def test_setup_takes_a_path_and_refuses_a_wrong_file(fake_home, fake_quota, tmp_
 def test_setup_without_a_key_says_where_to_get_one(fake_home, fake_quota):
     said = []
     assert not kaggle.setup(echo=said.append, api_factory=_ok_api)
-    assert "Create New Token" in said[0]
+    assert "Generate New Token" in said[0]
 
 
 def test_setup_warns_when_no_gpu_hours(fake_home, fake_quota):
@@ -266,3 +267,25 @@ def test_setup_warns_when_no_gpu_hours(fake_home, fake_quota):
     said = []
     kaggle.setup(echo=said.append, api_factory=_ok_api)
     assert any("verify your phone" in s for s in said)
+
+
+def test_setup_takes_the_newer_token_string(fake_home, fake_quota):
+    """Kaggle's Settings → API now gives a token string (kagglesdk reads ~/.kaggle/access_token first)."""
+    said = []
+    assert kaggle.setup("KGAT_0123456789abcdefABCDEF", echo=said.append, api_factory=_ok_api)
+    assert kaggle.token_path().read_text(encoding="utf-8") == "KGAT_0123456789abcdefABCDEF"
+    assert not any("0123456789abcdef" in s for s in said)  # never printed
+    said.clear()
+    assert not kaggle.setup("nope", echo=said.append, api_factory=_ok_api)
+    assert "neither a file nor a Kaggle token" in said[0]
+
+
+def test_the_librarys_own_sign_in_help_is_not_printed(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("KAGGLE_CONFIG_DIR", str(tmp_path))
+    for var in ("KAGGLE_USERNAME", "KAGGLE_KEY", "KAGGLE_API_TOKEN"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr(kaggle.os.path, "expanduser", lambda p: p.replace("~", str(tmp_path)), raising=False)
+    with pytest.raises(kaggle.KaggleError):
+        kaggle.client()
+    out = capsys.readouterr()
+    assert "Authentication required" not in out.out + out.err

@@ -4,6 +4,11 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-10
+- `mitra kaggle setup <token>`: Kaggle's Settings → API now gives a token string (saved to ~/.kaggle/access_token); a downloaded kaggle.json still works (`mitra kaggle setup` finds it).
+- No more 15-line Kaggle library sign-in help printed twice: Mitra's own short steps only.
+- README Kaggle steps follow the current Kaggle Settings page.
+
 ## [0.1.0] - 2026-11-10 · colleague preview
 First version for other people to try on their own projects.
 - Terminal chat on local models (Ollama): reads code, edits with your approval, runs tests and fixes failures;

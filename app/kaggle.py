@@ -14,6 +14,7 @@ KAGGLE_USERNAME / KAGGLE_KEY. Needs the `kaggle` package (a Mitra dependency).
 from __future__ import annotations
 
 import json
+import os
 import re
 import secrets
 import threading
@@ -87,22 +88,31 @@ def client():
     except (SystemExit, OSError) as exc:  # older kaggle versions authenticate on import
         raise KaggleError(_CREDS_HELP) from exc
     api = KaggleApi()
+    import contextlib
+    import io
+    quiet = io.StringIO()  # the library prints its own 15-line sign-in help (twice): ours is shorter and Mitra's
     try:
-        _timed(api.authenticate)
+        with contextlib.redirect_stdout(quiet), contextlib.redirect_stderr(quiet):
+            _timed(api.authenticate)
     except (SystemExit, OSError, ValueError, KaggleError) as exc:
         detail = "" if isinstance(exc, SystemExit) or str(exc).strip().isdigit() else f" ({exc})"
         raise KaggleError(_CREDS_HELP + detail) from exc
     return api
 
 
-_CREDS_HELP = ("No Kaggle API key found. On kaggle.com: your picture → Settings → API → Create New Token (it downloads "
-               "kaggle.json), then run `mitra kaggle setup`: it finds the file and puts it in place. "
-               "Also verify your phone in Settings (notebooks need it for internet).")
+_CREDS_HELP = ("No Kaggle API key found. On kaggle.com: your picture → Settings → API → Generate New Token, copy it and "
+               "run `mitra kaggle setup <token>` (if your browser downloaded kaggle.json instead: `mitra kaggle setup`). "
+               "Also verify your phone in Settings (notebooks need it for GPUs and internet).")
+TOKEN_RE = re.compile(r"^[A-Za-z0-9_.\-]{20,}$")
+
+
+def token_path() -> Path:
+    """Where Kaggle's newer API tokens live (kagglesdk reads ~/.kaggle/access_token before kaggle.json)."""
+    return Path(os.path.expanduser("~")) / ".kaggle" / "access_token"
 
 
 def key_path() -> Path:
     """Where the kaggle library looks: $KAGGLE_CONFIG_DIR/kaggle.json, else ~/.kaggle/kaggle.json."""
-    import os
     base = os.environ.get("KAGGLE_CONFIG_DIR")
     return Path(base) / "kaggle.json" if base else Path.home() / ".kaggle" / "kaggle.json"
 
@@ -120,11 +130,24 @@ def find_download() -> Path | None:
 def setup(source: str = "", *, echo=print, api_factory=None) -> bool:
     """`mitra kaggle setup [path]`: put the downloaded API key where Kaggle looks, check it, show the hours.
     Any Kaggle account; the key stays on this machine."""
-    import os
     import shutil
     target = key_path()
     src = Path(source).expanduser() if source else None
-    if src is None and not target.exists():
+    if source and not src.exists() and TOKEN_RE.match(source.strip()):  # the newer token: a string, not a file
+        tp = token_path()
+        tp.parent.mkdir(parents=True, exist_ok=True)
+        tp.write_text(source.strip(), encoding="utf-8")
+        try:
+            os.chmod(tp, 0o600)
+        except OSError:
+            pass
+        echo(f"✓ API token saved to {tp}")
+        src = None
+    elif source and not src.exists():
+        echo(f"✗ `{source}` is neither a file nor a Kaggle token. On kaggle.com: Settings → API → Generate New "
+             "Token, copy it, then `mitra kaggle setup <token>`.")
+        return False
+    elif src is None and not target.exists() and not token_path().exists():
         src = find_download()
     if src is not None:
         try:
@@ -142,9 +165,10 @@ def setup(source: str = "", *, echo=print, api_factory=None) -> bool:
         except OSError:
             pass
         echo(f"✓ API key for {data['username']} saved to {target}")
-    elif not target.exists():
-        echo("No kaggle.json found in Downloads. On kaggle.com: your picture → Settings → API → Create New Token, "
-             "then run `mitra kaggle setup` again (or `mitra kaggle setup <path to kaggle.json>`).")
+    elif not target.exists() and not token_path().exists():
+        echo("On kaggle.com: your picture → Settings → API → Generate New Token, copy it, then "
+             "`mitra kaggle setup <token>`. (A downloaded kaggle.json works too: `mitra kaggle setup` finds it in "
+             "Downloads, or `mitra kaggle setup <path>`.)")
         return False
     try:
         api = (api_factory or client)()

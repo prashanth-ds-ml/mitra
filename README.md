@@ -78,10 +78,10 @@ at full 256K context, about 3-4x faster than an 8 GB laptop, without you opening
 1. **Once (2 minutes):** sign in on [kaggle.com](https://www.kaggle.com) (a free account) → your picture →
    **Settings**:
    - **Phone verification**: verify (Kaggle needs it for GPUs and internet in notebooks).
-   - **API → Create New Token**: your browser downloads `kaggle.json`.
+   - **API → Generate New Token**: copy the token it shows.
 
-   Then run `mitra kaggle setup`. It finds `kaggle.json` in your Downloads, puts it where Kaggle looks, signs in and
-   shows your hours (`mitra kaggle setup <path>` if you saved it elsewhere).
+   Then run `mitra kaggle setup <the token>`. Mitra saves it where Kaggle looks, signs in and shows your hours.
+   (If your browser downloaded a `kaggle.json` instead, just run `mitra kaggle setup`: it finds it in Downloads.)
 2. **Every time:** `mitra kaggle start` uploads a private notebook to your account, waits until the model is loaded
    (4-8 minutes, it shows each step), and then every `mitra` window uses it. Inside Mitra: `/kaggle start`.
 3. **When done:** `mitra kaggle stop` (or `/kaggle stop`). It also stops by itself after 30 minutes unused.
