@@ -5,6 +5,7 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next session starts here (handoff 2026-11-08)
+0000000000000. **2026-11-10, v0.2.0 published (D-062 B0-B6)**; the user's friend now clones and tests setup + Kaggle (bring their feedback/issues here). Later phase: Modal (D-063, I-24); Kaggle benchmark of Mitra's tasks with the AI credits (I-25).
 000000000000. **2026-11-10, next: Kaggle/laptop switching** ([BACKENDS.md](BACKENDS.md), D-062): build order B0-B7 written, going through it with the user step by step; v0.1.2 (E-067 start-up fallback) pushed.
 00000000000. **2026-11-10, PUBLISHED v0.1.0 + v0.1.1** (pushed as prashanth-ds-ml; tags v0.1.0, v0.1.1; v0.1.0 GitHub release is up; the v0.1.1 release page was blocked by the permission check: the user creates it with gh). v0.1.1: `mitra kaggle setup <token>` for Kaggle's newer token, no library sign-in noise. Fresh clone from GitHub installs `mitra 0.1.1`. CI v0.1.0 green. Next: colleagues' feedback (issues labelled feedback), then fixes from it.
 0000000000. **2026-11-10, v0.1.0 colleague preview ready locally**: README for first-time users, issue forms (feedback, bug), pinned deps, fresh-clone install checked, secret scan clean. Waiting for the user's go to push + tag v0.1.0 + GitHub release; then colleagues clone and send feedback (issues labelled `feedback`).
