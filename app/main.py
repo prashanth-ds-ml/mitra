@@ -2903,7 +2903,8 @@ def _chat():
             from app.core import night as night_mod
             n_tasks, problem = night_mod.check_plan(plan_path)
             if problem:
-                _say(f"The plan cannot run: {problem}\n\nExample: `C:\\Users\\prash\\projects\\brick-breaker-night\\plan.md`.")
+                _say(f"The plan cannot run: {problem}\n\n`/plan template` writes a runnable example; "
+                     "`/plan check` checks a plan.")
                 continue
             try:  # a branch + one commit per task needs a repo with at least one commit
                 has_commit = subprocess.run(["git", "rev-parse", "--verify", "HEAD"], cwd=str(project),

@@ -4,27 +4,27 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mitra"
-version = "0.0.0"
+version = "0.1.0"
 description = "Local-first coding agent built for small models"
 license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
-    "rich",
-    "prompt-toolkit",
-    "langchain-ollama",
-    "langchain-core",
-    "tomli_w",
-    "typer",
-    "ollama",
-    "psutil",
-    "Pillow",
-    "numpy",
-    "PyYAML",
+    "rich>=15.0,<16",
+    "prompt-toolkit>=3.0.53,<4",
+    "langchain-ollama>=1.1,<2",
+    "langchain-core>=1.7,<2",
+    "tomli_w>=1.2,<2",
+    "typer>=0.29,<1",
+    "ollama>=0.6.2,<0.7",
+    "psutil>=7.2,<8",
+    "Pillow>=12,<14",
+    "numpy>=2.3,<3",
+    "PyYAML>=6.0,<7",
     "mcp>=2.3.0,<3",
-    "pytest",  # run_tests falls back to Mitra's own Python for projects without a venv (E-028)
-    "pyflakes",  # check_code: undefined names / unbound locals before a program runs (E4)
-    "kaggle>=2.2",  # mitra kaggle start/stop/status: your Kaggle GPU hours (D-061)
-    "six",  # kaggle 2.2.5 imports six without declaring it (E-065)
+    "pytest>=9,<10",  # run_tests falls back to Mitra's own Python for projects without a venv (E-028)
+    "pyflakes>=3.2,<5",  # check_code: undefined names / unbound locals before a program runs (E4)
+    "kaggle>=2.2.5,<3",  # mitra kaggle start/stop/status: your Kaggle GPU hours (D-061)
+    "six>=1.16,<2",  # kaggle 2.2.5 imports six without declaring it (E-065)
 ]
 
 [project.optional-dependencies]
