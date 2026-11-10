@@ -10,6 +10,7 @@ from langchain_core.messages import AIMessage
 
 from app import config, fit, main, remote
 from app.core import roles
+from app.core import chat as C_chat
 from tests.test_chat_core import Model
 
 KAGGLE_URL = "https://k.trycloudflare.com/tok"
@@ -286,7 +287,104 @@ def test_a_long_chat_is_compacted_before_moving_to_the_smaller_laptop_context(ha
     def plan_mode_with_kaggle_up():
         return "/mode plan"
 
-    Inputs.script = ["write a big feature", plan_mode_with_kaggle_up, "explain it", "exit"]
+    Inputs.script = ["/do write a big feature", plan_mode_with_kaggle_up, "explain it", "exit"]
     main._chat()
     out = " ".join(capsys.readouterr().out.split())
     assert compacted[:1] == ["backend"] and "too long for 128K" in out
+
+
+# ── D-065 P3-P5 in the real chat loop ─────────────────────────────────────────
+
+PLAN = """# Feature: score counter
+
+## Goal
+Count points.
+
+## Tasks
+
+### T1: score class
+- Files: `tests/test_score.py`, `score.py`
+- Do: test first, then the class.
+- Done when: `python -m pytest -q tests/test_score.py` passes
+- Needs: -
+"""
+
+
+def _planning_llm(state, monkeypatch):
+    def fake_llm(model, temperature=0.2, *, base_url=None, num_ctx=None, **kw):
+        state["llms"].append((model, base_url, num_ctx))
+        m = Model(*[AIMessage(content=f"answer {i}") for i in range(20)])
+        m.base_url, m.model = base_url, model
+        m.invoke = lambda messages: AIMessage(content=PLAN)
+        return m
+
+    monkeypatch.setattr(main, "get_local_llm", fake_llm)
+
+
+def _fake_runner(monkeypatch, calls):
+    from app.core import loop
+
+    def run_plan(text, ws, llm, **kw):
+        calls.append({"text": text, "git": kw.get("git")})
+        return {"tasks": {"T1": {"status": "passed", "tests": "2 passed", "summary": "done"}}, "passed_tasks": 1,
+                "total_tasks": 1, "final_tests": "2 passed", "final_tests_passed": True}
+
+    monkeypatch.setattr(loop, "run_plan", run_plan)
+
+
+def test_where_did_we_stop_is_answered_from_the_records_without_the_model(harness, monkeypatch, capsys):
+    state, ws = harness
+    runs = ws / ".mitra" / "runs"
+    runs.mkdir(parents=True)
+    (runs / "chat-20261109.jsonl").write_text(
+        '{"kind": "session"}\n{"kind": "turn_start", "turn": 1, "t": 1, "user": "add the score counter please"}\n'
+        '{"kind": "turn_end", "turn": 1, "outcome": "tests_passed", "changed": []}\n', encoding="utf-8")
+    monkeypatch.setattr(C_chat.ChatSession, "turn", lambda *a, **k: pytest.fail("the model was called"))
+    Inputs.script = ["hi mitra where did we last stop", "exit"]
+    main._chat()
+    out = " ".join(capsys.readouterr().out.split())
+    assert "Where we stopped last time" in out and "add the score counter please" in out
+    assert "no model call" in out
+
+
+def test_a_big_request_is_planned_then_built_after_go(harness, monkeypatch, capsys):
+    state, ws = harness
+    _planning_llm(state, monkeypatch)
+    runs = []
+    _fake_runner(monkeypatch, runs)
+    asked = _menu(monkeypatch, "go")
+    monkeypatch.setattr(C_chat.ChatSession, "turn", lambda *a, **k: pytest.fail("no plain turn for a big request"))
+    Inputs.script = ["build a score system for the game with a high score file and a menu", "exit"]
+    main._chat()
+    out = " ".join(capsys.readouterr().out.split())
+    assert "planning it first" in out and "Feature: score counter" in out
+    assert asked and asked[-1][0] == "Build this plan?" and asked[-1][2] == "go"
+    assert runs and runs[0]["git"] is False and "### T1: score class" in runs[0]["text"]
+    resume_note = (ws / ".mitra" / "resume.md").read_text(encoding="utf-8")
+    assert "T1 ✓ score class: 2 passed" in resume_note and "all tasks passed" in resume_note
+    assert list(ws.glob("*.plan.md"))
+
+
+def test_plan_command_and_save_for_a_night(harness, monkeypatch, capsys):
+    state, ws = harness
+    _planning_llm(state, monkeypatch)
+    runs = []
+    _fake_runner(monkeypatch, runs)
+    _menu(monkeypatch, "save")
+    Inputs.script = ["/plan add a score counter", "exit"]
+    main._chat()
+    out = " ".join(capsys.readouterr().out.split())
+    saved = list(ws.glob("*.plan.md"))
+    assert runs == [] and saved and f"/run {saved[0].name} 4" in out
+
+
+def test_do_skips_planning(harness, monkeypatch):
+    state, ws = harness
+    _planning_llm(state, monkeypatch)
+    turns = []
+    real_turn = C_chat.ChatSession.turn
+    monkeypatch.setattr(C_chat.ChatSession, "turn", lambda self, m, **k: turns.append(m[-1].content) or real_turn(self, m, **k))
+    monkeypatch.setattr(main.ui.menu, "choose", lambda *a, **k: pytest.fail("no plan menu for /do"))
+    Inputs.script = ["/do build a score system for the game with a high score file and a menu", "exit"]
+    main._chat()
+    assert turns == ["build a score system for the game with a high score file and a menu"]

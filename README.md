@@ -52,6 +52,16 @@ too small, it can borrow a free Kaggle GPU for a few hours.
 
 ## Using it
 
+**How Mitra works on a request** (built for small models with little context):
+- *"where did we stop?"* is answered at once from Mitra's records (last requests, plan progress, night
+  reports, git), no searching.
+- Questions and small changes run directly; large files are shown as an outline first, then only the part
+  needed.
+- A **bigger change** is planned first: 2-6 small steps, each with a test that proves it. You get **Go /
+  Change it / Save for /run / Cancel** (auto mode just goes). Each step then runs on its own with a fresh, small
+  context until its test passes; a step that fails is re-planned once, smaller. `.mitra/resume.md` keeps where
+  it ended. `/plan <task>` forces planning, `/do <task>` skips it.
+
 Just type what you want, e.g. *"what does this project do?"*, *"add a --verbose flag to cli.py and a test for it"*,
 *"the tests in tests/test_api.py fail, fix them"*. Mitra asks before every file change and command (shift+tab
 switches between asking, auto-edit and plan-only).

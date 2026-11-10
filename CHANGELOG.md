@@ -4,6 +4,16 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-10 · plan first, then small steps (D-065, docs/PLAN_FIRST.md)
+- "Where did we stop?" answered from Mitra's records (resume brief, also in the prompt), no model call.
+- Requests sorted without a model: resume / question / small / big; `/plan <task>`, `/do <task>`.
+- Bigger changes: a short runnable plan from a small context pack (file tree + outlines), Go / Change / Save /
+  Cancel, steps run one at a time with fresh context and their own test, failed steps re-planned once,
+  `.mitra/resume.md` written.
+- Large files read without a range give an outline first.
+- Fixed: slash commands were stored as project-memory topics (a model chased `/logs/...` paths); wrong paths
+  now suggest the real file; `run_command` states its rules; Python warning blocks folded on screen.
+
 ## [0.2.2] - 2026-11-10 · Mitra asks before using Kaggle (D-064)
 - At every start: one check (key valid, phone verified, hours left) and one of five cases: no key → offer to
   connect; key works but not decided → "Use it? when I need it (default) / start now / later / no"; decided →

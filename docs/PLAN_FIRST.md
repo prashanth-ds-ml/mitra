@@ -8,6 +8,8 @@ Seen 2026-11-10 (mitra-try, "hi mitra where did we last stop"): 13 tool calls an
 read (286 + 402 + 267 lines) for a question Mitra's own records answer, a `| tail` was refused, and a pytest warning
 page filled the screen. The user stopped it.
 
+**Status 2026-11-10: P0-P5 built and tested (unit + driven chat tests), v0.3.0.**
+
 ## The flow
 
 1. **Sort the request** (no model call):

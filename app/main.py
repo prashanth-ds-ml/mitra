@@ -736,6 +736,7 @@ _COMMAND_HELP = [
         ("/model use <m>", "Switch the chat model now (no restart)"),
         ("/run [plan] [h]", "Build a plan unattended in the background (overnight), up to h hours (default 4)"),
         ("/night",         "The latest night run: running?, progress, report"),
+        ("/plan <task>",   "Plan a change first (small checked steps; Go / Change / Save) · /do <task> skips planning"),
         ("/plan template", "Write a runnable plan template here · /plan check [file] checks a plan"),
         ("/good [note]",   "Mark the last turn good (your verdict teaches Mitra)"),
         ("/bad [why]",     "Mark the last turn bad, ideally with why"),
@@ -2786,6 +2787,115 @@ def _chat():
         else:
             bsession.no_kaggle_this_session = True
 
+    from app.core import intent as intent_mod
+    from app.core import planner as planner_mod
+
+    def _plan_first(task: str) -> None:
+        """P4: a short runnable plan from a small context pack; Go / Change / Save / Cancel (auto mode: Go)."""
+        console.print(Text("  ✎ a bigger change: planning it first (small steps, each checked) · "
+                           "`/do <task>` skips planning", style="m.tool"))
+        pack = planner_mod.context_pack(pathlib.Path(cfg["workspace"]), task)
+        text, feedback, choice = "", "", None
+        for _round in range(6):
+            console.print(Text("  planning …", style="m.faint"))
+            try:
+                text, problem = planner_mod.make_plan(local_llm, task, pack, feedback=feedback,
+                                                      previous=text if feedback else "")
+            except KeyboardInterrupt:
+                console.print(Text("  planning stopped", style="m.info"))
+                return
+            except Exception as exc:  # noqa: BLE001 - shown, the chat goes on
+                console.print(Text(f"  ✗ the planner failed: {exc}", style="m.err"))
+                return
+            console.print(Markdown(text))
+            if problem:
+                console.print(Text(f"  ⚠ the plan still has a problem: {problem}", style="m.info"))
+            if session_mode == "auto" and not problem:
+                choice = "go"
+                console.print(Text("  auto mode: building it now", style="m.faint"))
+                break
+            choice = ui.menu.choose(console, "Build this plan?",
+                                    [("go", "Go: build it step by step"), ("change", "Change it (say how)"),
+                                     ("save", "Save it for /run (unattended)"), ("cancel", "Cancel")],
+                                    default="change" if problem else "go")
+            if choice != "change":
+                break
+            try:
+                feedback = console.input("[m.accent]  what should change ›[/m.accent] ").strip()
+            except (EOFError, KeyboardInterrupt):
+                feedback = ""
+            if not feedback:
+                choice = None
+                break
+        if choice not in ("go", "save"):
+            console.print(Text("  plan not used", style="m.faint"))
+            return
+        path = planner_mod.save(pathlib.Path(cfg["workspace"]), task, text)
+        if choice == "save":
+            console.print(Text(f"  saved {path.name} · `/run {path.name} 4` builds it unattended", style="m.tool"))
+            return
+        _run_planned(task, text, path)
+
+    def _run_planned(task: str, text: str, path) -> None:
+        """P5: one step at a time with a fresh small context and its check; failed steps re-planned once; the
+        resume note written; the chat remembers what was done."""
+        from app.core import loop as loop_mod
+        _, tasks = loop_mod.parse_plan(text)
+        titles = {t.id: t.title for t in tasks}
+        console.print(Text(f"  ▶ building {len(tasks)} steps, one at a time (each with a fresh, small context) · "
+                           "ctrl+c stops", style="m.tool"))
+        record_dir = pathlib.Path(cfg["workspace"]) / ".mitra" / "runs" / f"plan-{time.strftime('%Y%m%d-%H%M%S')}"
+        saved_hook, chat.ws.before_write = chat.ws.before_write, None
+        chat.ws.journal = []
+        results: dict = {}
+        final = "not run"
+        try:
+            out = loop_mod.run_plan(text, chat.ws, local_llm, full_test_command="python -m pytest -q",
+                                    on_event=EventPrinter(console), record_dir=record_dir, num_ctx=num_ctx,
+                                    git=False, harness=harness)
+            results, final = dict(out["tasks"]), out["final_tests"]
+            failed = {tid: f"{r.get('tests', '')} · {str(r.get('summary', ''))[:300]}"
+                      for tid, r in results.items() if r.get("status") != "passed"}
+            failed.update({t.id: "skipped: it needed a step that failed" for t in tasks if t.id not in results})
+            if failed:
+                console.print(Text(f"  ↻ {len(failed)} step(s) did not pass: re-planning them once, smaller …",
+                                   style="m.info"))
+                retry = planner_mod.replan_failed(local_llm, text, failed)
+                if retry:
+                    _, rtasks = loop_mod.parse_plan(retry)
+                    titles.update({t.id: t.title for t in rtasks})
+                    console.print(Markdown(retry[retry.find("### "):]))
+                    out2 = loop_mod.run_plan(retry, chat.ws, local_llm, full_test_command="python -m pytest -q",
+                                             on_event=EventPrinter(console), record_dir=record_dir,
+                                             num_ctx=num_ctx, git=False, harness=harness)
+                    results.update(out2["tasks"])
+                    final = out2["final_tests"]
+                else:
+                    console.print(Text("  the planner could not split them further: your call", style="m.info"))
+        except KeyboardInterrupt:
+            console.print(Text("  stopped: the steps done so far stay; `/undo` takes back the last change set",
+                               style="m.info"))
+        finally:
+            chat.ws.before_write = saved_hook
+        for tid, r in results.items():
+            r["title"] = titles.get(tid, "")
+        note = planner_mod.resume_note(task, path, results, final)
+        resume_file = pathlib.Path(cfg["workspace"]) / ".mitra" / "resume.md"
+        resume_file.parent.mkdir(parents=True, exist_ok=True)
+        resume_file.write_text(note, encoding="utf-8")
+        console.print(Markdown(note))
+        journal = list(chat.ws.journal or [])
+        if journal:
+            memory.record_last_change_set(cfg["workspace"], {"entries": journal})
+            session_changes.append(journal)
+        from langchain_core.messages import AIMessage as _AIMessage
+        messages.append(HumanMessage(content=task))
+        messages.append(_AIMessage(content="I planned this and built it step by step:\n" + note))
+        ok = bool(results) and all(r.get("status") == "passed" for r in results.values())
+        chat.turn_log.append({"no": len(chat.turn_log) + 1, "user": task[:300],
+                              "outcome": "tests_passed" if ok else "tests_failed",
+                              "files": [e["path"] for e in journal]})
+
     if _kaggle_died_turns is not None:
         _kaggle_report("the Kaggle GPU ended while Mitra was closed", turns=_kaggle_died_turns, summarize=False)
     _kaggle_at_start()
@@ -2827,6 +2937,13 @@ def _chat():
         # ── Slash commands ────────────────────────────────────────────────────
         user_input = _strip_sentence_dot(user_input)
         cmd = user_input.strip().lower()
+        force_kind = ""  # D-065 P3: /plan <task> plans first, /do <task> skips planning
+        if cmd.startswith("/plan ") and not cmd.startswith(("/plan template", "/plan check", "/plan help")):
+            force_kind, user_input = "big", user_input.strip()[len("/plan "):].strip()
+            cmd = user_input.lower()
+        elif cmd.startswith("/do "):
+            force_kind, user_input = "small", user_input.strip()[len("/do "):].strip()
+            cmd = user_input.lower()
 
         if cmd in ("/help", "help"):
             _print_help()
@@ -3268,6 +3385,15 @@ def _chat():
             _say(f"Unknown command `{unknown}`. Type `/help` for the list.")
             continue
 
+        # ── What kind of request (D-065 P3) ───────────────────────────────────
+        request_kind = force_kind or intent_mod.classify(user_input)
+        if request_kind == "resume":  # from Mitra's records: instant, no model call, no searching
+            _brief = resume_mod.brief(pathlib.Path(cfg["workspace"]))
+            console.print(Markdown(_brief or "Nothing recorded for this project yet."))
+            console.print(Text("  (from Mitra's records, no model call) · ask for the next step, or "
+                               "`/plan <task>` to plan a bigger change", style="m.faint"))
+            continue
+
         # ── Where this turn runs: laptop or Kaggle (D-062) ─────────────────────────
         for _note in bsession.notes:
             console.print(Text("  ✗ " + _note, style="m.err"))
@@ -3286,6 +3412,10 @@ def _chat():
                     backend_mod.why(_want, session_mode, chat.role))
         elif backend_mod.route(session_mode, chat.role) == backend_mod.REMOTE:
             _maybe_offer_kaggle()
+
+        if request_kind == "big":  # D-065 P4/P5: plan first, then small checked steps
+            _plan_first(user_input)
+            continue
 
         messages.append(HumanMessage(content=user_input))
 
