@@ -4,6 +4,15 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-10 · Kaggle and laptop, seamlessly (D-062, docs/BACKENDS.md)
+- Status line shows where the model runs and the Kaggle hours left (`☁ kaggle · … · 28.1 h left` / `💻 laptop`).
+- Read work (plan mode, planner, reviewer) on the laptop, write work on Kaggle; switches between turns.
+- Kaggle ends (idle, time limit, quota, tunnel): laptop model (quietly smaller if RAM is short), a report of what
+  was done in `.mitra/reports/`, and Mitra stops; also when it ended while Mitra was closed, and mid-turn.
+- A long chat is compacted before moving to the laptop's smaller context.
+- Write work with no Kaggle running: start it in the background (asked once per session).
+- First start: Mitra offers to connect a free Kaggle GPU (guided).
+
 ## [0.1.2] - 2026-11-10
 - Fixed: after a Kaggle run stopped by itself, `mitra` said "no compatible local Ollama models"; it now says the Kaggle GPU has stopped and uses this machine (E-067).
 

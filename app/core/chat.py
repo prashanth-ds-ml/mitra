@@ -101,6 +101,21 @@ def is_connection_error(exc: BaseException) -> bool:
             or any(s in text for s in ("10054", "10061", "forcibly closed", "connection reset", "connection refused")))
 
 
+class RemoteGone(Exception):
+    """The remote GPU (Kaggle) stopped answering: switch to the laptop, write the report, stop (D-062 B3)."""
+
+
+def is_remote_down(exc: BaseException) -> bool:
+    """A remote that is gone: a lost connection, a tunnel that no longer resolves, or Cloudflare's 5xx pages."""
+    if is_connection_error(exc):
+        return True
+    text = str(exc).lower()
+    status = getattr(exc, "status_code", None)
+    return status in (502, 503, 504, 530) or any(s in text for s in (
+        "getaddrinfo", "name or service not known", "nodename nor servname", "trycloudflare", "error 1033",
+        "connecterror", "timed out"))
+
+
 def wait_for_ollama(base_url: str | None = None, timeout_s: float = 90, poll_s: float = 3) -> bool:
     """True once Ollama answers again (within timeout_s)."""
     import urllib.request
@@ -212,6 +227,8 @@ class TurnResult:
     journal: list = field(default_factory=list)
     tests_run: int = 0
     last_test_ok: bool | None = None
+    last_test_summary: str = ""
+    remote_gone: bool = False  # the remote GPU stopped mid-turn (D-062 B3)
 
 
 class ChatSession:
@@ -225,6 +242,8 @@ class ChatSession:
         self.rec = core_loop.Recorder(self.ws.root / ".mitra" / "runs" / f"chat-{time.strftime('%Y%m%d')}.jsonl",
                                       traces=traces)  # + full model calls for the fine-tune (D-041)
         self.turn_no = 0
+        self.backend_kind = "laptop"  # laptop | remote: a remote that drops raises RemoteGone (D-062)
+        self.turn_log: list[dict] = []  # {no, user, outcome, files}: the facts for the Kaggle-ended report
         self._plans_run: dict = {}  # (plan path, text hash) -> result, reset every turn (E-050)
         self._last_user = ""  # start of the last turn's message, named when you mark it (E-052)
         self.last_night: dict | None = None  # a /run started after the last turn: /good /bad judge it (E-052)
@@ -437,6 +456,18 @@ class ChatSession:
                        role=self.role)
         try:
             res = self._turn(messages, res, max_steps)
+        except RemoteGone as exc:  # D-062 B3: not the model's failure; the chat switches to the laptop and reports
+            res.stopped, res.remote_gone = True, True
+            res.stop_reason = f"the remote GPU stopped answering ({exc})"
+            repair_history(messages)
+            self.rec.write("turn_end", turn=self.turn_no, steps=res.steps, stopped=True, reason=res.stop_reason,
+                           text="", tokens_in=res.tokens_in, tokens_out=res.tokens_out, ctx_used=res.ctx_used,
+                           seconds=round(time.monotonic() - t0, 1), outcome="kaggle_ended",
+                           changed=[e["path"] for e in res.journal])
+            self._remember_left(res.journal)
+            self.turn_log.append({"no": self.turn_no, "user": str(user)[:300], "outcome": "kaggle_ended",
+                                  "files": [e["path"] for e in res.journal]})
+            return res
         except BaseException as exc:  # interrupted (esc / ctrl+c) or crashed: still recorded, the analyzer counts it
             self.rec.write("turn_end", turn=self.turn_no, steps=res.steps, stopped=True, interrupted=True,
                            reason=f"interrupted ({type(exc).__name__})", text="", tokens_in=res.tokens_in,
@@ -450,6 +481,8 @@ class ChatSession:
                        ctx_used=res.ctx_used, seconds=round(time.monotonic() - t0, 1), outcome=turn_outcome(res),
                        changed=[e["path"] for e in res.journal])
         self._remember_left(res.journal)
+        self.turn_log.append({"no": self.turn_no, "user": str(user)[:300], "outcome": turn_outcome(res),
+                              "files": [e["path"] for e in res.journal]})
         return res
 
     def _turn(self, messages: list, res: TurnResult, max_steps: int) -> TurnResult:
@@ -469,6 +502,16 @@ class ChatSession:
             try:
                 streamed = self._stream(bound.stream(messages), step)
             except Exception as exc:  # Ollama could not read the model's tool call (E-044)
+                if self.backend_kind == "remote" and is_remote_down(exc):  # D-062 B3: a tunnel blip, or gone
+                    self.rec.write("model_error", turn=self.turn_no, step=step, error=str(exc)[:500],
+                                   retry=not conn_retried, remote=True)
+                    if not conn_retried:
+                        conn_retried = True
+                        self.hooks.show("retry", {}, f"the remote GPU did not answer ({str(exc)[:120]}); trying once more",
+                                        False)
+                        time.sleep(5)
+                        continue
+                    raise RemoteGone(str(exc)[:300]) from exc
                 if is_connection_error(exc) and not conn_retried:  # Ollama restarted (E-047): wait, retry once
                     conn_retried = True
                     self.rec.write("model_error", turn=self.turn_no, step=step, error=str(exc)[:500], retry=True)
@@ -531,6 +574,7 @@ class ChatSession:
                 if name == "run_tests":
                     res.tests_run += 1
                     res.last_test_ok = ok
+                    res.last_test_summary = (out.strip().splitlines() or [""])[0][:200]
                 self.hooks.show(name, args, out, ok)
                 self.rec.write("tool", turn=self.turn_no, step=step, name=name, args=args, ok=ok, output=out[:3000])
                 messages.append(ToolMessage(content=out, tool_call_id=tc["id"]))

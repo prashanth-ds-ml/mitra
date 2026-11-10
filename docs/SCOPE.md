@@ -149,6 +149,14 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   optional second provider, Ollama stays. Install (`irm .../install.ps1 | iex`) needs the user's go. The other
   Magnitude (browser-agent, vision UI tests) needs a 72B vision model or Claude: no fit; Playwright stays (M4).
 - **I-23 Kaggle GPU as a remote Ollama — BUILT 2026-11-10 (D-060)** (user): ~30 GPU h/week, 2x T4 16 GB, 12 h sessions; mimo at 256K fully on GPU there. First experiment: the same brick-breaker plan on the laptop (128K) vs Kaggle T4 (256K) vs a bigger model on both T4s; speed, tasks passed, hidden judge.
+- **I-24 Modal as a second free GPU** (research 2026-11-10): $30/month credits refill (~180 T4 h), started
+  from code, serves a port itself (no tunnel), official Ollama example. Lightning AI possible (one-time
+  credits). Colab free: no (its FAQ bans bypassing the notebook UI and remote proxies); HF ZeroGPU: no.
+- **I-25 Kaggle AI credits: a Kaggle Community Benchmark of Mitra's coding tasks** (research 2026-11-10):
+  the credits are $10/day ($100/month) of Kaggle Benchmarks Model Proxy spend for frontier models
+  (Claude, Gemini, DeepSeek, ...), meant for benchmarks. Legit use: publish Mitra's tasks as a benchmark and
+  score frontier vs small open models, with an LLM judge. NOT as Mitra's chat backend (scoped to benchmark
+  development; risky for the account).
 
 ## Later (not milestones)
 Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,

@@ -40,14 +40,21 @@ def status_line(
     background_tasks: int = 0,
     branch: str | None = None,
     notice: str = "",
+    backend: str = "",
+    backend_level: str = "ok",
 ) -> list[tuple[str, str]]:
-    """prompt_toolkit formatted text for the bottom toolbar."""
+    """prompt_toolkit formatted text for the bottom toolbar. `backend` (D-062 B1), e.g. '☁ kaggle · mimo 256K ·
+    28.1 h left', replaces the model name: where the model runs, and the hours left."""
     pct = min(100, int(total_tokens / max(context_limit, 1) * 100))
     folder = re.split(r"[\\\\/]", str(cwd).rstrip("\\\\/"))[-1] or str(cwd)  # Windows or POSIX path
     branch = git_branch(cwd) if branch is None else branch
     ctx_style = "class:status.warn" if pct >= 80 else "class:status"
-    parts: list[tuple[str, str]] = [
-        ("class:status", f"  {model} · "),
+    head = [("class:status", f"  {model} · ")]
+    if backend:
+        style = {"warn": "class:status.warn", "err": "class:status.warn", "info": "class:status.accent"}.get(
+            backend_level, "class:status")
+        head = [("class:status", "  "), (style, backend), ("class:status", " · ")]
+    parts: list[tuple[str, str]] = head + [
         ("class:status.accent", mode),
         ("class:status", " · "),
         (ctx_style, f"ctx {pct}%"),

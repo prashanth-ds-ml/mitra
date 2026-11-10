@@ -121,6 +121,7 @@ def check_alive(cfg: dict, echo=print, timeout: float = 15.0) -> bool:
         return True
     name = r.get("name") or "remote"
     unapply(cfg)
+    cfg["_remote_died"] = name  # the chat writes the "Kaggle ended" report on the last session (D-062 B3)
     if name == "kaggle":
         clear()
         echo("☁ the Kaggle GPU is not answering: its run has ended (30 min unused, its time limit, or stopped on "

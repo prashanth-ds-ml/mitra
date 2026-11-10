@@ -194,13 +194,13 @@ def live_programs() -> list[Program]:
     return group_programs(rows(), skip_pids=_own_pids())
 
 
-def check(model: str, context: int, *, base_url: str = "http://127.0.0.1:11434") -> Fit:
+def check(model: str, context: int, *, base_url: str = "http://127.0.0.1:11434", local: bool = False) -> Fit:
     """Gather the live facts and assess. Process listing runs only when the fit is not comfortable."""
     from app import config
     from app import remote
 
     on_remote = remote.active()
-    if on_remote:  # the model runs elsewhere (Kaggle): this machine's RAM and GPU do not matter (D-060)
+    if on_remote and not local:  # the model runs elsewhere (Kaggle): this machine's RAM and GPU do not matter (D-060)
         return Fit("remote", model, context, None, None, None, None, source=str(on_remote.get("name") or "remote"))
 
     gpu = config.get_gpu_memory_info()

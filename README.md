@@ -87,8 +87,25 @@ at full 256K context, about 3-4x faster than an 8 GB laptop, without you opening
 3. **When done:** `mitra kaggle stop` (or `/kaggle stop`). It also stops by itself after 30 minutes unused.
    `mitra kaggle status` shows your hours left this week.
 
+The first time you start Mitra it offers to set this up for you (*Yes, guide me* opens the Kaggle settings page and
+takes the pasted token).
+
+**How Mitra switches** (you do not have to think about it):
+- The status line always shows where the model runs: `☁ kaggle · mimo 256K · 28.1 h left` or `💻 laptop · …`.
+- **Read work** (plan mode, the planner and reviewer roles) runs on the laptop; **write work** (edits, tests,
+  `/run` nights) runs on Kaggle when it is up. Mitra switches between turns, never in the middle of one, and compacts
+  a long chat first if the laptop's context is smaller.
+- Write work with Kaggle not running: Mitra asks once per session whether to start it in the background; you keep
+  working on the laptop meanwhile and it moves over when ready.
+- **Kaggle ends** (30 minutes unused, the 12 h limit, your hours run out, the tunnel drops): Mitra switches to the
+  laptop model (a smaller one if RAM is short), writes a report of what was done (`.mitra/reports/kaggle-ended-….md`:
+  your requests, changed files, last tests, a short summary) and stops, so you decide how to go on. A message you had
+  just typed goes back to the input box.
+
 Your code and prompts then pass through the Kaggle machine and Cloudflare's tunnel (protected by a random token):
-use it for code you may share, not secrets. Details: [remote/kaggle/README.md](remote/kaggle/README.md).
+use it for code you may share, not secrets. Kaggle's terms do not mention tunnels; Mitra keeps it to one private
+notebook, used by you and stopped when idle, but it is your account and your call. Details:
+[remote/kaggle/README.md](remote/kaggle/README.md).
 
 ## What stays on your machine
 

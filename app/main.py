@@ -2266,6 +2266,11 @@ def _chat():
     cfg = config.load()
     from app import remote as _remote
     _remote.check_alive(cfg, echo=lambda s: console.print(Text("  " + s, style="m.info")))  # E-067
+    _kaggle_died_turns = None
+    if cfg.pop("_remote_died", "") == "kaggle":  # D-062 B3 at start-up: report on the last session's records
+        from app.core import handoff as _handoff
+        _rec = _handoff.latest_record(pathlib.Path(cfg["workspace"]))
+        _kaggle_died_turns = _handoff.turns_from_record(_rec) if _rec else []
     model = _startup_model(cfg)
     config.save_last_model(model)
     from app.core import store as _store
@@ -2519,6 +2524,8 @@ def _chat():
             cwd=shell_agent.get_cwd(),
             background_tasks=shell_agent.count_background_tasks(only_running=True),
             notice=ui_state.current_notice(),
+            **dict(zip(("backend", "backend_level"),
+                       backend_mod.status_text(bsession.kind, model, num_ctx, health.s))),
         ),
         print_folded=_print_folded,
     )
@@ -2530,10 +2537,14 @@ def _chat():
 
     from app.core import roles as roles_mod
 
-    def _apply_role(role_name: str) -> None:
-        """Swap model, context, tools, MCP servers and thinking for a role, live (D-049..D-052)."""
+    def _apply_role(role_name: str, *, model_override: str | None = None, ctx_override: int | None = None,
+                    quiet: bool = False) -> None:
+        """Swap model, context, tools, MCP servers and thinking for a role, live (D-049..D-052). The overrides are
+        the laptop fallback model (D-062 B2); quiet = the caller prints its own one line."""
         nonlocal model, num_ctx, local_llm, review_llm, codegen_llm, auto_compact_threshold
         r = roles_mod.route(role_name, cfg)
+        if model_override:
+            r = {**r, "model": model_override, "num_ctx": ctx_override or r["num_ctx"]}
         think = {"on": True, "off": False}.get(r["thinking"] or "", thinking_setting(cfg.get("thinking")))
         swapped = r["model"] != model or r["num_ctx"] != num_ctx
         model, num_ctx = r["model"], r["num_ctx"]
@@ -2542,10 +2553,181 @@ def _chat():
         review_llm = codegen_llm = local_llm
         auto_compact_threshold = config.compact_threshold(cfg, num_ctx)
         chat.apply_route(r, llm=local_llm, num_ctx=num_ctx)
+        if quiet:
+            return
         console.print(Text("  ⇄ " + roles_mod.describe(r), style="m.tool"))
         if swapped:
             console.print(Text("    Ollama loads the model on the next message (one model at a time)", style="m.faint"))
             _print_memory_fit(model, num_ctx, cfg.get("ollama_local_base_url") or "http://127.0.0.1:11434")
+
+    # ── Where the model runs: laptop or Kaggle (D-062, docs/BACKENDS.md) ─────────────────────────────────────────
+    from app import backend as backend_mod
+    from app import kaggle as kaggle_mod
+    from app import remote as remote_mod
+    from app import fit as fit_mod
+
+    def _kaggle_quota():
+        return kaggle_mod.quota(kaggle_mod.client())
+
+    health = backend_mod.Health(quota=_kaggle_quota)
+    bsession = backend_mod.Session(kind=backend_mod.REMOTE if cfg.get("remote") else backend_mod.LAPTOP)
+    chat.backend_kind = bsession.kind
+    health.start()
+    last_test_summary = ""
+
+    def _guard_context(new_ctx: int) -> None:
+        """B4: a long chat moving to a smaller context is compacted first, so the next call fits."""
+        nonlocal messages, ctx_used
+        if ctx_used and ctx_used > 0.8 * new_ctx:
+            console.print(ui.tool_line("Compacting", detail=f"the chat ({ctx_used:,} tokens) is too long for "
+                                                            f"{new_ctx // 1024}K: summarising older turns first"))
+            messages = _compact(local_llm, messages, system_prompt, workspace=cfg["workspace"], reason="backend",
+                                total_tokens=ctx_used, rec=chat.rec)
+            ctx_used = 0
+
+    def _to_laptop(reason: str, *, report: bool = False) -> None:
+        """B2 + B3: this machine's model that fits the free memory (quietly smaller), optionally the report."""
+        remote_mod.unapply(cfg)
+        r = roles_mod.route(chat.role, cfg)
+        pick, ctx, note = backend_mod.laptop_choice(
+            r["model"], roles_mod.context_for(r["model"], cfg), roles_mod.installed(),
+            lambda m, c: fit_mod.check(m, c, base_url=cfg.get("ollama_local_base_url") or "http://127.0.0.1:11434",
+                                       local=True).verdict,
+            cfg.get("laptop_models"))
+        _apply_role(chat.role, model_override=pick, ctx_override=ctx, quiet=True)
+        bsession.kind, chat.backend_kind = backend_mod.LAPTOP, "laptop"
+        console.print(Text(f"  💻 {reason} → laptop · {pick} {ctx // 1024}K" + (f" · {note}" if note else ""),
+                           style="m.info"))
+        _guard_context(ctx)
+        if report:
+            _kaggle_report(reason, note)
+
+    def _to_remote(reason: str) -> None:
+        remote_mod.apply(cfg)
+        _apply_role(chat.role, quiet=True)
+        bsession.kind, chat.backend_kind = backend_mod.REMOTE, "remote"
+        console.print(Text(f"  ☁ {reason} → {cfg.get('remote') or 'remote'} · {model} {num_ctx // 1024}K",
+                           style="m.tool"))
+
+    def _kaggle_report(reason: str, note: str = "", turns=None, summarize: bool = True) -> None:
+        """B3: facts from Mitra's records + a short summary by the laptop model; written, shown, then Mitra waits."""
+        from app.core import handoff
+        st = kaggle_mod.load_state()
+        session_min = int((time.time() - st["started"]) / 60) if st.get("started") else None
+        night = None
+        try:
+            from app.core import night as _night
+            ns = _night.status(n=5)
+            if ns:
+                night = {"state": "running" if ns["running"] else "finished", "plan": pathlib.Path(ns["plan"]).name,
+                         "detail": f"{ns['elapsed_min']} min of up to {ns['hours']} h"}
+        except Exception:
+            pass
+        summary = ""
+        if summarize and len(messages) > 1:
+            console.print(Text("  writing the report with the laptop model (the first load takes a moment; "
+                               "ctrl+c skips the summary) …", style="m.faint"))
+            try:
+                summary = handoff.summarize(local_llm, messages)
+            except KeyboardInterrupt:
+                summary = ""
+        text = handoff.build(reason=reason, workspace=pathlib.Path(cfg["workspace"]),
+                             turns=chat.turn_log if turns is None else turns,
+                             laptop=f"{model} at {num_ctx // 1024}K" + (f" ({note})" if note else ""),
+                             summary=summary, last_tests=last_test_summary, night=night,
+                             kaggle={"session_min": session_min, "left_h": health.s.hours_left})
+        path = handoff.write(pathlib.Path(cfg["workspace"]), text)
+        console.print(Markdown(text))
+        console.print(Text(f"  report saved: {path}", style="m.faint"))
+
+    def _kaggle_ended(reason: str) -> None:
+        """Kaggle is gone: its address is useless now (a new one every session): laptop, report, stop (B3)."""
+        if (remote_mod.active() or {}).get("name") == "kaggle":
+            remote_mod.clear()
+        st = kaggle_mod.load_state()
+        if st:
+            kaggle_mod.save_state({**st, "ended": time.time()})
+        _to_laptop(reason, report=True)
+
+    def _start_kaggle_background() -> None:
+        """B5 a: start Kaggle while you keep working here; the next turn after it is ready moves write work there."""
+        import threading as _threading
+        health.starting("uploading the notebook")
+
+        def run():
+            try:
+                kaggle_mod.start(model, 262_144,
+                                 echo=lambda s: health.starting(str(s).strip(" ·✓⏳☁").strip()[:60]))
+                health.check()
+            except Exception as exc:  # noqa: BLE001 - reported before the next turn
+                health.s.state, health.s.stage = "none", ""
+                bsession.notes.append(f"Kaggle did not start: {exc}")
+
+        _threading.Thread(target=run, daemon=True, name="mitra-kaggle-start").start()
+        console.print(Text("  ☁ starting Kaggle in the background (4-8 min): keep working; the status line shows "
+                           "its progress and write work moves there when it is ready", style="m.tool"))
+
+    def _has_kaggle_key() -> bool:
+        return bool(kaggle_mod.key_path().exists() or kaggle_mod.token_path().exists()
+                    or os.environ.get("KAGGLE_API_TOKEN") or os.environ.get("KAGGLE_KEY"))
+
+    def _maybe_offer_kaggle() -> None:
+        """B5 a: write work, no Kaggle running: ask once per session (only when Kaggle is set up)."""
+        if bsession.asked_start or bsession.no_kaggle_this_session or health.s.state == "starting":
+            return
+        if backend_mod.prefs().get("kaggle_offer") == "no" or not _has_kaggle_key():
+            return
+        bsession.asked_start = True
+        answer = ui.menu.choose(console, "Write work runs 3-4x faster on your Kaggle GPU. Start it?",
+                                [("bg", "Yes, in the background (4-8 min; keep working here, I switch when ready)"),
+                                 ("no", "No, this machine for this session")], default="bg")
+        if answer == "bg":
+            _start_kaggle_background()
+        else:
+            bsession.no_kaggle_this_session = True
+
+    def _onboard_kaggle() -> None:
+        """B6: the first start on a machine offers a free Kaggle GPU, once."""
+        p = backend_mod.prefs()
+        if p.get("onboarded"):
+            return
+        if _has_kaggle_key():
+            backend_mod.save_prefs(onboarded=True, kaggle_offer="yes")
+            return
+        if not sys.stdin.isatty():
+            return
+        answer = ui.menu.choose(console, "A free Kaggle GPU (about 30 h a week) makes Mitra 3-4x faster with 256K "
+                                         "context. Connect it now? (about 2 minutes)",
+                                [("yes", "Yes, guide me"), ("later", "Later (`mitra kaggle setup` any time)"),
+                                 ("no", "No, this machine only")], default="yes")
+        if answer != "yes":
+            backend_mod.save_prefs(onboarded=True, kaggle_offer="no" if answer == "no" else "later")
+            return
+        import webbrowser
+        try:
+            webbrowser.open("https://www.kaggle.com/settings")
+        except Exception:
+            pass
+        console.print(Text("  On kaggle.com → Settings (opened in your browser; sign up free if needed):\n"
+                           "    1. Phone verification: verify (Kaggle needs it for GPUs)\n"
+                           "    2. API → Generate New Token, then copy it", style="m.text"))
+        try:
+            token = console.input("[m.accent]  paste the token here (enter = later) ›[/m.accent] ", password=True).strip()
+        except (EOFError, KeyboardInterrupt):
+            token = ""
+        if token and kaggle_mod.setup(token, echo=lambda s: console.print(Text("  " + str(s), style="m.tool"))):
+            backend_mod.save_prefs(onboarded=True, kaggle_offer="yes")
+            if ui.menu.choose(console, "Start the Kaggle GPU now?",
+                              [("bg", "Yes, in the background (keep working here)"), ("later", "Later")],
+                              default="bg") == "bg":
+                _start_kaggle_background()
+        else:
+            backend_mod.save_prefs(onboarded=True, kaggle_offer="later")
+            console.print(Text("  later: `mitra kaggle setup <token>`", style="m.faint"))
+
+    if _kaggle_died_turns is not None:
+        _kaggle_report("the Kaggle GPU ended while Mitra was closed", turns=_kaggle_died_turns, summarize=False)
+    _onboard_kaggle()
 
     while True:
         _set_current_task("Ready")
@@ -2882,12 +3064,18 @@ def _chat():
                                        style="m.dim"))
                     kaggle_mod.start(model, 262_144,
                                      echo=lambda s: console.print(Text(str(s), style="m.tool")))
-                    remote_mod.apply(cfg)
-                    _apply_role(chat.role)  # this chat now talks to Kaggle at its context
+                    health.check()
+                    _want = backend_mod.route(session_mode, chat.role)
+                    if _want == backend_mod.REMOTE:
+                        _to_remote("Kaggle is ready")  # this chat now talks to Kaggle at its context
+                    else:
+                        console.print(Text(f"  ☁ Kaggle is ready; {backend_mod.why(_want, session_mode, chat.role)}"
+                                           " until you leave it", style="m.tool"))
                 elif sub == "stop":
                     kaggle_mod.stop(echo=lambda s: console.print(Text(str(s), style="m.tool")))
-                    remote_mod.unapply(cfg)
-                    _apply_role(chat.role)  # back on this machine
+                    health.check()
+                    if bsession.kind == backend_mod.REMOTE:
+                        _to_laptop("Kaggle stopped")  # back on this machine
                 else:
                     kaggle_mod.status(echo=lambda s: console.print(Text("  " + str(s), style="m.tool")))
             except kaggle_mod.KaggleError as exc:
@@ -3003,6 +3191,25 @@ def _chat():
             _say(f"Unknown command `{unknown}`. Type `/help` for the list.")
             continue
 
+        # ── Where this turn runs: laptop or Kaggle (D-062) ─────────────────────────
+        for _note in bsession.notes:
+            console.print(Text("  ✗ " + _note, style="m.err"))
+        bsession.notes.clear()
+        _hstate = health.check().state if (remote_mod.active() or bsession.kind == backend_mod.REMOTE) else "none"
+        if bsession.kind == backend_mod.REMOTE and _hstate != "up":
+            _kaggle_ended("the Kaggle GPU stopped answering (30 min unused, its time limit, or stopped on Kaggle)")
+            typed_ahead = user_input
+            console.print(Text("  your message was not sent: it is back in the input box (enter sends it on the "
+                               "laptop)", style="m.faint"))
+            continue
+        if _hstate == "up":
+            _want = backend_mod.route(session_mode, chat.role)
+            if _want != bsession.kind:
+                (_to_remote if _want == backend_mod.REMOTE else _to_laptop)(
+                    backend_mod.why(_want, session_mode, chat.role))
+        elif backend_mod.route(session_mode, chat.role) == backend_mod.REMOTE:
+            _maybe_offer_kaggle()
+
         messages.append(HumanMessage(content=user_input))
 
         console.print()
@@ -3040,6 +3247,10 @@ def _chat():
                     files=len({e["path"] for e in turn.journal}), tests_run=turn.tests_run,
                     last_test_ok=turn.last_test_ok, tokens_in=turn_in, tokens_out=turn_out))
             ui.notify.done(console, time.monotonic() - turn_started)
+            last_test_summary = turn.last_test_summary or last_test_summary
+            if turn.remote_gone:  # D-062 B3: the remote stopped in the middle of the turn
+                _kaggle_ended("the Kaggle GPU stopped answering in the middle of the turn")
+                continue
 
             # ── Auto-compact ──────────────────────────────────────────────────
             if ctx_used >= auto_compact_threshold:  # E-025: compare the real context size

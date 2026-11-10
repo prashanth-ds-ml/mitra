@@ -22,6 +22,8 @@ the user before the next one starts.
   machine half way. Proposal: route by **mode and role**, not by guessing the message: plan mode and the planner /
   reviewer roles = laptop; ask / auto-edit with the chat, builder, tester, debugger roles = Kaggle when it is up.
 
+**Status 2026-11-10: B0-B6 built and tested (unit + 6 driven chat tests), v0.2.0.** Defaults taken by the user's "go with your defaults": a = ask once per session, start in the background; b = route by mode and role.
+
 ## Build order
 
 Each step: what it does · where · done when (tests that fail without it + a live check).
