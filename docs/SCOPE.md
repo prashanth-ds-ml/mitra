@@ -137,6 +137,17 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
 - **I-20 Experiments registry + dashboard section** ([EXPERIMENTS.md](EXPERIMENTS.md), plan 2026-11-08): one result
   file per experiment run (question, setup, numbers, verdict, decision), written by `mitra night`, a new
   `mitra judge`, the screen and level runs; an Experiments section with comparisons and "what chose this default".
+- **I-21 `/free`: make room for the model** (user, 2026-11-10; RAM was 3.7 GB free, mimo 128K needs ~5.2 GB):
+  shows need vs free, a tick list of programs (grouped, never-close list and Mitra's own terminal excluded, biggest
+  pre-ticked by `fit.pick_to_close`), closes the ticked ones politely (like ✕; force only on a second yes), offers
+  to unload other Ollama models and the smaller options, then re-checks. Offered at start (⚠/✗), before `/run`,
+  in `/doctor`. Builds on `app/fit.py`. Impact: every session while RAM is tight; small. Waiting: name + when.
+- **I-22 Magnitude inference engine trial** (user asked 2026-11-10; magnitude.dev, Apache 2.0, Windows native,
+  RTX 5050 supported, OpenAI-compatible API on :10100, claims ~2x Ollama decode): same model (qwen3.5:4b) on both
+  with `bench/model_screen.py`: tok/s, prompt speed, native tool calls. Gaps: no mimo-v2.6 / deepseek-r1 in its
+  catalog, tool calling and thinking undocumented, 9B Q4 (8.4 GB) > 8 GB VRAM. If faster with working tools: an
+  optional second provider, Ollama stays. Install (`irm .../install.ps1 | iex`) needs the user's go. The other
+  Magnitude (browser-agent, vision UI tests) needs a 72B vision model or Claude: no fit; Playwright stays (M4).
 
 ## Later (not milestones)
 Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,
