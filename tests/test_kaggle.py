@@ -289,3 +289,32 @@ def test_the_librarys_own_sign_in_help_is_not_printed(monkeypatch, tmp_path, cap
         kaggle.client()
     out = capsys.readouterr()
     assert "Authentication required" not in out.out + out.err
+
+
+def _ready_env(monkeypatch, tmp_path, key=True):
+    k = tmp_path / "kaggle.json"
+    if key:
+        k.write_text('{"username": "u", "key": "k"}', encoding="utf-8")
+    monkeypatch.setattr(kaggle, "key_path", lambda: k)
+    monkeypatch.setattr(kaggle, "token_path", lambda: tmp_path / "none")
+    for var in ("KAGGLE_API_TOKEN", "KAGGLE_KEY", "KAGGLE_USERNAME"):
+        monkeypatch.delenv(var, raising=False)
+
+
+def test_readiness_cases(monkeypatch, tmp_path, fake_quota):
+    """D-064: one check at start, one plain line with the fix when something is wrong."""
+    _ready_env(monkeypatch, tmp_path, key=False)
+    r = kaggle.readiness(api_factory=_ok_api)
+    assert not r["key"] and "/kaggle setup" in r["problem"]
+    _ready_env(monkeypatch, tmp_path)
+    r = kaggle.readiness(api_factory=_ok_api)
+    assert r["ok"] and r["user"] == "someone" and r["left_h"] == 29.0 and r["problem"] == ""
+    fake_quota.update(total_h=0.0, left_h=0.0)
+    assert "verify your phone" in kaggle.readiness(api_factory=_ok_api)["problem"]
+    fake_quota.update(total_h=30.0, left_h=0.1)
+    assert "used up this week" in kaggle.readiness(api_factory=_ok_api)["problem"]
+
+    def bad():
+        raise kaggle.KaggleError(kaggle._CREDS_HELP)
+
+    assert "does not work any more" in kaggle.readiness(api_factory=bad)["problem"]

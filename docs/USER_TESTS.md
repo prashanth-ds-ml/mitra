@@ -12,6 +12,12 @@ machine or your judgment. Updated every release.
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
 
+## 2026-11-10 · Kaggle start-up question (D-064, v0.2.2)
+
+- [ ] Your next start (key set, not decided): asked once, "Yes, when I need it" pre-selected; then one ready line
+- [ ] Friend's first start (no key): "Use a free Kaggle GPU? Yes, guide me / Later / No"
+- [ ] `/kaggle use now`: Kaggle starts in the background; `/kaggle` shows the setting
+
 ## 2026-11-10 · Kaggle/laptop switching (D-062, v0.2.0)
 
 - [ ] Status line shows `☁ kaggle · … h left` on Kaggle and `💻 laptop` after `/kaggle stop`

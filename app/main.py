@@ -394,7 +394,7 @@ def _kaggle_model() -> str:
 
 
 def cmd_kaggle(
-    action: str = typer.Argument("status", help="setup [path] | start | stop | status"),
+    action: str = typer.Argument("status", help="setup [token|path] | start | stop | status | use <now|when-needed|never>"),
     path: str = typer.Argument("", help="For setup: the downloaded kaggle.json (default: look in Downloads)."),
     model: str = typer.Option("", "--model", help="Model to run there (default: your chat model)."),
     ctx: int = typer.Option(262_144, "--ctx", help="Context (default 256K, mimo's maximum)."),
@@ -408,12 +408,22 @@ def cmd_kaggle(
         if action == "setup":
             if not kaggle.setup(path, echo=console.print):
                 raise typer.Exit(1)
+        elif action == "use":  # D-064: when Mitra uses Kaggle
+            from app import backend
+            if path not in backend.USE_VALUES:
+                console.print("Usage: mitra kaggle use now|when-needed|never")
+                raise typer.Exit(2)
+            backend.save_prefs(kaggle_use=path, onboarded=True)
+            console.print(f"☁ Kaggle {backend.USE_TEXT[path]}")
         elif action == "start":
             kaggle.start(model or _kaggle_model(), ctx, idle_min=idle, max_hours=hours, echo=console.print)
             console.print("  Start Mitra (or restart it): it now runs on Kaggle. `mitra kaggle stop` when done.")
         elif action == "stop":
             kaggle.stop(echo=console.print)
         else:
+            from app import backend
+            use = backend.kaggle_use()
+            console.print(f"Setting: {use or 'not decided yet'} ({backend.USE_TEXT.get(use, 'asked at the next start')})")
             kaggle.status(echo=console.print)
     except kaggle.KaggleError as exc:
         console.print(f"✗ {exc}")
@@ -720,7 +730,7 @@ _COMMAND_HELP = [
         ("/status",        "Workspace, model, mode and session status"),
         ("/doctor",        "Machine and setup check: RAM, GPU, Ollama, permissions, MCP"),
         ("/free",          "Make RAM room for the model: tick programs, Mitra closes them"),
-        ("/kaggle [start|stop]", "Run the model on your Kaggle GPU hours (status: hours left)"),
+        ("/kaggle [start|stop|use|setup]", "Kaggle GPU: status and hours · start/stop · use now|when-needed|never"),
         ("/report",        "Rebuild the dashboard (sessions, tools, improvement, training data) and open it"),
         ("/role [name]",   "Show roles, or switch role: model, tools and MCP servers at once"),
         ("/model use <m>", "Switch the chat model now (no restart)"),
@@ -2668,41 +2678,32 @@ def _chat():
                            "its progress and write work moves there when it is ready", style="m.tool"))
 
     def _has_kaggle_key() -> bool:
-        return bool(kaggle_mod.key_path().exists() or kaggle_mod.token_path().exists()
-                    or os.environ.get("KAGGLE_API_TOKEN") or os.environ.get("KAGGLE_KEY"))
+        return kaggle_mod.has_key()
 
-    def _maybe_offer_kaggle() -> None:
-        """B5 a: write work, no Kaggle running: ask once per session (only when Kaggle is set up)."""
-        if bsession.asked_start or bsession.no_kaggle_this_session or health.s.state == "starting":
-            return
-        if backend_mod.prefs().get("kaggle_offer") == "no" or not _has_kaggle_key():
-            return
-        bsession.asked_start = True
-        answer = ui.menu.choose(console, "Write work runs 3-4x faster on your Kaggle GPU. Start it?",
-                                [("bg", "Yes, in the background (4-8 min; keep working here, I switch when ready)"),
-                                 ("no", "No, this machine for this session")], default="bg")
-        if answer == "bg":
-            _start_kaggle_background()
-        else:
-            bsession.no_kaggle_this_session = True
+    def _say_line(text: str, style: str = "m.tool") -> None:
+        console.print(Text("  " + text, style=style))
 
-    def _onboard_kaggle() -> None:
-        """B6: the first start on a machine offers a free Kaggle GPU, once."""
-        p = backend_mod.prefs()
-        if p.get("onboarded"):
-            return
-        if _has_kaggle_key():
-            backend_mod.save_prefs(onboarded=True, kaggle_offer="yes")
-            return
-        if not sys.stdin.isatty():
-            return
-        answer = ui.menu.choose(console, "A free Kaggle GPU (about 30 h a week) makes Mitra 3-4x faster with 256K "
-                                         "context. Connect it now? (about 2 minutes)",
-                                [("yes", "Yes, guide me"), ("later", "Later (`mitra kaggle setup` any time)"),
-                                 ("no", "No, this machine only")], default="yes")
-        if answer != "yes":
-            backend_mod.save_prefs(onboarded=True, kaggle_offer="no" if answer == "no" else "later")
-            return
+    def _ask_use(user: str = "", left_h=None) -> str | None:
+        """Case 2 (D-064): Kaggle works here; does the user want it, and when? Saved; None = later."""
+        who = f" for {user}" if user else ""
+        hours = f" · {left_h:.1f} h left this week" if left_h is not None else ""
+        answer = ui.menu.choose(console, f"Kaggle is set up{who}{hours}. Use its GPU with Mitra (3-4x faster, 256K)?",
+                                [("when-needed", "Yes, when I need it (starts on your first write work; no hours "
+                                                 "used before)"),
+                                 ("now", "Yes, start it now, and at every Mitra start"),
+                                 ("later", "Ask me later"),
+                                 ("never", "No, this machine only")], default="when-needed")
+        if answer in backend_mod.USE_VALUES:
+            backend_mod.save_prefs(kaggle_use=answer, onboarded=True)
+            if answer != "never":
+                _say_line(f"☁ Kaggle {backend_mod.USE_TEXT[answer]} · `/kaggle use now|when-needed|never` "
+                          "changes it", "m.faint")
+            return answer
+        backend_mod.save_prefs(later_day=time.strftime("%Y-%m-%d"), onboarded=True)
+        return None
+
+    def _guide_setup() -> bool:
+        """Case 1: no key yet: open Kaggle's settings page, take the pasted token, check it."""
         import webbrowser
         try:
             webbrowser.open("https://www.kaggle.com/settings")
@@ -2715,19 +2716,73 @@ def _chat():
             token = console.input("[m.accent]  paste the token here (enter = later) ›[/m.accent] ", password=True).strip()
         except (EOFError, KeyboardInterrupt):
             token = ""
-        if token and kaggle_mod.setup(token, echo=lambda s: console.print(Text("  " + str(s), style="m.tool"))):
-            backend_mod.save_prefs(onboarded=True, kaggle_offer="yes")
-            if ui.menu.choose(console, "Start the Kaggle GPU now?",
-                              [("bg", "Yes, in the background (keep working here)"), ("later", "Later")],
-                              default="bg") == "bg":
-                _start_kaggle_background()
+        if token and kaggle_mod.setup(token, echo=lambda s: _say_line(str(s))):
+            return True
+        _say_line("later: `/kaggle setup <token>`", "m.faint")
+        return False
+
+    def _kaggle_at_start() -> None:
+        """D-064: at every start, one check (key, still works, phone verified, hours left) and one of five cases."""
+        use = backend_mod.kaggle_use()
+        if bsession.kind == backend_mod.REMOTE or use == "never":   # case 5 (running) or the user said no
+            return
+        interactive = sys.stdin.isatty()
+        if not _has_kaggle_key():                                    # case 1: no key
+            if use is None and interactive and not backend_mod.asked_later_today():
+                answer = ui.menu.choose(console, "Use a free Kaggle GPU with Mitra? About 30 h a week, 3-4x faster, "
+                                                 "256K context (2 minutes to connect)",
+                                        [("yes", "Yes, guide me"), ("later", "Later"),
+                                         ("never", "No, this machine only")], default="yes")
+                if answer == "never":
+                    backend_mod.save_prefs(kaggle_use="never", onboarded=True)
+                elif answer == "yes" and _guide_setup():
+                    _kaggle_at_start()  # now case 2: ask when to use it
+                else:
+                    backend_mod.save_prefs(later_day=time.strftime("%Y-%m-%d"), onboarded=True)
+            elif use in ("now", "when-needed"):
+                _say_line("☁ Kaggle: no key on this machine any more · `/kaggle setup <token>`", "m.info")
+            return
+        console.print(Text("  checking Kaggle …", style="m.faint"))
+        r = kaggle_mod.readiness()
+        if r["problem"]:                                             # case 4: something to fix, with the fix
+            if use is not None or not backend_mod.asked_later_today():
+                _say_line("☁ " + r["problem"], "m.info")
+            return
+        if use is None:                                              # case 2: works, never asked
+            if not interactive or backend_mod.asked_later_today():
+                return
+            use = _ask_use(r["user"], r["left_h"])
+            if use is None or use == "never":
+                return
+        if use == "now":                                             # case 3: said yes
+            _start_kaggle_background()
         else:
-            backend_mod.save_prefs(onboarded=True, kaggle_offer="later")
-            console.print(Text("  later: `mitra kaggle setup <token>`", style="m.faint"))
+            _say_line(f"☁ Kaggle ready · {r['left_h']:.1f} h left · starts on your first write work "
+                      "(`/kaggle start` now)", "m.faint")
+
+    def _maybe_offer_kaggle() -> None:
+        """Write work and Kaggle is not running: 'when-needed' starts it in the background without asking; not
+        decided yet: ask once per session; 'never': nothing."""
+        if bsession.asked_start or bsession.no_kaggle_this_session or health.s.state == "starting":
+            return
+        use = backend_mod.kaggle_use()
+        if use == "never" or not _has_kaggle_key():
+            return
+        bsession.asked_start = True
+        if use in ("now", "when-needed"):
+            _start_kaggle_background()
+            return
+        answer = ui.menu.choose(console, "Write work runs 3-4x faster on your Kaggle GPU. Start it?",
+                                [("bg", "Yes, in the background (4-8 min; keep working here, I switch when ready)"),
+                                 ("no", "No, this machine for this session")], default="bg")
+        if answer == "bg":
+            _start_kaggle_background()
+        else:
+            bsession.no_kaggle_this_session = True
 
     if _kaggle_died_turns is not None:
         _kaggle_report("the Kaggle GPU ended while Mitra was closed", turns=_kaggle_died_turns, summarize=False)
-    _onboard_kaggle()
+    _kaggle_at_start()
 
     while True:
         _set_current_task("Ready")
@@ -3076,7 +3131,23 @@ def _chat():
                     health.check()
                     if bsession.kind == backend_mod.REMOTE:
                         _to_laptop("Kaggle stopped")  # back on this machine
+                elif sub == "use":  # D-064: when Mitra uses Kaggle
+                    value = (user_input.strip().split() + ["", "", ""])[2].lower()
+                    if value not in backend_mod.USE_VALUES:
+                        _say("`/kaggle use now` (start at every Mitra start) · `/kaggle use when-needed` (on your "
+                             "first write work) · `/kaggle use never` (this machine only)")
+                    else:
+                        backend_mod.save_prefs(kaggle_use=value, onboarded=True)
+                        console.print(Text(f"  ☁ Kaggle {backend_mod.USE_TEXT[value]}", style="m.tool"))
+                        if value == "now" and health.s.state not in ("up", "starting") and _has_kaggle_key():
+                            _start_kaggle_background()
+                elif sub == "setup":
+                    _guide_setup()
                 else:
+                    use = backend_mod.kaggle_use()
+                    console.print(Text(f"  setting: {use or 'not decided yet'} · "
+                                       f"{backend_mod.USE_TEXT.get(use, 'asked at the next start')} · "
+                                       "`/kaggle use now|when-needed|never`", style="m.tool"))
                     kaggle_mod.status(echo=lambda s: console.print(Text("  " + str(s), style="m.tool")))
             except kaggle_mod.KaggleError as exc:
                 console.print(Text(f"  ✗ {exc}", style="m.err"))

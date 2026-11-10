@@ -73,7 +73,12 @@ def harness(tmp_path, monkeypatch):
                                                       "refresh": None})
     monkeypatch.setattr(kaggle, "client", lambda: object())
     from app import backend
-    backend.save_prefs(onboarded=True, kaggle_offer="later")
+    backend.save_prefs(onboarded=True, kaggle_use="never")  # each test sets what it needs
+    nokey = tmp_path / "nokey"
+    monkeypatch.setattr(kaggle, "key_path", lambda: nokey / "kaggle.json")
+    monkeypatch.setattr(kaggle, "token_path", lambda: nokey / "access_token")
+    for var in ("KAGGLE_API_TOKEN", "KAGGLE_KEY", "KAGGLE_USERNAME"):
+        monkeypatch.delenv(var, raising=False)
     config.save_last_model("mimo-v2.6:9b")
     Inputs.defaults, Inputs.toolbars = [], []
     yield state, ws
@@ -127,7 +132,8 @@ def test_write_work_without_kaggle_asks_once_per_session(harness, monkeypatch, t
     key = tmp_path / "kaggle.json"
     key.write_text('{"username": "u", "key": "k"}', encoding="utf-8")
     monkeypatch.setattr(kaggle, "key_path", lambda: key)
-    backend.save_prefs(onboarded=True, kaggle_offer="yes")
+    backend._prefs_file().unlink()
+    backend.save_prefs(later_day=__import__("time").strftime("%Y-%m-%d"))  # not decided; already asked today
     asked = []
     monkeypatch.setattr(main.ui.menu, "choose", lambda console, q, opts, default=None: asked.append(q) or "no")
     Inputs.script = ["write a test", "write another", "/mode plan", "explain it", "exit"]
@@ -135,25 +141,111 @@ def test_write_work_without_kaggle_asks_once_per_session(harness, monkeypatch, t
     assert len(asked) == 1 and "Kaggle GPU" in asked[0]
 
 
-def test_first_start_offers_kaggle_and_remembers_no(harness, monkeypatch):
+def _menu(monkeypatch, answer):
+    asked = []
+    monkeypatch.setattr(main.ui.menu, "choose", lambda console, q, opts, default=None: asked.append(
+        (q, [k for k, _ in opts], default)) or answer)
+    monkeypatch.setattr(main.sys.stdin, "isatty", lambda: True, raising=False)
+    return asked
+
+
+def _undecided():
     from app import backend
     backend._prefs_file().unlink()
-    from app import kaggle
-    monkeypatch.setattr(kaggle, "key_path", lambda: pathlib.Path("no-such-key.json"))
-    monkeypatch.setattr(kaggle, "token_path", lambda: pathlib.Path("no-such-token"))
-    for var in ("KAGGLE_API_TOKEN", "KAGGLE_KEY"):
-        monkeypatch.delenv(var, raising=False)
-    monkeypatch.setattr(main.sys.stdin, "isatty", lambda: True, raising=False)
-    asked = []
-    monkeypatch.setattr(main.ui.menu, "choose", lambda console, q, opts, default=None: asked.append(q) or "no")
+
+
+def test_case1_no_key_asks_once_and_remembers_never(harness, monkeypatch):
+    _undecided()
+    asked = _menu(monkeypatch, "never")
     Inputs.script = ["exit"]
     main._chat()
-    assert len(asked) == 1 and "free Kaggle GPU" in asked[0]
-    assert backend.prefs() == {"onboarded": True, "kaggle_offer": "no"}
+    assert len(asked) == 1 and "free Kaggle GPU" in asked[0][0] and asked[0][1] == ["yes", "later", "never"]
+    from app import backend
+    assert backend.kaggle_use() == "never"
     asked.clear()
     Inputs.script = ["exit"]
     main._chat()
-    assert asked == []  # never asked again
+    assert asked == []
+
+
+def test_case1_later_asks_again_only_on_another_day(harness, monkeypatch):
+    _undecided()
+    asked = _menu(monkeypatch, "later")
+    for _ in range(2):
+        Inputs.script = ["exit"]
+        main._chat()
+    assert len(asked) == 1
+
+
+def _key_ready(monkeypatch, tmp_path, problem=""):
+    from app import kaggle
+    key = tmp_path / "k.json"
+    key.write_text('{"username": "friend", "key": "k"}', encoding="utf-8")
+    monkeypatch.setattr(kaggle, "key_path", lambda: key)
+    monkeypatch.setattr(kaggle, "readiness", lambda **k: {"key": True, "ok": not problem, "user": "friend",
+                                                          "left_h": 28.1, "total_h": 30.0, "refresh": None,
+                                                          "problem": problem})
+    started = []
+    monkeypatch.setattr(kaggle, "start", lambda *a, **k: started.append(a))
+    return started
+
+
+def test_case2_key_works_asks_when_with_when_needed_first(harness, monkeypatch, tmp_path, capsys):
+    _undecided()
+    _key_ready(monkeypatch, tmp_path)
+    asked = _menu(monkeypatch, "when-needed")
+    Inputs.script = ["exit"]
+    main._chat()
+    q, keys, default = asked[0]
+    assert "set up for friend" in q and "28.1 h left" in q
+    assert keys == ["when-needed", "now", "later", "never"] and default == "when-needed"
+    from app import backend
+    assert backend.kaggle_use() == "when-needed"
+    asked.clear()
+    Inputs.script = ["exit"]
+    main._chat()  # case 3: said yes: one line, no question
+    out = " ".join(capsys.readouterr().out.split())
+    assert asked == [] and "Kaggle ready · 28.1 h left · starts on your first write work" in out
+
+
+def test_case3_now_starts_in_the_background_at_start(harness, monkeypatch, tmp_path):
+    from app import backend
+    backend.save_prefs(kaggle_use="now")
+    started = _key_ready(monkeypatch, tmp_path)
+    Inputs.script = ["exit"]
+    main._chat()
+    import time as _t
+    for _ in range(50):
+        if started:
+            break
+        _t.sleep(0.05)
+    assert started
+
+
+def test_case4_a_problem_is_one_line_with_the_fix(harness, monkeypatch, tmp_path, capsys):
+    from app import backend
+    backend.save_prefs(kaggle_use="when-needed")
+    _key_ready(monkeypatch, tmp_path, problem="Kaggle shows 0 GPU hours: verify your phone on kaggle.com → Settings")
+    asked = _menu(monkeypatch, "now")
+    Inputs.script = ["exit"]
+    main._chat()
+    out = " ".join(capsys.readouterr().out.split())
+    assert asked == [] and "verify your phone" in out
+
+
+def test_when_needed_starts_kaggle_on_write_work_without_asking(harness, monkeypatch, tmp_path):
+    from app import backend
+    backend.save_prefs(kaggle_use="when-needed")
+    started = _key_ready(monkeypatch, tmp_path)
+    asked = _menu(monkeypatch, "no")
+    Inputs.script = ["/mode plan", "explain it", "/mode auto", "write a test", "exit"]
+    main._chat()
+    import time as _t
+    for _ in range(50):
+        if started:
+            break
+        _t.sleep(0.05)
+    assert asked == [] and len(started) == 1
 
 
 def test_ram_short_quietly_takes_the_smaller_laptop_model(harness, monkeypatch, capsys):

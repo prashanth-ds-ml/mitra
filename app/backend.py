@@ -216,3 +216,27 @@ class Session:
     no_kaggle_this_session: bool = False
     asked_start: bool = False
     notes: list = field(default_factory=list)
+
+
+# ── D-064: does the user want Kaggle, and when ───────────────────────────────
+
+USE_VALUES = ("now", "when-needed", "never")
+USE_TEXT = {"now": "starts in the background when Mitra starts",
+            "when-needed": "starts in the background on your first write work",
+            "never": "not used: this machine only"}
+
+
+def kaggle_use() -> str | None:
+    """The user's answer: now | when-needed | never, or None = not asked yet (or 'later')."""
+    p = prefs()
+    use = p.get("kaggle_use")
+    if use in USE_VALUES:
+        return use
+    if p.get("kaggle_offer") == "no":  # an explicit "No" given in v0.2.0
+        return "never"
+    return None  # v0.2.0 also saved a silent "yes" for anyone with a key: ask them properly now
+
+
+def asked_later_today(today: str | None = None) -> bool:
+    """'Later' asks again at the next start, at most once a day."""
+    return prefs().get("later_day") == (today or time.strftime("%Y-%m-%d"))

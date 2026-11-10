@@ -441,3 +441,38 @@ def status(*, echo=print, api=None) -> None:
              (f"✗ not answering ({err})" if err else "✓ answering"))
     else:
         echo("Mitra uses: this machine's Ollama")
+
+
+def has_key() -> bool:
+    """A Kaggle key is on this machine (kaggle.json, the newer access_token, or environment variables)."""
+    return bool(key_path().exists() or token_path().exists() or os.environ.get("KAGGLE_API_TOKEN")
+                or (os.environ.get("KAGGLE_USERNAME") and os.environ.get("KAGGLE_KEY")))
+
+
+def readiness(api_factory=None) -> dict:
+    """Can Mitra use Kaggle right now? {key, ok, user, left_h, total_h, refresh, problem} (D-064).
+    problem is one plain line with the fix, or ""."""
+    out = {"key": has_key(), "ok": False, "user": "", "left_h": None, "total_h": None, "refresh": None, "problem": ""}
+    if not out["key"]:
+        out["problem"] = "no Kaggle key on this machine: `/kaggle setup` (2 minutes)"
+        return out
+    try:
+        api = (api_factory or client)()
+        out["user"] = username(api)
+        q = quota(api)
+    except KaggleError as exc:
+        text = str(exc)
+        out["problem"] = ("the Kaggle key does not work any more: make a new one (kaggle.com → Settings → API) and "
+                          "`/kaggle setup <token>`") if "API key" in text or "Generate New Token" in text else \
+            f"Kaggle did not answer ({text[:120]}); this machine for now"
+        return out
+    out.update(left_h=q["left_h"], total_h=q["total_h"], refresh=q["refresh"])
+    if not q["total_h"]:
+        out["problem"] = ("Kaggle shows 0 GPU hours: verify your phone on kaggle.com → Settings (GPUs need it), "
+                          "then restart Mitra")
+    elif q["left_h"] < 0.25:
+        when = q["refresh"].astimezone().strftime("%a %H:%M") if q.get("refresh") else "next week"
+        out["problem"] = f"Kaggle GPU hours are used up this week (resets {when}): this machine until then"
+    else:
+        out["ok"] = True
+    return out

@@ -4,6 +4,13 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-10 · Mitra asks before using Kaggle (D-064)
+- At every start: one check (key valid, phone verified, hours left) and one of five cases: no key → offer to
+  connect; key works but not decided → "Use it? when I need it (default) / start now / later / no"; decided →
+  one line or a background start; a problem → one line with the fix; already running → the status line.
+- `/kaggle use now|when-needed|never` and `mitra kaggle use ...`; `/kaggle` shows the setting.
+- 'when-needed' starts Kaggle on the first write work without asking again; 'Later' asks again the next day.
+
 ## [0.2.1] - 2026-11-10
 - Fixed: the memory line suggested closing Windows' own `MemCompression` (E-068).
 

@@ -87,8 +87,15 @@ at full 256K context, about 3-4x faster than an 8 GB laptop, without you opening
 3. **When done:** `mitra kaggle stop` (or `/kaggle stop`). It also stops by itself after 30 minutes unused.
    `mitra kaggle status` shows your hours left this week.
 
-The first time you start Mitra it offers to set this up for you (*Yes, guide me* opens the Kaggle settings page and
-takes the pasted token).
+**Mitra asks you first.** At start it checks your Kaggle key (still valid, phone verified, hours left):
+- no key yet: *"Use a free Kaggle GPU? Yes, guide me / Later / No"* (the guide opens the Kaggle settings page and
+  takes the pasted token);
+- key works, not decided: *"Kaggle is set up for you · 28.1 h left. Use it? Yes, when I need it / Yes, start it
+  now / Ask me later / No"*;
+- something wrong (expired key, phone not verified, hours used up): one line with the fix.
+
+Change it any time: `/kaggle use when-needed` (start on your first write work, the default), `/kaggle use now`
+(start with Mitra), `/kaggle use never`. `/kaggle` shows the setting and your hours.
 
 **How Mitra switches** (you do not have to think about it):
 - The status line always shows where the model runs: `☁ kaggle · mimo 256K · 28.1 h left` or `💻 laptop · …`.
