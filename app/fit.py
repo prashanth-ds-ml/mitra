@@ -26,7 +26,7 @@ MEASURED: dict[tuple[str, int], tuple[float, float]] = {
 
 # Never suggest closing these: Windows itself, the AV, the desktop, Ollama (it is the model), Mitra's own terminal.
 _NEVER = {
-    "system", "system idle process", "idle", "registry", "memory compression", "secure system", "smss.exe",
+    "system", "system idle process", "idle", "registry", "memory compression", "memcompression", "secure system", "smss.exe",
     "csrss.exe", "wininit.exe", "winlogon.exe", "services.exe", "lsass.exe", "svchost.exe", "dwm.exe",
     "explorer.exe", "msmpeng.exe", "searchhost.exe", "startmenuexperiencehost.exe", "shellexperiencehost.exe",
     "fontdrvhost.exe", "sihost.exe", "ctfmon.exe", "audiodg.exe", "conhost.exe", "openconsole.exe",

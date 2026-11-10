@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-068 | 2026-11-10 | M2 | Medium | user's start (pasted) | The memory line suggested closing `MemCompression 1.8 GB`: newer Windows names its memory-compression process `MemCompression`, the never-close list only had "memory compression" | closed | F-068 |
 | E-067 | 2026-11-10 | M4 | High | user's session (pasted) | After the Kaggle run stopped by itself (30 min unused, as designed), `mitra` said "No compatible local Ollama models found" and quit: the remote setting still pointed at the dead tunnel, so the model list came back empty; local Ollama was fine | closed | F-067 |
 | E-066 | 2026-11-10 | M4 | Low | fresh-clone test (v0.1.0 prep) | Started without a real terminal (piped input, an IDE output pane, Git Bash without a console), the chat died with a 60-line prompt_toolkit traceback (`NoConsoleScreenBufferError`) after the header; also the no-API-key Kaggle message ended with a stray `(1)` | closed | F-066 |
 | E-065 | 2026-11-10 | M4 | High | user's tool reinstall (live) | `mitra kaggle status` said "the `kaggle` package is missing" after the reinstall: kaggle 2.2.5 imports `six` without declaring it, so the fresh tool env could not load it (the dev venv happened to have six); the message hid the real import error | closed | F-065 |

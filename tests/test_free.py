@@ -133,3 +133,10 @@ def test_typed_numbers_work_when_the_list_cannot_run():
 
     assert menu.tick(Con(), "q", ["a", "b", "c"], {0}, runner=broken) == [1, 2]
     assert menu.tick(Con(), "q", ["a", "b"], {0}, runner=lambda o, t: {1, 0}) == [0, 1]
+
+
+def test_windows_memory_compression_is_never_offered():
+    """E-068: newer Windows names it MemCompression (no space): it was suggested for closing at start."""
+    progs = F.group_programs([(1, "MemCompression", 2 * F.GIB, []), (2, "Memory Compression", 2 * F.GIB, []),
+                              (3, "Code.exe", 1.5 * F.GIB, [])])
+    assert [p.name for p in progs] == ["Code"]

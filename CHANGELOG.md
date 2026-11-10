@@ -4,6 +4,9 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-10
+- Fixed: the memory line suggested closing Windows' own `MemCompression` (E-068).
+
 ## [0.2.0] - 2026-11-10 · Kaggle and laptop, seamlessly (D-062, docs/BACKENDS.md)
 - Status line shows where the model runs and the Kaggle hours left (`☁ kaggle · … · 28.1 h left` / `💻 laptop`).
 - Read work (plan mode, planner, reviewer) on the laptop, write work on Kaggle; switches between turns.
