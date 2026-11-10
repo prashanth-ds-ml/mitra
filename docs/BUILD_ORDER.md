@@ -48,6 +48,7 @@ Template per step: **What we build · What Mitra does after it · Why · Done wh
 
 ### Step 2. Questions about code (explainer)
 **✓ Built 2026-11-10** (`ChatSession.explain`: list_files / search / read_file only, `explain_max_steps` = 6, the last step without tools; `tests/test_step2_explain.py`). The 2 questions are asked in the answer, not by an `ask_user` tool (simpler for a small model). Live on mimo-v2.6:9b: the snake level, 4 questions in 8-22 s, 2-4 steps, files cited, nothing changed; Mitra's own code: request sorting right in 3 steps (21 s); "Kaggle stops mid-turn" used all 6 steps (38 s) and answered, but read the wrong file (kaggle.py, not chat.py/main.py): a wrong-place answer the step 3 set must catch.
+**2b (2026-11-10, v0.5.1):** brainstorming, reviews and opinions about the project go to the explainer too (ideas: 3-5 options with trade-offs, then a pick); "go with option 2" then builds it; "update the plan with …" edits plan.md in place. Live: brainstorm 50 s (6 steps, 8 ideas, some misread), review 44 s (2 steps, one wrong point).
 - **Build:** an explainer role: read only (outline, search, read a part), 6 steps, must end with `answer`; `ask_user`
   for at most 2 questions when it truly cannot start.
 - **Mitra after:** "explain the game logic" answered in under a minute with file:line references and no edits.

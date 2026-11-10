@@ -58,11 +58,12 @@ REPLY_NOTES = {
 # D-068 step 2: questions about the project's code: read only, a small budget, always an answer
 EXPLAIN_TOOLS = ("list_files", "read_file", "search")
 EXPLAIN_NOTE = (
-    "This is a question about the project's code. You may only look: list_files, search, read_file (read the part "
-    "you need, not whole big files). You have {steps} steps. Find the right files first (search for a name, or "
-    "list_files), read only what answers the question, then answer: short, plain, with path:line references for "
-    "each point. Do not change anything. Only if the question is too vague to start, ask at most 2 short questions "
-    "instead of searching.")
+    "This is a question, review or brainstorm about the project. You may only look: list_files, search, read_file "
+    "(read the part you need, not whole big files). You have {steps} steps. Find the right files first (search for "
+    "a name, or list_files), read only what you need, then answer with path:line references. How or why: short and "
+    "plain. Review or opinion: what is good, what is risky, what you would change, and why. Ideas: 3-5 options that "
+    "fit this code, each with its cost and trade-off, then your pick; the user says which one to build. Do not change "
+    "anything. Only if the question is too vague to start, ask at most 2 short questions instead of searching.")
 LAST_STEP_NOTE = ("[Mitra: this is your last step. Answer the question now from what you have read, with path:line "
                   "references; say what you could not check. Do not call tools.]")
 _CITE = re.compile(r"(?<![\w/.\\-])([\w./\\-]*[A-Za-z_][\w-]*\.[A-Za-z]\w*)(?![\w(])")

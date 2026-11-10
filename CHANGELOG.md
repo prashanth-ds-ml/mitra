@@ -4,6 +4,11 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-10 · brainstorming and reviews about your code (D-068 step 2b)
+- "brainstorm ideas to make the game harder", "review game.py", "pros and cons of …" read the code first
+  (explainer); ideas come as 3-5 options with trade-offs, and "go with option 2" builds the one you pick.
+- "update the plan with …" / "add a task to plan.md" edit the plan in place instead of planning a feature.
+
 ## [0.5.0] - 2026-11-10 · questions about code (D-068 step 2)
 - A question about the project ("explain the game logic", "where is the API defined?") gets read-only tools
   (list_files, search, read_file) and 6 steps; the last step has no tools, so there is always an answer, with

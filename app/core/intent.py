@@ -43,8 +43,16 @@ WRITING_VERBS = {"draft", "compose", "proofread", "rephrase", "paraphrase", "tra
 REFINE = re.compile(r"^(make it|now make it|can you make it|a bit|slightly|more|less|shorter|longer|simpler|"
                     r"too long|too short|too formal|too casual|add (a|the|my)|remove (the|my)|change the tone|"
                     r"in hindi|in telugu|in english|sign it|without)\b")
-DAILY = re.compile(r"^(plan my|help me plan|make (a|my) (to-?do|todo|schedule|checklist)|give me (ideas|names|a list|"
-                   r"suggestions)|brainstorm|suggest (some|a few)|prioriti[sz]e (my|these))\b")
+DAILY = re.compile(r"^(plan my|help me plan|make (a|my) (to-?do|todo|schedule|checklist)|prioriti[sz]e (my|these))\b")
+# ideas: general when they name nothing in the project; "brainstorm ways to make the game harder" is about it
+IDEAS = re.compile(r"^(give me (ideas|names|a list|suggestions)|brainstorm|suggest|any ideas|ideas (for|to|on))\b")
+# picking one of the options Mitra just gave ("go with option 2", "the first idea", "let's do 3")
+PICK = re.compile(r"\b(option|idea|approach|choice|number|no\.?) ?#?\d\b|\b(first|second|third|fourth|fifth|last) "
+                  r"(one|idea|option|approach)\b|^(go with|let'?s do|lets do|do|pick|take|choose|use) \S+$|"
+                  r"^(go with|let'?s (do|go with)|lets (do|go with)|pick|take|choose) (option |idea |#)?\d\b")
+# the plan and the docs are edited in place (a small change), not planned first (D-068 step 2b)
+DOC_TARGET = re.compile(r"\b(the|our|my|this) (plan|roadmap|todo list|to-?do|readme|docs|notes)\b|"
+                        r"\b(plan|readme|notes|todo|tasks|roadmap|changelog)\.md\b")
 # a question that names these is about the project (explainer / chat loop), not general knowledge
 PROJECT_WORDS = {"this", "our", "code", "codebase", "project", "repo", "repository", "file", "files", "function",
                  "functions", "class", "classes", "method", "test", "tests", "bug", "error", "errors", "module",
@@ -94,23 +102,29 @@ def classify(text: str, previous: str = "", project_words: frozenset | set = fro
         return "chat"
     if previous not in ("", "resume") + EVERYDAY and 0 < len(short) <= 6 and set(short) <= SMALL_TALK | ANSWERS:
         return "small"  # "ok" / "yes go ahead" answers the working turn's question: continue it with its tools
+    if previous in ("question", "small", "big") and len(short) <= 8 and PICK.search(low) and not low.endswith("?"):
+        return "small"  # "go with option 2" after Mitra's ideas: build the one you picked, with tools
     if DAILY.match(low):
         return "general"
+    named = set(re.findall(r"[a-z0-9_\-]+", low)) & {w.lower() for w in project_words}
+    about = bool(any(c in raw for c in "/\\`") or "." in "".join(t for t in low.split() if not t.endswith("."))
+                 or set(words) & PROJECT_WORDS or named)
+    if IDEAS.match(low):
+        return "question" if about else "general"  # ideas about the project: look at it first (explainer)
     if previous == "writing" and REFINE.match(low):
         return "writing"
     if _writing(words, low, raw):
         return "writing"
     verbs = [w for w in words if w in CHANGE_VERBS]
-    if not verbs:
-        named = set(re.findall(r"[a-z0-9_\-]+", low)) & {w.lower() for w in project_words}
-        if any(c in raw for c in "/\\`") or "." in "".join(t for t in low.split() if not t.endswith(".")) \
-                or set(words) & PROJECT_WORDS or named:
-            return "question"
-        return "general"
+    if not verbs:  # a follow-up that points back ("what is option 2 exactly?", "why that?") stays on the project
+        back = previous == "question" and re.search(r"\b(option|idea|approach|it|that|those|these|them|one)\b", low)
+        return "question" if about or back else "general"
     asks = low.startswith(QUESTION_START) and not low.startswith(("how about", "can you", "could you"))
     if asks and not re.search(r"\b(please|can you|could you|let's|lets)\b", low) and len(set(verbs)) == 1 \
             and low.endswith("?"):
         return "question"  # "what does the fix in X change?" asks; "add a test" does
+    if DOC_TARGET.search(low) and not set(verbs) & {"build", "implement", "develop"}:
+        return "small"  # "update the plan with a level system": edit plan.md, do not plan a new feature
     big = (len(set(verbs)) >= 2 or len(words) > 35 or raw.count("\n") >= 2
            or any(w in BIG_WORDS for w in words))
     return "big" if big else "small"

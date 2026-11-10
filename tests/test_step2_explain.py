@@ -118,6 +118,34 @@ def test_a_follow_up_records_only_its_own_reads(tmp_path):
     assert second["files_read"] == ["pkg/paddle.py"] and second["line_refs"] is True
 
 
+def test_ideas_reviews_and_plan_edits_about_the_project_are_sorted_right():
+    """Step 2b (user, 2026-11-10): brainstorming, reviews and plan updates on the project must work, not only
+    "how does it work". Before: project ideas went to the no-tools path and "update the plan" planned a feature."""
+    from app.core.intent import classify
+    pw = {"game", "paddle", "ball", "snake", "api"}
+    cases = {
+        "brainstorm ideas to make the game harder": "question", "suggest some improvements for the api": "question",
+        "any ideas to speed up our tests?": "question", "what could we add to the snake game next?": "question",
+        "review the code in game.py": "question", "is this a good way to structure the game loop?": "question",
+        "pros and cons of moving to fastapi for this project": "question",
+        "update the plan with a level system": "small", "add a task to plan.md for sound": "small",
+        "update the plan and implement the level system": "big",
+        # not about the project: still the quick everyday answer
+        "brainstorm names for my startup": "general", "give me ideas for a weekend trip": "general",
+        "plan my day: gym, kaggle run, review PRs": "general",
+    }
+    assert {t: classify(t, project_words=pw) for t in cases} == cases
+    picks = {"go with option 2": "small", "lets do option 3": "small", "yes, the first idea": "small",
+             "build the second one": "small", "what is option 2 exactly?": "question"}
+    assert {t: classify(t, previous="question", project_words=pw) for t in picks} == picks
+    assert classify("go with option 2") == "general"          # nothing was offered before
+
+
+def test_the_explainer_note_covers_reviews_and_ideas():
+    note = C.EXPLAIN_NOTE.format(steps=6)
+    assert "Review or opinion" in note and "Ideas: 3-5 options" in note and "Do not change" in note
+
+
 def test_the_budget_is_a_harness_limit():
     assert H.Harness().limit("explain_max_steps") == 6
 

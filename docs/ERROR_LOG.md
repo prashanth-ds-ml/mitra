@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-075 | 2026-11-10 | D-068 step 2 | Medium | user question + sorting check | Talking about the project beyond "how does it work" went to the wrong path: "brainstorm ideas to make the game harder" and "suggest improvements for the api" took the no-tools everyday path (no files read); "update the plan with a level system" was planned as a new feature; "go with option 2" after Mitra's ideas was answered without tools | closed | F-074 |
 | E-074 | 2026-11-10 | D-068 step 2 | Low | live check (snake, mimo-v2.6:9b) | The explainer's record missed files an answer named without a line ("**Board** (`snake/game.py`)"): `files_cited` was [] for a 4-file answer | closed | F-073 |
 | E-073 | 2026-11-10 | D-068 step 2 | Low | live check (snake, mimo-v2.6:9b) | A follow-up question's record listed every file read in earlier turns (`files_read` scanned the whole history) | closed | F-072 |
 | E-072 | 2026-11-10 | D-068 step 1 | Low | full test run | `tests/test_kaggle.py::test_the_librarys_own_sign_in_help_is_not_printed` (and one more) failed once in a full run while the clipboard was being checked from the same shell; passed alone and in the next full run (809 passed). Not reproduced: watching | open | - |
