@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import sqlite3
 import textwrap
 from datetime import datetime
@@ -129,8 +130,18 @@ def load_context(workspace: str) -> str | None:
     """Return the contents of context.md, or None if it does not exist yet."""
     path = _dir(workspace) / _CONTEXT
     if path.exists():
-        return path.read_text(encoding="utf-8")
+        return _without_commands(path.read_text(encoding="utf-8"))
     return None
+
+
+_TOPIC_CMD = re.compile(r"^- `[^`]*` [/!]")
+
+
+def _without_commands(text: str) -> str:
+    """Topic lines that are slash or shell commands (`/logs`, `!dir`) are not topics: a model read `/logs` as a
+    folder and guessed /logs/... paths seven times (2026-11-10, D-065 P0)."""
+    kept = [line for line in text.splitlines() if not _TOPIC_CMD.match(line)]
+    return "\n".join(kept) + ("\n" if text.endswith("\n") else "")
 
 
 def update_context(workspace: str, new_topic: str) -> None:
@@ -138,6 +149,8 @@ def update_context(workspace: str, new_topic: str) -> None:
 
     Creates the file with a starter template if it does not exist.
     """
+    if (new_topic or "").strip().startswith(("/", "!")):  # commands are not topics (D-065 P0)
+        return
     path  = _dir(workspace) / _CONTEXT
     now   = datetime.now().strftime("%Y-%m-%d %H:%M")
     topic = _trim(new_topic, 120)

@@ -137,7 +137,8 @@ def is_tool_call_parse_error(exc: BaseException) -> bool:
 MAX_STEPS = 40
 
 EXTRA_SPECS = [
-    {"name": "run_command", "description": "Run a shell command in the project folder (tests, git, pip, ...).",
+    {"name": "run_command", "description": "Run ONE command in the project folder (tests, git, pip). No pipes, "
+                                           "redirects or cd; use python -m pytest.",
      "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}},
     {"name": "web_search", "description": "Search Wikipedia, Hugging Face, GitHub, arXiv and the Ollama library. "
                                           "Short queries.",

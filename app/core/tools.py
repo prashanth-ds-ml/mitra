@@ -49,8 +49,11 @@ class Workspace:
     def path(self, rel: str) -> Path:
         rel = (rel or ".").strip().strip("\"'")
         p = Path(rel)
-        if p.is_absolute():
-            raise ToolError(f"Use a path relative to the workspace, not '{rel}'.")
+        if p.is_absolute() or rel.startswith(("/", "\\")):  # '/logs/x' has no drive on Windows: rooted, not ours
+            inside = self._inside(p)
+            if inside is not None:  # an absolute path into this workspace: use it
+                return inside
+            raise ToolError(f"Use a path relative to the workspace, not '{rel}'." + self.suggest(rel))
         parts = p.parts
         if len(parts) > 1 and parts[0].lower() == self.root.name.lower() and not (self.root / parts[0]).exists():
             p = Path(*parts[1:])  # E-019: model repeated the workspace folder name
@@ -58,8 +61,37 @@ class Workspace:
         try:
             full.relative_to(self.root)
         except ValueError:
-            raise ToolError(f"'{rel}' is outside the workspace.") from None
+            raise ToolError(f"'{rel}' is outside the workspace." + self.suggest(rel)) from None
         return full
+
+    def _inside(self, p: Path) -> Path | None:
+        try:
+            full = p.resolve()
+            full.relative_to(self.root)
+            return full
+        except (ValueError, OSError):
+            return None
+
+    def suggest(self, rel: str) -> str:
+        """' Did you mean brick-breaker/plan.md?' when a file in the workspace matches the end of a wrong path
+        (D-065 P0: seven calls to made-up /logs/brick-breaker/... paths), else ''."""
+        parts = [x for x in Path(rel.replace("\\", "/")).parts if x not in ("/", "\\") and not x.endswith(":\\")]
+        for i in range(len(parts)):
+            cand = self.root.joinpath(*parts[i:])
+            if parts[i:] and cand.exists():
+                return f" Did you mean '{cand.relative_to(self.root).as_posix()}'?"
+        if parts:
+            name = parts[-1]
+            hits = []
+            for found in self.root.rglob(name):
+                if any(x in found.parts for x in (".git", ".venv", "node_modules", "__pycache__", ".mitra")):
+                    continue
+                hits.append(found.relative_to(self.root).as_posix())
+                if len(hits) > 3:
+                    break
+            if hits:
+                return " Did you mean " + " or ".join(f"'{h}'" for h in hits[:3]) + "?"
+        return " Use list_files to see what exists."
 
     def rel(self, full: Path) -> str:
         return full.relative_to(self.root).as_posix() or "."
@@ -94,7 +126,7 @@ def _commit(ws: Workspace, full: Path, new_text: str) -> None:
 def list_files(ws: Workspace, path: str = ".") -> str:
     base = ws.path(path)
     if not base.exists():
-        raise ToolError(f"'{path}' does not exist.")
+        raise ToolError(f"'{path}' does not exist." + ws.suggest(path))
     if base.is_file():
         return ws.rel(base)
     lines: list[str] = []
@@ -115,7 +147,7 @@ def list_files(ws: Workspace, path: str = ".") -> str:
 def read_file(ws: Workspace, path: str, start: int = 1, end: int = 0) -> str:
     full = ws.path(path)
     if not full.is_file():
-        raise ToolError(f"'{path}' is not a file. Use list_files to see what exists.")
+        raise ToolError(f"'{path}' is not a file." + ws.suggest(path))
     text = full.read_text(encoding="utf-8", errors="replace")
     lines = text.splitlines()
     ws.seen[ws.rel(full)] = full.stat().st_mtime

@@ -93,6 +93,33 @@ def configure(
 
 LIVE_OUTPUT_LINES = 10
 
+_WARNING_START = re.compile(r"\b\w*Warning: ")
+
+
+class WarningFold:
+    """Screen-only filter: a Python warning block ('...py:208: PytestDeprecationWarning: ...' up to its
+    'warnings.warn(...)' line) becomes one dim line. The model and ctrl+o still get the full output (D-065 P0)."""
+
+    def __init__(self):
+        self.inside = False
+
+    def feed(self, line: str) -> str | None:
+        """The text to show for this line, or None to hide it."""
+        stripped = line.strip()
+        if self.inside:
+            if stripped.startswith("warnings.warn("):
+                self.inside = False
+                return None
+            if stripped.startswith(("=", "platform ", "collected ", "FAILED", "PASSED", "ERROR")):
+                self.inside = False  # the warning had no warnings.warn line: show the real output again
+                return line
+            return None
+        if _WARNING_START.search(line) and ".py:" in line:
+            self.inside = True
+            kind = _WARNING_START.search(line).group(0).rstrip(": ")
+            return f"({kind} folded · ctrl+o shows it)"
+        return line
+
 
 @dataclass
 class ShellResult:
@@ -581,6 +608,7 @@ def execute(
     proc: subprocess.Popen | None = None
     timed_out = False
     shown = {"live": 0, "hidden": 0}   # live output is capped at LIVE_OUTPUT_LINES (D-035)
+    fold = WarningFold()                # Python warning blocks: one dim line on screen (D-065 P0)
 
     def _reader(stream, tag: str) -> None:
         """Read lines from a stream, print live, and append to lines list."""
@@ -589,8 +617,11 @@ def execute(
                 line = raw.rstrip("\n")
                 lines.append(line)
                 if _config.stream_to_console and console is not None:
+                    screen = fold.feed(line)
+                    if screen is None:
+                        continue
                     if shown["live"] < LIVE_OUTPUT_LINES:
-                        console.print(Text("     " + line, style="m.dim"), soft_wrap=True)
+                        console.print(Text("     " + screen, style="m.dim"), soft_wrap=True)
                         shown["live"] += 1
                     else:
                         shown["hidden"] += 1
