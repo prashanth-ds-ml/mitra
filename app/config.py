@@ -747,20 +747,24 @@ def get_local_model_inventory(*, include_incompatible: bool = False) -> list[Loc
     embedding, OCR and other models that cannot call tools are left out.
     """
     try:
-        result = subprocess.run(
-            ["ollama", "list"],
-            capture_output=True, text=True, timeout=10,
-        )
-        lines = result.stdout.strip().splitlines()[1:]  # skip header
+        from app import remote
+        on_remote = remote.active()
+        if on_remote:  # `ollama list` would drop the token path of the remote URL: ask its API (D-060)
+            models_json, _ = remote.probe(on_remote["url"], timeout=15)
+            rows = remote.tag_rows(models_json)
+        else:
+            result = subprocess.run(
+                ["ollama", "list"],
+                capture_output=True, text=True, timeout=10,
+            )
+            rows = []
+            for line in result.stdout.strip().splitlines()[1:]:  # skip header
+                parts = line.split()
+                if len(parts) >= 4:
+                    rows.append((parts[0], parts[2], parts[3]))
         vram_gib = get_gpu_vram_gib()
         models: list[LocalModelInfo] = []
-        for line in lines:
-            parts = line.split()
-            if len(parts) < 4:
-                continue
-            name = parts[0]
-            size_value = parts[2]
-            size_unit = parts[3]
+        for name, size_value, size_unit in rows:
             if size_value == "-" or size_unit == "-":
                 continue
             size_text = f"{size_value} {size_unit}"
@@ -781,6 +785,8 @@ def get_local_model_inventory(*, include_incompatible: bool = False) -> list[Loc
                     context = min(context, int(facts["context"]))  # never more than the model supports
                 if context > 65_536 and placement == "gpu":
                     placement = "split"  # measured: above 64K the 4B and the 9B spill to CPU (D-033, D-036)
+            if on_remote:  # the local GPU says nothing about the remote one
+                placement, recommended = "remote", True
             models.append(
                 LocalModelInfo(
                     name=name,
@@ -932,7 +938,8 @@ def load(cwd: str | None = None, cli_overrides: dict | None = None) -> dict:
         raw_plugin_dirs = [raw_plugin_dirs]
     cfg["plugin_dirs"] = list(raw_plugin_dirs)
 
-    return cfg
+    from app import remote  # a remote Ollama (Kaggle) wins over the local one while it is set (D-060)
+    return remote.apply(cfg)
 
 
 

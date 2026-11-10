@@ -348,6 +348,46 @@ def cmd_night(
 cli.command("night")(cmd_night)
 
 
+def cmd_remote(
+    action: str = typer.Argument("status", help="status | set <url> | off"),
+    url: str = typer.Argument("", help="For set: the URL the Kaggle notebook printed (it holds the token)."),
+    ctx: int = typer.Option(262_144, "--ctx", help="Context to run at on the remote (default 256K)."),
+    name: str = typer.Option("kaggle", "--name", help="A short name for records and the header."),
+) -> None:
+    """Run the model on a remote Ollama (a Kaggle GPU, see remote/kaggle/README.md) instead of this machine (D-060)."""
+    from app import remote
+
+    if action == "set":
+        if not url:
+            console.print("Usage: mitra remote set <url from the notebook> [--ctx 262144]")
+            raise typer.Exit(2)
+        target = remote.clean_url(url)
+        models, err = remote.probe(target)
+        if err:
+            console.print(f"✗ cannot reach {remote.shown(target)}: {err}\n  Is the notebook still running? Copy the "
+                          "whole line it printed (the token is part of the URL).")
+            raise typer.Exit(1)
+        data = remote.set_remote(target, ctx, name)
+        names = ", ".join(str(m.get("name")) for m in models) or "none yet"
+        console.print(f"☁ remote set: {name} · {remote.shown(data['url'])} · {ctx // 1024}K context · models: {names}\n"
+                      "  Start (or restart) Mitra: every model call now goes there. `mitra remote off` to go back.")
+        return
+    if action == "off":
+        console.print("✓ back to this machine's Ollama" if remote.clear() else "No remote was set.")
+        return
+    r = remote.active()
+    if not r:
+        console.print("No remote: Mitra uses this machine's Ollama. `mitra remote set <url>` uses a Kaggle GPU.")
+        return
+    models, err = remote.probe(r["url"], timeout=10)
+    state = f"✗ not reachable ({err})" if err else "✓ reachable · models: " + (
+        ", ".join(str(m.get("name")) for m in models) or "none")
+    console.print(f"☁ {r.get('name')} · {remote.shown(r['url'])} · {int(r.get('num_ctx') or 0) // 1024}K · {state}")
+
+
+cli.command("remote")(cmd_remote)
+
+
 cli.command("solve")(cmd_solve)
 
 
@@ -1937,6 +1977,9 @@ def _cmd_free(model: str, num_ctx: int, base_url: str, *, fit_mod=None, tick=Non
     before = fit_mod.check(model, num_ctx, base_url=base_url)
     style = {"ok": "m.ok", "tight": "m.info", "no": "m.err"}.get(before.verdict, "m.faint")
     console.print(Text(f"  {model} · {num_ctx // 1024}K · " + fit_mod.summary(before), style=style))
+    if before.verdict == "remote":
+        console.print(Text("    nothing to free here: `mitra remote off` goes back to this machine", style="m.faint"))
+        return
     programs, pre = fit_mod.free_choices(before, fit_mod.live_programs())
     unload = [m.split(" (")[0] for m in before.unload]
     options = [fit_mod.label(p) for p in programs] + [f"unload {m} from Ollama" for m in unload]
@@ -2195,6 +2238,8 @@ def _chat():
         (m for m in config.get_local_model_inventory() if m.name == model), None
     )
     _placement = _model_info.placement if _model_info else config.get_model_placement(None, _vram)
+    if cfg.get("remote"):
+        _placement = "remote"
     num_gpu = config.get_num_gpu_for_placement(_placement, gpu_layers_cfg)
 
     loaded: list[str] = []  # shown on one line in the header
@@ -2390,7 +2435,8 @@ def _chat():
         chat.note_session(model=model, num_ctx=num_ctx, mode=session_mode,
                           fit=getattr(_fit, "verdict", None), need_ram_gb=getattr(_fit, "need_ram_gb", None),
                           ram_free_gb=getattr(_fit, "free_ram_gb", None),
-                          vram_free_gb=_gpu.free_gib if _gpu else None)
+                          vram_free_gb=_gpu.free_gib if _gpu else None,
+                          remote=cfg.get("remote") or "")  # e.g. "kaggle": not this machine's energy (D-060)
     except Exception:
         pass
     console.print(ui.header.tips())

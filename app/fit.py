@@ -197,6 +197,11 @@ def live_programs() -> list[Program]:
 def check(model: str, context: int, *, base_url: str = "http://127.0.0.1:11434") -> Fit:
     """Gather the live facts and assess. Process listing runs only when the fit is not comfortable."""
     from app import config
+    from app import remote
+
+    on_remote = remote.active()
+    if on_remote:  # the model runs elsewhere (Kaggle): this machine's RAM and GPU do not matter (D-060)
+        return Fit("remote", model, context, None, None, None, None, source=str(on_remote.get("name") or "remote"))
 
     gpu = config.get_gpu_memory_info()
     inv = {m.name: m for m in config.get_local_model_inventory()}
@@ -216,13 +221,15 @@ def check(model: str, context: int, *, base_url: str = "http://127.0.0.1:11434")
 
 # ── text ──────────────────────────────────────────────────────────────────────
 
-_MARK = {"ok": "✓", "tight": "⚠", "no": "✗", "unknown": "?"}
+_MARK = {"ok": "✓", "tight": "⚠", "no": "✗", "unknown": "?", "remote": "☁"}
 _WORD = {"ok": "comfortable", "tight": "tight: may be slow, or fail on long chats",
          "no": "not enough free RAM: loading will likely fail or swap", "unknown": "could not check memory"}
 
 
 def summary(fit: Fit) -> str:
     """One line, e.g. '✓ needs ~6.8 GB RAM + 5.2 GB GPU · 9.4 GB free · comfortable'."""
+    if fit.verdict == "remote":
+        return f"☁ runs on {fit.source} at {fit.context // 1024}K · this machine's RAM is not used"
     parts = []
     if fit.source == "loaded":
         parts.append("already loaded")

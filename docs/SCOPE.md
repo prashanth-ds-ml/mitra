@@ -148,6 +148,7 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   catalog, tool calling and thinking undocumented, 9B Q4 (8.4 GB) > 8 GB VRAM. If faster with working tools: an
   optional second provider, Ollama stays. Install (`irm .../install.ps1 | iex`) needs the user's go. The other
   Magnitude (browser-agent, vision UI tests) needs a 72B vision model or Claude: no fit; Playwright stays (M4).
+- **I-23 Kaggle GPU as a remote Ollama — BUILT 2026-11-10 (D-060)** (user): ~30 GPU h/week, 2x T4 16 GB, 12 h sessions; mimo at 256K fully on GPU there. First experiment: the same brick-breaker plan on the laptop (128K) vs Kaggle T4 (256K) vs a bigger model on both T4s; speed, tasks passed, hidden judge.
 
 ## Later (not milestones)
 Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,

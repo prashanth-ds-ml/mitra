@@ -12,6 +12,15 @@ machine or your judgment. Updated every release.
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
 
+## 2026-11-10 · Kaggle remote (D-060)
+
+Needs your Kaggle account and a real session; tested here only with the local Ollama behind the proxy.
+
+- [ ] Kaggle: phone verified; Settings shows the weekly GPU quota (write it in STATUS)
+- [ ] Import `remote/kaggle/mitra_kaggle_server.ipynb`, GPU T4 x2 + Internet on, Run All: it prints `mitra remote set ...` within ~6 min; the load line says "fully on GPU" at 262144
+- [ ] Laptop: paste the line, start `mitra`: header `remote GPU`, `☁ runs on kaggle at 256K`; a chat reply streams
+- [ ] `/run` a small plan on it; `mitra remote off` afterwards; stop the Kaggle session
+
 ## 2026-11-10 · `/free` (D-059)
 
 Closing real programs needs you: automated tests use stand-ins and never close anything.

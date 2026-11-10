@@ -7,7 +7,8 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-_PLACEMENT = {"gpu": ("GPU", "m.ok"), "split": ("GPU+CPU", "m.info"), "cpu": ("CPU, slow", "m.err")}
+_PLACEMENT = {"gpu": ("GPU", "m.ok"), "split": ("GPU+CPU", "m.info"), "cpu": ("CPU, slow", "m.err"),
+              "remote": ("remote GPU", "m.ok")}
 
 
 def title_line() -> Text:
