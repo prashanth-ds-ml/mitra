@@ -51,3 +51,58 @@ def is_rephrase(previous: str, now: str) -> bool:
     if len(cur.split()) < 4 or cur == prev and len(cur.split()) < 4:
         return False
     return difflib.SequenceMatcher(None, prev, cur).ratio() >= REPHRASE_RATIO
+
+
+# ── your notes, read every turn (D-068 step 1) ──────────────────────────────────
+
+NOTES_MAX_CHARS = 2000  # both files together, so a long notes file never crowds out the task
+ME_TEMPLATE = """# About me (Mitra reads this every turn; edit it any time)
+
+Name:
+Role:
+Mail signature:
+    Regards,
+    <your name>
+
+Tone: concise, friendly, plain English; no filler
+Stack:
+Habits:
+"""
+
+
+def ensure_me() -> Path | None:
+    """Create ~/.mitra/me.md from the template the first time; returns its path when it was just created."""
+    f = H.home() / "me.md"
+    if f.exists():
+        return None
+    try:
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(ME_TEMPLATE, encoding="utf-8")
+        return f
+    except OSError:
+        return None
+
+
+def notes_text(workspace: Path, max_chars: int = NOTES_MAX_CHARS) -> str:
+    """Your notes for the prompt: me.md, then the project's notes; template lines left empty are dropped."""
+    parts = []
+    for f, title in zip(notes_files(workspace), ("About the user (me.md)", "Project notes (.mitra/notes.md)")):
+        try:
+            text = f.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        raw = [ln.rstrip() for ln in text.splitlines() if ln.strip() and "<your name>" not in ln]
+        lines = []
+        for i, ln in enumerate(raw):
+            if ln.lstrip().startswith("#"):
+                continue
+            nxt = raw[i + 1] if i + 1 < len(raw) else ""
+            if re.fullmatch(r"\s*[\w ]+:\s*", ln) and not nxt.startswith((" ", "\t")):
+                continue  # a template field left empty ("Stack:"), not a heading for indented lines below
+            lines.append(ln)
+        if len(lines) == 1 and lines[0].strip().endswith(":"):
+            lines = []
+        if lines:
+            parts.append(f"## {title}\n" + "\n".join(lines))
+    out = "\n\n".join(parts)
+    return out if len(out) <= max_chars else out[:max_chars - 1] + "…"

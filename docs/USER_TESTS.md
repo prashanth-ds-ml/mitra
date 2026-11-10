@@ -12,6 +12,14 @@ machine or your judgment. Updated every release.
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
 
+## 2026-11-10 · Everyday chat (D-068 step 1, v0.4.0)
+
+- [ ] Check `~/.mitra/me.md` (seeded with your name, signature, tone, stack): change anything that is not you
+- [ ] "hi" answers at once, no tools
+- [ ] "draft a mail to …" gives a mail in your voice, signed as you, nothing invented; "make it shorter" refines it
+- [ ] `/copy`, then paste into your mail app: the text arrives intact
+- [ ] A code request ("fix the failing test in …") still works with tools as before
+
 ## 2026-11-10 · Plan first (D-065, v0.3.0)
 
 - [ ] "where did we last stop": the brief appears at once (no tool calls)

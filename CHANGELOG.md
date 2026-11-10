@@ -4,6 +4,16 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-10 · everyday chat + records for self-improvement (D-068, docs/BUILD_ORDER.md)
+- Small talk, writing (mails, messages, summaries, rewrites, translations, "make it shorter" after one) and general
+  questions are sorted without a model and answered in one call with no tools and thinking off. Live on mimo-v2.6:9b:
+  "hi" 1.0 s, a team mail 3.1 s, first word 0.3-0.5 s.
+- `~/.mitra/me.md` (name, signature, tone, stack; created on the first start) and `.mitra/notes.md`, read every turn.
+- `/copy`: the last answer to the clipboard.
+- Thinking off by default; on only for the planner and the debugger.
+- Every turn records its kind, path, machine, thinking, notes version and time to the first word; quiet signals
+  (asked again, stopped, `/undo`, `/copy`); plan-first and "where did we stop" are counted as turns.
+
 ## [0.3.0] - 2026-11-10 · plan first, then small steps (D-065, docs/PLAN_FIRST.md)
 - "Where did we stop?" answered from Mitra's records (resume brief, also in the prompt), no model call.
 - Requests sorted without a model: resume / question / small / big; `/plan <task>`, `/do <task>`.

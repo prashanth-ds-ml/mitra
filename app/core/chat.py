@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from app.agents.limits import RepeatGuard
 from app.core import harness as H
@@ -38,6 +38,21 @@ levels, so do not copy them unless the user asks for a level.
 
 When the work is done, or you need the user, reply in a few short lines: what you did, what is left. Do not describe
 changes you did not make."""
+
+# D-068 step 1: the one-call reply path (small talk, writing, general questions): no tools, thinking off
+REPLY_NOTES = {
+    "chat": "This is small talk. Reply in one or two friendly sentences. If it is the start of the conversation and "
+            "the 'where we stopped' brief above has something, add one short line on it. Do not call tools.",
+    "writing": "This is a writing task (a mail, message, summary, rewrite or translation). You are drafting it FOR "
+               "the user, as the user: write in their voice and tone from their notes, and never sign as Mitra. "
+               "For a mail: a 'Subject:' line, then the body, then the user's mail signature copied exactly from "
+               "their notes (no signature in the notes: end with [your name]). Use only facts the user gave or that "
+               "are in this conversation: do not add claims, offers, numbers or advice they did not mention; write "
+               "[placeholder] for anything missing. Output only the text itself: no preamble, no notes after it. "
+               "Do not call tools.",
+    "general": "This is a general question or everyday task, not about the project's files. Answer directly and "
+               "briefly, with a short list or example when it helps. Do not call tools.",
+}
 
 READ_ONLY_TOOLS = {"list_files", "read_file", "search", "web_search", "fetch_url", "mcp_find"}  # plan mode
 
@@ -487,6 +502,21 @@ class ChatSession:
             lines.append(f"- {tid}: {res['status']} ({res['tests']}) {res['summary'][:120]}")
         return "\n".join(lines), out["final_tests_passed"]
 
+    def reply(self, messages: list, kind: str, llm, notes: str = "") -> TurnResult:
+        """The one-call path (D-068 step 1): `llm` is the same model with thinking off; no tools; your notes and a
+        short instruction for the kind of request go in just before your message. Recorded as path "reply"."""
+        saved = (self.llm, self.allowed_tools, self.request_kind, self.path, self.thinking)
+        note = REPLY_NOTES.get(kind, REPLY_NOTES["general"])
+        call = list(messages[:-1]) + [SystemMessage(content=(notes + "\n\n" if notes else "") + note), messages[-1]]
+        self.llm, self.allowed_tools, self.request_kind, self.path, self.thinking = llm, (), kind, "reply", False
+        try:
+            res = self.turn(call, max_steps=1)
+        finally:
+            self.llm, self.allowed_tools, self.request_kind, self.path, self.thinking = saved
+        if len(call) > len(messages) + 1 and isinstance(call[-1], AIMessage):
+            messages.append(call[-1])  # the history keeps your message and the answer, not the instruction
+        return res
+
     def turn(self, messages: list, *, max_steps: int | None = None) -> TurnResult:
         """Run the loop on `messages` (the user's message is already the last one). Appends to `messages`."""
         res = TurnResult()
@@ -538,7 +568,7 @@ class ChatSession:
         specs = H.apply_tools(tool_specs(self.mode), self.harness)
         if self.allowed_tools is not None:  # the role's tool set (routing)
             specs = [s for s in specs if s["name"] in self.allowed_tools]
-        bound = self.llm.bind_tools(specs)
+        bound = self.llm.bind_tools(specs) if specs else self.llm  # the reply path: no tools at all (D-068)
         guard = RepeatGuard(max_repeats=self.harness.limit("max_repeats"),
                             max_failures=self.harness.limit("max_failures"))
         bad_calls = 0

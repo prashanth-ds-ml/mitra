@@ -749,6 +749,7 @@ _COMMAND_HELP = [
         ("/fix <cmd>",     "Run a command, and edit + retry until it passes (bounded)"),
         ("/diff",          "Show the git diff or Mitra's last change set"),
         ("/undo [all]",    "Undo Mitra's last change (all: every change this session)"),
+        ("/copy",          "Copy Mitra's last answer (e.g. a drafted mail) to the clipboard"),
         ("/commit [msg]",  "Commit staged changes (--generate drafts the message); never pushes"),
         ("/review [staged]", "Review the current or staged diff for real problems"),
         ("/mcp",           "MCP servers: list, test, tools, on/off, trust, import, call"),
@@ -2355,10 +2356,19 @@ def _chat():
         system_prompt += f"\n\n## Active Plan (from .mitra/plan.md)\n{plan_text}"
         loaded.append("plan")
 
+    from app.core import signals as signals_mod  # D-068 step 1: your notes, read every turn
+    _me_created = signals_mod.ensure_me()
+    notes_now = signals_mod.notes_text(pathlib.Path(cfg["workspace"]))
+    if notes_now:
+        system_prompt += f"\n\n{notes_now}"
+        loaded.append("your notes")
+
 
     cloud_api_key = ""  # Mitra is local-only (D-025)
+    from app.core.roles import THINKING as _ROLE_THINKING
+    _chat_think = {"on": True, "off": False}.get(_ROLE_THINKING.get("chat") or "", thinking_setting(cfg.get("thinking")))
     local_llm = get_local_llm(model, temperature, base_url=cfg.get("ollama_local_base_url"),
-                              num_ctx=num_ctx, num_gpu=num_gpu, reasoning=thinking_setting(cfg.get("thinking")))
+                              num_ctx=num_ctx, num_gpu=num_gpu, reasoning=_chat_think)
     review_llm = codegen_llm = local_llm  # one model for everything (M1)
 
     # Compact before the model's context is full: at most 80% of num_ctx (D-033).
@@ -2445,6 +2455,9 @@ def _chat():
         return res.text if res.ok else f"✗ {res.text}"
 
     typed_buffer: list[str] = []
+    if _me_created:
+        console.print(Text(f"  ✎ created {_me_created}: add your name, mail signature, tone and stack; Mitra reads it "
+                           "every turn", style="m.faint"))
     chat = ChatSession(
         workspace=cfg["workspace"],
         llm=local_llm,
@@ -2789,6 +2802,40 @@ def _chat():
 
     from app.core import intent as intent_mod
     from app.core import planner as planner_mod
+
+    chat.thinking = _chat_think if isinstance(_chat_think, bool) else None
+    last_kind = ""      # the last request's kind: "make it shorter" after a mail is writing (D-068)
+    last_answer = ""    # for /copy
+    _think_cache: dict = {}
+
+    def _reply_llm():
+        """The current model with thinking off, for the one-call reply path (D-068 step 1). Same model and context,
+        so Ollama does not reload it."""
+        from app.llm import model_supports_thinking
+        if model not in _think_cache:
+            try:
+                _think_cache[model] = model_supports_thinking(model)
+            except Exception:  # noqa: BLE001 - unknown: send no think flag
+                _think_cache[model] = None
+        return get_local_llm(model, temperature, base_url=cfg.get("ollama_local_base_url"), num_ctx=num_ctx,
+                             num_gpu=num_gpu, reasoning=False if _think_cache[model] else None)
+
+    def _project_words() -> frozenset:
+        """Names in the workspace (files, folders, stems; two levels): a question naming one is about the project."""
+        root, out = pathlib.Path(cfg["workspace"]), set()
+        try:
+            for p in list(root.iterdir())[:200]:
+                if p.name.startswith(".") or p.name in ("node_modules", "__pycache__", "venv"):
+                    continue
+                out.update({p.name.lower(), p.stem.lower()})
+                if p.is_dir():
+                    for q in list(p.iterdir())[:100]:
+                        out.update({q.name.lower(), q.stem.lower()})
+        except OSError:
+            pass
+        return frozenset(w for w in out if len(w) > 2)
+
+    project_words = _project_words()
 
     def _plan_first(task: str) -> dict:
         """P4: a short runnable plan from a small context pack; Go / Change / Save / Cancel (auto mode: Go).
@@ -3162,6 +3209,18 @@ def _chat():
             memory.update_context(cfg["workspace"], user_input)
             continue
 
+        if cmd == "/copy":  # D-068 step 1: the last answer (a drafted mail) to the clipboard
+            from app.ui import clipboard
+            if not last_answer:
+                _say("Nothing to copy yet.")
+            elif clipboard.copy(last_answer):
+                chat.signal("copy")
+                console.print(Text(f"  ✓ copied the last answer ({len(last_answer.splitlines())} lines)",
+                                   style="m.tool"))
+            else:
+                _say("Could not reach the clipboard on this system.")
+            continue
+
         if cmd in ("/undo", "/undo all"):
             if cmd == "/undo all":
                 entries = [e for journal in session_changes for e in journal]
@@ -3394,7 +3453,8 @@ def _chat():
             continue
 
         # ── What kind of request (D-065 P3) ───────────────────────────────────
-        request_kind = force_kind or intent_mod.classify(user_input)
+        request_kind = force_kind or intent_mod.classify(user_input, previous=last_kind, project_words=project_words)
+        last_kind = request_kind
         if request_kind == "resume":  # from Mitra's records: instant, no model call, no searching
             _brief = resume_mod.brief(pathlib.Path(cfg["workspace"]))
             chat.note_request(user_input, "resume", "resume_brief", "answered" if _brief else "nothing_recorded")
@@ -3441,7 +3501,11 @@ def _chat():
             chat.mode = session_mode
             chat.request_kind, chat.path = request_kind, "loop"  # D-068: recorded with the turn
             typed_buffer.clear()
-            turn = chat.turn(messages)
+            if request_kind in intent_mod.EVERYDAY:  # D-068 step 1: one call, no tools, thinking off
+                turn = chat.reply(messages, request_kind, _reply_llm(),
+                                  notes=signals_mod.notes_text(pathlib.Path(cfg["workspace"])))
+            else:
+                turn = chat.turn(messages)
             if chat.noticed:  # your edits since the last turn: recorded as corrections (self-improvement)
                 console.print(Text(f"  ✎ noticed your change to {', '.join(chat.noticed[:3])}"
                                    f"{' …' if len(chat.noticed) > 3 else ''}: recorded as a correction of the turn before",
@@ -3451,6 +3515,7 @@ def _chat():
             turn_in, turn_out = turn.tokens_in, turn.tokens_out
             ctx_used = turn.ctx_used or ctx_used
             ai_reply = turn.text.strip()
+            last_answer = ai_reply or last_answer
             if turn.journal:
                 memory.record_last_change_set(cfg["workspace"], {"entries": turn.journal})
                 session_changes.append(list(turn.journal))

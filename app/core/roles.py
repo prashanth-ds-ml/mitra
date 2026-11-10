@@ -62,10 +62,11 @@ MCP: dict[str, tuple[str, ...] | None] = {
     "deployer": ("playwright",),
     "reporter": ("git",),
 }
-# Thinking per role: "on" / "off" / None (= the session's setting; adaptive thinking E2 later).
+# Thinking per role: "on" / "off" / None (= the session's setting). D-068 step 1: off by default, on only where it
+# pays: the planner and the debugger (the chat thought for 5 minutes over "explain the game logic").
 THINKING: dict[str, str | None] = {
-    "chat": None, "planner": "on", "tester": "on", "builder": None, "debugger": "on",
-    "reviewer": "on", "deployer": "off", "reporter": "off",
+    "chat": "off", "planner": "on", "tester": "off", "builder": "off", "debugger": "on",
+    "reviewer": "off", "deployer": "off", "reporter": "off",
 }
 # Paths the role may read but not change: the builder cannot edit the tests it must pass (D-049).
 READ_ONLY: dict[str, tuple[str, ...]] = {"builder": ("tests",)}

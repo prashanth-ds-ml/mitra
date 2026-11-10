@@ -33,6 +33,7 @@ Template per step: **What we build · What Mitra does after it · Why · Done wh
 - **Records:** this step is the records.
 
 ### Step 1. Everyday chat (mail, conversation, daily work)
+**✓ Built 2026-11-10** (`intent.py` chat/writing/general, `ChatSession.reply`, `signals.notes_text`, `/copy`, thinking table; `tests/test_step1_everyday.py`). Live on mimo-v2.6:9b (laptop, 32K): "hi" 1.0 s, mail 3.1 s, "make it shorter" 2.4 s, LoRA vs QLoRA 8.7 s; first word 0.3-0.5 s (the old loop with thinking: 4.1 s to the first word, 14.3 s). Open: it signed "Thanks," instead of the exact "Regards," (step 3 writing checks will measure it).
 - **Build:** sorting gains `chat / writing / general` (mail, message, reply, draft, summarise, rewrite, translate →
   writing); these take a one-call path with no tools and thinking off; thinking off by default, on only for planner
   and debugger; `~/.mitra/me.md` (name, signature, tone, stack, "use uv") + `.mitra/notes.md` per project, both read
