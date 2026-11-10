@@ -106,6 +106,31 @@ def unapply(cfg: dict) -> dict:
     return cfg
 
 
+def check_alive(cfg: dict, echo=print, timeout: float = 15.0) -> bool:
+    """At start: a remote that does not answer is not used (E-067: a Kaggle run that stopped by itself left Mitra
+    asking a dead address, which then said "no compatible local Ollama models"). A dead Kaggle address is forgotten
+    (each session gets a new one); another remote stays set but this run uses this machine. True = remote in use."""
+    if not cfg.get("remote"):
+        return False
+    r = active()
+    if not r:
+        unapply(cfg)
+        return False
+    _, err = probe(r["url"], timeout=timeout)
+    if not err:
+        return True
+    name = r.get("name") or "remote"
+    unapply(cfg)
+    if name == "kaggle":
+        clear()
+        echo("☁ the Kaggle GPU is not answering: its run has ended (30 min unused, its time limit, or stopped on "
+             "Kaggle). Using this machine's Ollama. `mitra kaggle start` starts a new one.")
+    else:
+        echo(f"☁ {name} ({shown(r['url'])}) is not answering: using this machine's Ollama for now. "
+             "`mitra remote off` forgets it.")
+    return False
+
+
 def tag_rows(models: list[dict]) -> list[tuple[str, str, str]]:
     """/api/tags models as `ollama list` rows: (name, size value, size unit)."""
     out = []

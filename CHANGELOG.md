@@ -4,6 +4,9 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-10
+- Fixed: after a Kaggle run stopped by itself, `mitra` said "no compatible local Ollama models"; it now says the Kaggle GPU has stopped and uses this machine (E-067).
+
 ## [0.1.1] - 2026-11-10
 - `mitra kaggle setup <token>`: Kaggle's Settings → API now gives a token string (saved to ~/.kaggle/access_token); a downloaded kaggle.json still works (`mitra kaggle setup` finds it).
 - No more 15-line Kaggle library sign-in help printed twice: Mitra's own short steps only.

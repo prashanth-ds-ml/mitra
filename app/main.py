@@ -2264,6 +2264,8 @@ def _chat():
     show_banner()
 
     cfg = config.load()
+    from app import remote as _remote
+    _remote.check_alive(cfg, echo=lambda s: console.print(Text("  " + s, style="m.info")))  # E-067
     model = _startup_model(cfg)
     config.save_last_model(model)
     from app.core import store as _store
