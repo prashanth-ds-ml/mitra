@@ -388,6 +388,37 @@ def cmd_remote(
 cli.command("remote")(cmd_remote)
 
 
+def _kaggle_model() -> str:
+    from app.core import roles
+    return roles.resolve("chat", config.load())[0]
+
+
+def cmd_kaggle(
+    action: str = typer.Argument("status", help="start | stop | status"),
+    model: str = typer.Option("", "--model", help="Model to run there (default: your chat model)."),
+    ctx: int = typer.Option(262_144, "--ctx", help="Context (default 256K, mimo's maximum)."),
+    idle: int = typer.Option(30, "--idle", help="Stop by itself after this many minutes unused."),
+    hours: float = typer.Option(11.5, "--hours", help="Hard time limit for the run."),
+) -> None:
+    """Use your Kaggle GPU hours from Mitra: start a private GPU notebook, stop it, see hours left (D-061)."""
+    from app import kaggle
+
+    try:
+        if action == "start":
+            kaggle.start(model or _kaggle_model(), ctx, idle_min=idle, max_hours=hours, echo=console.print)
+            console.print("  Start Mitra (or restart it): it now runs on Kaggle. `mitra kaggle stop` when done.")
+        elif action == "stop":
+            kaggle.stop(echo=console.print)
+        else:
+            kaggle.status(echo=console.print)
+    except kaggle.KaggleError as exc:
+        console.print(f"✗ {exc}")
+        raise typer.Exit(1)
+
+
+cli.command("kaggle")(cmd_kaggle)
+
+
 cli.command("solve")(cmd_solve)
 
 
@@ -677,6 +708,7 @@ _COMMAND_HELP = [
         ("/status",        "Workspace, model, mode and session status"),
         ("/doctor",        "Machine and setup check: RAM, GPU, Ollama, permissions, MCP"),
         ("/free",          "Make RAM room for the model: tick programs, Mitra closes them"),
+        ("/kaggle [start|stop]", "Run the model on your Kaggle GPU hours (status: hours left)"),
         ("/report",        "Rebuild the dashboard (sessions, tools, improvement, training data) and open it"),
         ("/role [name]",   "Show roles, or switch role: model, tools and MCP servers at once"),
         ("/model use <m>", "Switch the chat model now (no restart)"),
@@ -2430,6 +2462,13 @@ def _chat():
         dashboard=_dash_line,
     ))
     _fit = _print_memory_fit(model, num_ctx, cfg.get("ollama_local_base_url") or "http://127.0.0.1:11434")
+    if cfg.get("remote") == "kaggle":  # Kaggle's own count of your GPU hours (D-061)
+        try:
+            from app import kaggle as _kaggle
+            console.print(Text("    " + _kaggle.quota_line(_kaggle.quota(_kaggle.client()))
+                               + " · /kaggle stop when done", style="m.dim"))
+        except Exception:
+            pass
     try:  # machine state for the dashboard (item 0)
         _gpu = config.get_gpu_memory_info()
         chat.note_session(model=model, num_ctx=num_ctx, mode=session_mode,
@@ -2817,6 +2856,30 @@ def _chat():
                 "## MCP\n\n" + mcp_registry.summarize(mcp_registry.discover(cfg["workspace"])),
             ])
             _say(ai_reply)
+            continue
+
+        if cmd == "/kaggle" or cmd.startswith("/kaggle "):  # Kaggle GPU from the chat, switched live (D-061)
+            from app import kaggle as kaggle_mod
+            from app import remote as remote_mod
+            sub = (user_input.strip().split() + ["status"])[1].lower()
+            try:
+                if sub == "start":
+                    console.print(Text("  starting a Kaggle GPU (4-8 min) · ctrl+c stops waiting, not the run",
+                                       style="m.dim"))
+                    kaggle_mod.start(model, 262_144,
+                                     echo=lambda s: console.print(Text(str(s), style="m.tool")))
+                    remote_mod.apply(cfg)
+                    _apply_role(chat.role)  # this chat now talks to Kaggle at its context
+                elif sub == "stop":
+                    kaggle_mod.stop(echo=lambda s: console.print(Text(str(s), style="m.tool")))
+                    remote_mod.unapply(cfg)
+                    _apply_role(chat.role)  # back on this machine
+                else:
+                    kaggle_mod.status(echo=lambda s: console.print(Text("  " + str(s), style="m.tool")))
+            except kaggle_mod.KaggleError as exc:
+                console.print(Text(f"  ✗ {exc}", style="m.err"))
+            except KeyboardInterrupt:
+                console.print(Text("  stopped waiting; the Kaggle run goes on: `/kaggle status`", style="m.info"))
             continue
 
         if cmd == "/free":  # make RAM room for the model: tick programs, Mitra closes them (I-21)

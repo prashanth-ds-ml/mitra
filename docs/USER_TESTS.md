@@ -12,6 +12,14 @@ machine or your judgment. Updated every release.
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
 
+## 2026-11-10 · `mitra kaggle` (D-061)
+
+- [ ] With Mitra closed: `uv tool install --reinstall -e C:\Users\prash\projects\langchain\portfolio\05-mitra` (adds the kaggle package)
+- [ ] `mitra kaggle status`: your hours (used / 30 / reset)
+- [ ] `mitra kaggle start`: stages, then ready within ~8 min; `mitra` header says remote GPU and shows the hours line
+- [ ] In the chat: `/kaggle stop` switches back to this machine; Kaggle shows the run ended; `/kaggle start` switches live
+- [ ] Leave it unused 30+ min: the run ends by itself
+
 ## 2026-11-10 · Kaggle remote (D-060)
 
 Needs your Kaggle account and a real session; tested here only with the local Ollama behind the proxy.

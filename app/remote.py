@@ -80,11 +80,29 @@ def apply(cfg: dict) -> dict:
     r = active()
     if not r:
         return cfg
+    if "_local" not in cfg:  # what to go back to when the remote stops (unapply)
+        cfg["_local"] = {"ollama_local_base_url": cfg.get("ollama_local_base_url"), "num_ctx": cfg.get("num_ctx"),
+                         "OLLAMA_HOST": os.environ.get("OLLAMA_HOST")}
     cfg["ollama_local_base_url"] = r["url"]
     os.environ["OLLAMA_HOST"] = r["url"]  # config._ollama_base_url, and inherited by /run night children
     if not cfg.get("num_ctx"):
         cfg["num_ctx"] = int(r.get("num_ctx") or DEFAULT_CTX)
     cfg["remote"] = r.get("name") or "remote"
+    return cfg
+
+
+def unapply(cfg: dict) -> dict:
+    """Back to this machine in a running Mitra (`/kaggle stop`): the settings `apply` replaced."""
+    local = cfg.pop("_local", None)
+    cfg.pop("remote", None)
+    if local is None:
+        return cfg
+    cfg["ollama_local_base_url"] = local.get("ollama_local_base_url") or "http://localhost:11434"
+    cfg["num_ctx"] = local.get("num_ctx") or 0
+    if local.get("OLLAMA_HOST"):
+        os.environ["OLLAMA_HOST"] = local["OLLAMA_HOST"]
+    else:
+        os.environ.pop("OLLAMA_HOST", None)
     return cfg
 
 
