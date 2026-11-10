@@ -207,3 +207,62 @@ def test_a_broken_kaggle_install_says_why(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", fake)
     with pytest.raises(kaggle.KaggleError, match="No module named 'six'"):
         kaggle.client()
+
+
+def test_no_api_key_gives_the_steps_without_noise(monkeypatch, tmp_path):
+    """A new colleague without kaggle.json: the steps, no stray '(1)' from the library's exit code."""
+    monkeypatch.setenv("KAGGLE_CONFIG_DIR", str(tmp_path))
+    monkeypatch.delenv("KAGGLE_USERNAME", raising=False)
+    monkeypatch.delenv("KAGGLE_KEY", raising=False)
+    monkeypatch.delenv("KAGGLE_API_TOKEN", raising=False)
+    with pytest.raises(kaggle.KaggleError) as err:
+        kaggle.client()
+    assert "Create New Token" in str(err.value) and not str(err.value).rstrip().endswith("(1)")
+
+
+@pytest.fixture
+def fake_home(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    (home / "Downloads").mkdir(parents=True)
+    monkeypatch.setattr(kaggle.Path, "home", classmethod(lambda cls: home))
+    monkeypatch.setenv("KAGGLE_CONFIG_DIR", str(tmp_path / "kcfg"))
+    return home
+
+
+def _ok_api():
+    return FakeApi([])
+
+
+def test_setup_finds_the_downloaded_key_and_checks_it(fake_home, fake_quota):
+    (fake_home / "Downloads" / "kaggle.json").write_text('{"username": "friend", "key": "abc123"}', encoding="utf-8")
+    said = []
+    assert kaggle.setup(echo=said.append, api_factory=_ok_api)
+    assert json.loads(kaggle.key_path().read_text(encoding="utf-8"))["username"] == "friend"
+    assert any("saved to" in s for s in said) and any("Kaggle GPU:" in s for s in said)
+    assert any("mitra kaggle start" in s for s in said)
+    assert not any("abc123" in s for s in said)  # the key itself is never printed
+
+
+def test_setup_takes_a_path_and_refuses_a_wrong_file(fake_home, fake_quota, tmp_path):
+    bad = tmp_path / "notes.json"
+    bad.write_text('{"hello": 1}', encoding="utf-8")
+    said = []
+    assert not kaggle.setup(str(bad), echo=said.append, api_factory=_ok_api)
+    assert "not a Kaggle API key" in said[0] and not kaggle.key_path().exists()
+    good = tmp_path / "kaggle (1).json"
+    good.write_text('{"username": "friend", "key": "k"}', encoding="utf-8")
+    assert kaggle.setup(str(good), echo=said.append, api_factory=_ok_api)
+
+
+def test_setup_without_a_key_says_where_to_get_one(fake_home, fake_quota):
+    said = []
+    assert not kaggle.setup(echo=said.append, api_factory=_ok_api)
+    assert "Create New Token" in said[0]
+
+
+def test_setup_warns_when_no_gpu_hours(fake_home, fake_quota):
+    fake_quota.update(total_h=0.0, left_h=0.0)
+    (fake_home / "Downloads" / "kaggle.json").write_text('{"username": "f", "key": "k"}', encoding="utf-8")
+    said = []
+    kaggle.setup(echo=said.append, api_factory=_ok_api)
+    assert any("verify your phone" in s for s in said)

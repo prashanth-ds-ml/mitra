@@ -394,7 +394,8 @@ def _kaggle_model() -> str:
 
 
 def cmd_kaggle(
-    action: str = typer.Argument("status", help="start | stop | status"),
+    action: str = typer.Argument("status", help="setup [path] | start | stop | status"),
+    path: str = typer.Argument("", help="For setup: the downloaded kaggle.json (default: look in Downloads)."),
     model: str = typer.Option("", "--model", help="Model to run there (default: your chat model)."),
     ctx: int = typer.Option(262_144, "--ctx", help="Context (default 256K, mimo's maximum)."),
     idle: int = typer.Option(30, "--idle", help="Stop by itself after this many minutes unused."),
@@ -404,7 +405,10 @@ def cmd_kaggle(
     from app import kaggle
 
     try:
-        if action == "start":
+        if action == "setup":
+            if not kaggle.setup(path, echo=console.print):
+                raise typer.Exit(1)
+        elif action == "start":
             kaggle.start(model or _kaggle_model(), ctx, idle_min=idle, max_hours=hours, echo=console.print)
             console.print("  Start Mitra (or restart it): it now runs on Kaggle. `mitra kaggle stop` when done.")
         elif action == "stop":
@@ -639,7 +643,15 @@ def main(
         raise typer.Exit(0)
     if ctx.invoked_subcommand is not None:
         return
-    _chat()
+    try:
+        _chat()
+    except Exception as exc:  # E-066: no real terminal (piped input, an IDE output pane): one line, not a traceback
+        if type(exc).__name__ != "NoConsoleScreenBufferError":
+            raise
+        console.print("✗ Mitra's chat needs a terminal window: Windows Terminal, PowerShell, cmd or Git Bash. "
+                      "It cannot draw its input box when input is piped or in an output pane. "
+                      "Commands like `mitra kaggle status` work anywhere.")
+        raise typer.Exit(1)
 
 
 

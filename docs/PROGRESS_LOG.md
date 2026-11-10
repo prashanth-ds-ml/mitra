@@ -31,3 +31,4 @@ Filled from EVALS.md at each milestone.
 | % solved locally (with escalation) | n/a | n/a | n/a | - |
 | Frontier ₹ per task | - | - | - | - |
 | GPU Wh per solved task | - | - | - | - |
+| 2026-11-10 | v0.1.0 preview | Colleague preview prepared: deep-dive review fixes (E-050..E-066), `/free`, Kaggle GPU (`mitra kaggle start|stop|status`, first live start worked: mimo 256K fully on GPU, 37.6 tok/s), README rewritten for first-time users, feedback + bug issue forms, dependencies pinned, fresh-clone install checked in isolated dirs (9 s, `mitra 0.1.0`), secret scan of files and history clean | v0.1.0 (tag + push waiting for the user's go) |

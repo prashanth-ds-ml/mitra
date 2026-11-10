@@ -4,6 +4,9 @@ Kaggle gives about 30 GPU hours a week (2x T4 16 GB, or a P100), up to 12 hours 
 there so Mitra on your laptop uses that GPU at full context: mimo-v2.6:9b at its 256K maximum fits on the T4s, where
 the laptop's 8 GB GPU needs RAM and 128K.
 
+**Easiest: you do not need this notebook by hand.** `mitra kaggle setup` (once) and `mitra kaggle start` do
+everything below from Mitra (see the main README). This page is the manual way and how it works.
+
 ## Once
 1. Kaggle → your profile → Settings: verify your phone (needed for internet in notebooks) and note your GPU quota.
 2. Kaggle → Create → New Notebook → File → Import Notebook → `mitra_kaggle_server.ipynb` from this folder.

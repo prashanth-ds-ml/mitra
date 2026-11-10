@@ -1,0 +1,53 @@
+name: Feedback (preview)
+description: You tried Mitra on your own project. What worked, what did not? (2 minutes)
+title: "Feedback: "
+labels: ["feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for trying Mitra. Short answers are fine; skip anything you like.
+  - type: input
+    id: machine
+    attributes:
+      label: Your machine
+      description: OS, GPU (and its memory), RAM. Or "Kaggle".
+      placeholder: "Windows 11, RTX 3060 6 GB, 16 GB RAM"
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model and context
+      description: From the Mitra header, e.g. "qwen3.5:4b 64K".
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you asked it to do
+      description: A few of the tasks, in your words, and on what kind of project (language, size).
+    validations:
+      required: true
+  - type: textarea
+    id: worked
+    attributes:
+      label: What worked
+  - type: textarea
+    id: broke
+    attributes:
+      label: What did not work or was annoying
+      description: Wrong answers, slowness, setup trouble, confusing messages. Paste terminal output if you have it.
+  - type: dropdown
+    id: again
+    attributes:
+      label: Would you use it again for real work?
+      options:
+        - "5 - yes, already would"
+        - "4 - yes, after a few fixes"
+        - "3 - maybe"
+        - "2 - probably not"
+        - "1 - no"
+    validations:
+      required: true
+  - type: textarea
+    id: wish
+    attributes:
+      label: The one thing that would make it most useful for you

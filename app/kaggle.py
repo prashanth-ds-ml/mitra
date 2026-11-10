@@ -90,13 +90,73 @@ def client():
     try:
         _timed(api.authenticate)
     except (SystemExit, OSError, ValueError, KaggleError) as exc:
-        raise KaggleError(_CREDS_HELP + f" ({exc})") from exc
+        detail = "" if isinstance(exc, SystemExit) or str(exc).strip().isdigit() else f" ({exc})"
+        raise KaggleError(_CREDS_HELP + detail) from exc
     return api
 
 
-_CREDS_HELP = ("No Kaggle API key found. On kaggle.com: your picture → Settings → API → Create New Token; save the "
-               "downloaded kaggle.json as ~/.kaggle/kaggle.json (Windows: C:\\Users\\<you>\\.kaggle\\kaggle.json). "
+_CREDS_HELP = ("No Kaggle API key found. On kaggle.com: your picture → Settings → API → Create New Token (it downloads "
+               "kaggle.json), then run `mitra kaggle setup`: it finds the file and puts it in place. "
                "Also verify your phone in Settings (notebooks need it for internet).")
+
+
+def key_path() -> Path:
+    """Where the kaggle library looks: $KAGGLE_CONFIG_DIR/kaggle.json, else ~/.kaggle/kaggle.json."""
+    import os
+    base = os.environ.get("KAGGLE_CONFIG_DIR")
+    return Path(base) / "kaggle.json" if base else Path.home() / ".kaggle" / "kaggle.json"
+
+
+def find_download() -> Path | None:
+    """The newest kaggle.json / kaggle (1).json in Downloads (Kaggle's Create New Token saves it there)."""
+    downloads = Path.home() / "Downloads"
+    try:
+        found = sorted(downloads.glob("kaggle*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    except OSError:
+        return None
+    return found[0] if found else None
+
+
+def setup(source: str = "", *, echo=print, api_factory=None) -> bool:
+    """`mitra kaggle setup [path]`: put the downloaded API key where Kaggle looks, check it, show the hours.
+    Any Kaggle account; the key stays on this machine."""
+    import os
+    import shutil
+    target = key_path()
+    src = Path(source).expanduser() if source else None
+    if src is None and not target.exists():
+        src = find_download()
+    if src is not None:
+        try:
+            data = json.loads(src.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            echo(f"✗ cannot read {src}: {exc}")
+            return False
+        if not (isinstance(data, dict) and data.get("username") and data.get("key")):
+            echo(f"✗ {src} is not a Kaggle API key (it needs \"username\" and \"key\").")
+            return False
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, target)
+        try:
+            os.chmod(target, 0o600)  # the kaggle library warns about a key readable by others
+        except OSError:
+            pass
+        echo(f"✓ API key for {data['username']} saved to {target}")
+    elif not target.exists():
+        echo("No kaggle.json found in Downloads. On kaggle.com: your picture → Settings → API → Create New Token, "
+             "then run `mitra kaggle setup` again (or `mitra kaggle setup <path to kaggle.json>`).")
+        return False
+    try:
+        api = (api_factory or client)()
+        q = quota(api)
+    except KaggleError as exc:
+        echo(f"✗ {exc}")
+        return False
+    echo(f"✓ signed in to Kaggle as {username(api)} · " + quota_line(q))
+    if not q.get("total_h"):
+        echo("⚠ no GPU hours shown: verify your phone on kaggle.com → Settings (GPU and internet need it)")
+    echo("Next: `mitra kaggle start` (4-8 minutes), then `mitra` in any project folder. `mitra kaggle stop` when done.")
+    return True
 
 
 def username(api) -> str:
