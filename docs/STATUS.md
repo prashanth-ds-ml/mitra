@@ -5,6 +5,7 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next session starts here (handoff 2026-11-08)
+000000000. **2026-11-10: first live `mitra kaggle start` worked** (user's laptop, no browser): queued → install → download → mimo 14.5 GB at 262144, fully on GPU → tunnel → ready; `mitra kaggle status` ✓ answering, 1.3 h used of 30. Next: chat + `/kaggle stop` live check, then the laptop-vs-Kaggle brick-breaker experiment.
 00000000. **2026-11-10, `mitra kaggle start|stop|status` + `/kaggle` (D-061)**: no browser needed. Live-checked read-only on the user's account (username, quota 1.1 h of 30, reset Sat 05:30). The manual notebook run worked (mimo 14.5 GB 100% on GPU at 256K, 37.6 tok/s). Next: the tool reinstall (kaggle package) with Mitra closed, then a live `mitra kaggle start`.
 0000000. **2026-11-10, Kaggle remote built (D-060)**: `remote/kaggle/README.md` has the steps; live-tested here with the local Ollama behind the proxy (404 without token, models + facts + 256K + ☁ line through it). Next: the user runs the notebook (USER_TESTS D-060), then the laptop-vs-Kaggle brick-breaker experiment.
 000000. **2026-11-10, `/free` built (D-059)** while the user's Mitra was open (no /run until it restarts, L-041): exit and start Mitra again, then `/free`. USER_TESTS has the 4 checks.
