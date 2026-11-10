@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-069 | 2026-11-10 | D-068 step 0 | Medium | driven chat test (before commit) | A plan-first request whose planner failed crashed the chat: the new plan-path record passed `reason` twice to the recorder (`TypeError: got multiple values for keyword argument 'reason'`) | closed | F-069 |
 | E-068 | 2026-11-10 | M2 | Medium | user's start (pasted) | The memory line suggested closing `MemCompression 1.8 GB`: newer Windows names its memory-compression process `MemCompression`, the never-close list only had "memory compression" | closed | F-068 |
 | E-067 | 2026-11-10 | M4 | High | user's session (pasted) | After the Kaggle run stopped by itself (30 min unused, as designed), `mitra` said "No compatible local Ollama models found" and quit: the remote setting still pointed at the dead tunnel, so the model list came back empty; local Ollama was fine | closed | F-067 |
 | E-066 | 2026-11-10 | M4 | Low | fresh-clone test (v0.1.0 prep) | Started without a real terminal (piped input, an IDE output pane, Git Bash without a console), the chat died with a 60-line prompt_toolkit traceback (`NoConsoleScreenBufferError`) after the header; also the no-API-key Kaggle message ended with a stray `(1)` | closed | F-066 |

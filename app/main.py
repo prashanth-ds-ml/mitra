@@ -2569,7 +2569,7 @@ def _chat():
                                   num_gpu=num_gpu, reasoning=think)
         review_llm = codegen_llm = local_llm
         auto_compact_threshold = config.compact_threshold(cfg, num_ctx)
-        chat.apply_route(r, llm=local_llm, num_ctx=num_ctx)
+        chat.apply_route(r, llm=local_llm, num_ctx=num_ctx, thinking=think)
         if quiet:
             return
         console.print(Text("  ⇄ " + roles_mod.describe(r), style="m.tool"))
@@ -2790,23 +2790,26 @@ def _chat():
     from app.core import intent as intent_mod
     from app.core import planner as planner_mod
 
-    def _plan_first(task: str) -> None:
-        """P4: a short runnable plan from a small context pack; Go / Change / Save / Cancel (auto mode: Go)."""
+    def _plan_first(task: str) -> dict:
+        """P4: a short runnable plan from a small context pack; Go / Change / Save / Cancel (auto mode: Go).
+        Returns what happened for the records (D-068): outcome, your choice, planning rounds, steps passed."""
         console.print(Text("  ✎ a bigger change: planning it first (small steps, each checked) · "
                            "`/do <task>` skips planning", style="m.tool"))
         pack = planner_mod.context_pack(pathlib.Path(cfg["workspace"]), task)
         text, feedback, choice = "", "", None
+        rounds = 0
         for _round in range(6):
+            rounds = _round + 1
             console.print(Text("  planning …", style="m.faint"))
             try:
                 text, problem = planner_mod.make_plan(local_llm, task, pack, feedback=feedback,
                                                       previous=text if feedback else "")
             except KeyboardInterrupt:
                 console.print(Text("  planning stopped", style="m.info"))
-                return
+                return {"outcome": "interrupted", "choice": "stopped", "rounds": rounds}
             except Exception as exc:  # noqa: BLE001 - shown, the chat goes on
                 console.print(Text(f"  ✗ the planner failed: {exc}", style="m.err"))
-                return
+                return {"outcome": "error", "choice": "", "rounds": rounds, "reason": str(exc)[:300]}
             console.print(Markdown(text))
             if problem:
                 console.print(Text(f"  ⚠ the plan still has a problem: {problem}", style="m.info"))
@@ -2829,14 +2832,16 @@ def _chat():
                 break
         if choice not in ("go", "save"):
             console.print(Text("  plan not used", style="m.faint"))
-            return
+            return {"outcome": "plan_cancelled", "choice": choice or "cancel", "rounds": rounds}
         path = planner_mod.save(pathlib.Path(cfg["workspace"]), task, text)
         if choice == "save":
             console.print(Text(f"  saved {path.name} · `/run {path.name} 4` builds it unattended", style="m.tool"))
-            return
-        _run_planned(task, text, path)
+            return {"outcome": "plan_saved", "choice": "save", "rounds": rounds}
+        done = _run_planned(task, text, path)
+        return {"outcome": "tests_passed" if done["ok"] else "tests_failed", "choice": "go", "rounds": rounds,
+                "steps_passed": done["passed"], "steps_total": done["total"]}
 
-    def _run_planned(task: str, text: str, path) -> None:
+    def _run_planned(task: str, text: str, path) -> dict:
         """P5: one step at a time with a fresh small context and its check; failed steps re-planned once; the
         resume note written; the chat remembers what was done."""
         from app.core import loop as loop_mod
@@ -2895,6 +2900,8 @@ def _chat():
         chat.turn_log.append({"no": len(chat.turn_log) + 1, "user": task[:300],
                               "outcome": "tests_passed" if ok else "tests_failed",
                               "files": [e["path"] for e in journal]})
+        return {"ok": ok, "passed": sum(1 for r in results.values() if r.get("status") == "passed"),
+                "total": len(results)}
 
     if _kaggle_died_turns is not None:
         _kaggle_report("the Kaggle GPU ended while Mitra was closed", turns=_kaggle_died_turns, summarize=False)
@@ -3163,6 +3170,7 @@ def _chat():
                 session_changes.clear()
             elif session_changes:
                 session_changes.pop()
+            chat.signal("undo", all=cmd == "/undo all")  # D-068: you took Mitra's change back
             ai_reply = filesystem.undo_last_change_set(cfg["workspace"])
             _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
@@ -3389,6 +3397,7 @@ def _chat():
         request_kind = force_kind or intent_mod.classify(user_input)
         if request_kind == "resume":  # from Mitra's records: instant, no model call, no searching
             _brief = resume_mod.brief(pathlib.Path(cfg["workspace"]))
+            chat.note_request(user_input, "resume", "resume_brief", "answered" if _brief else "nothing_recorded")
             console.print(Markdown(_brief or "Nothing recorded for this project yet."))
             console.print(Text("  (from Mitra's records, no model call) · ask for the next step, or "
                                "`/plan <task>` to plan a bigger change", style="m.faint"))
@@ -3414,7 +3423,10 @@ def _chat():
             _maybe_offer_kaggle()
 
         if request_kind == "big":  # D-065 P4/P5: plan first, then small checked steps
-            _plan_first(user_input)
+            _t_plan = time.monotonic()
+            _plan_info = _plan_first(user_input) or {}
+            chat.note_request(user_input, "big", "plan_first", _plan_info.pop("outcome", "plan_cancelled"),
+                              seconds=time.monotonic() - _t_plan, **_plan_info)
             continue
 
         messages.append(HumanMessage(content=user_input))
@@ -3427,6 +3439,7 @@ def _chat():
             # ── One turn of the core loop (M1 stage 2) ────────────────────────
             turn_in = turn_out = 0
             chat.mode = session_mode
+            chat.request_kind, chat.path = request_kind, "loop"  # D-068: recorded with the turn
             typed_buffer.clear()
             turn = chat.turn(messages)
             if chat.noticed:  # your edits since the last turn: recorded as corrections (self-improvement)

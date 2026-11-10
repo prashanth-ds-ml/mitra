@@ -98,6 +98,9 @@ documents) and offers the matching servers once; `/mcp` changes it any time.
 
 ## 6. Build order
 
+**Replaced by [BUILD_ORDER.md](BUILD_ORDER.md) (D-068).** Kept below for reference.
+
+
 1. `app/core/behaviour.py`: this file's role table (jobs, tools, direct MCP tools, thinking, budget, machine) as the
    one source of truth; roles.py and the routing read it.
 2. Small talk, question and where-we-stopped paths; tolerant `run_command`, structured `run_tests`, `answer`,

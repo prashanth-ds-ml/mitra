@@ -8,6 +8,7 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-069 | 2026-11-10 | E-069 | `note_request` merges the path's extra fields into the turn_end row instead of passing them twice | `app/core/chat.py` | `tests/test_step0_records.py::test_a_planner_error_reason_does_not_clash_with_the_record_fields`; `tests/test_backend_chat.py::test_switching_between_kaggle_and_the_laptop` | works (800 passed) |
 | F-068 | 2026-11-10 | E-068 | `memcompression` added to `fit._NEVER`; live list on the user's machine no longer shows it | `app/fit.py` | `tests/test_free.py::test_windows_memory_compression_is_never_offered` | works |
 | F-067 | 2026-11-10 | E-067 | `remote.check_alive` at chat and `mitra solve` start: a remote that does not answer is not used (settings restored to this machine) with a plain message; a dead Kaggle address is forgotten (new URL every session), another remote stays set. Live: the user's dead Kaggle remote → local Ollama, 5 models listed | `app/remote.py`, `app/main.py`, `app/core/cli.py` | `tests/test_e067_dead_remote.py` (4, fail without the fix) | works |
 | F-066 | 2026-11-10 | E-066 | `main()` turns `NoConsoleScreenBufferError` into one line (other errors still raise); the Kaggle key message drops a bare exit code | `app/main.py`, `app/kaggle.py` | `tests/test_e066_console.py` (2), `tests/test_kaggle.py::test_no_api_key_gives_the_steps_without_noise` | works |

@@ -76,6 +76,9 @@ script · brick-breaker features · the endpoint fix · the schema design (03b) 
 
 ## Still to clarify (in this order)
 
+Settled 2026-11-10 in [BUILD_ORDER.md](BUILD_ORDER.md) (D-068): 1 (flow), 2 (coach by hand first), 5 (what we freeze). Open: 3, 4.
+
+
 1. **How one task flows end to end** for you: where you hand it over (chat, a task file, Claude Code), what you
    approve, where it runs, how it reports back.
 2. **The coach loop** (defaults proposed 2026-11-10: weekly + `/coach` + queued alerts; Claude via `claude -p`;

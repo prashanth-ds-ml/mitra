@@ -5,6 +5,7 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next session starts here (handoff 2026-11-08)
+0000000000000000. **2026-11-10, build order agreed (D-068, [BUILD_ORDER.md](BUILD_ORDER.md)); step 0 built**: every turn records request kind, path (loop / plan_first / resume_brief), backend, thinking, notes version, time to first word; signals rephrase / interrupt / undo (copy comes with step 1); plan-first requests are numbered turns with choice, rounds, steps passed; insights split by path / request / backend. 800 tests pass. **Next: step 1, everyday chat** (mail, writing, general; one call, no tools, thinking off; me.md + notes; /copy). Restart Mitra to pick up the code.
 000000000000000. **2026-11-10, v0.3.0: plan first, then small steps (D-065, PLAN_FIRST.md)**: P0-P5 built; next: the user tries a big request live (plan → Go) and "where did we stop".
 00000000000000. **2026-11-10, v0.2.2: Mitra asks before using Kaggle (D-064)**, five start-up cases + `/kaggle use`; 11 driven chat tests. The user's own first start will ask (case 2).
 0000000000000. **2026-11-10, v0.2.0 published (D-062 B0-B6)**; the user's friend now clones and tests setup + Kaggle (bring their feedback/issues here). Later phase: Modal (D-063, I-24); Kaggle benchmark of Mitra's tasks with the AI credits (I-25).

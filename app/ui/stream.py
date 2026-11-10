@@ -83,6 +83,7 @@ class StreamResult:
     thinking: str = ""
     thinking_tokens: int = 0
     seconds: float = 0.0
+    first_s: float | None = None    # time to the first answer word or tool call (not thinking)
     printed: bool = False           # answer text was shown on screen
     stopped: bool = False           # the user pressed esc
     chunks: list = field(default_factory=list)
@@ -155,6 +156,8 @@ def stream_reply(
                 continue
             if not say.strip() and not piece.strip():
                 continue
+            if res.first_s is None and piece.strip():
+                res.first_s = round(clock() - start, 2)
             if not say:
                 piece = piece.lstrip("\n")
                 show_thinking_line(live)
@@ -184,6 +187,8 @@ def stream_reply(
             content = getattr(chunk, "content", "") or ""
             if isinstance(content, str) and content:
                 handle(splitter.feed(content), live)
+            if getattr(chunk, "tool_call_chunks", None) and res.first_s is None:
+                res.first_s = round(clock() - start, 2)
             if getattr(chunk, "tool_call_chunks", None) and not say:
                 thinking.label = "Choosing a tool"
         if res.stopped:

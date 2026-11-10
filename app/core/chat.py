@@ -19,6 +19,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from app.agents.limits import RepeatGuard
 from app.core import harness as H
 from app.core import loop as core_loop
+from app.core import signals as SIG
 from app.core import tools as T
 from app.core.parse import text_tool_calls
 
@@ -230,6 +231,7 @@ class TurnResult:
     last_test_ok: bool | None = None
     last_test_summary: str = ""
     remote_gone: bool = False  # the remote GPU stopped mid-turn (D-062 B3)
+    first_s: float | None = None  # time to the first answer word or tool call of the turn (D-068)
 
 
 class ChatSession:
@@ -255,10 +257,17 @@ class ChatSession:
         self.role = "chat"
         self.allowed_tools: tuple[str, ...] | None = None
         self.allowed_mcp: tuple[str, ...] | None = None
+        # D-068 step 0: what the coach needs to see per turn; main sets these before each turn
+        self.request_kind = ""      # how the request was sorted (intent.classify, or /plan /do)
+        self.path = "loop"          # which path ran it: loop | plan_first | resume_brief (more in later steps)
+        self.thinking: bool | None = None  # the model's thinking setting for this role (None = model default)
+        self._prev_user_full = ""   # the last request in full, to notice when you ask the same thing again
 
-    def apply_route(self, route: dict, llm=None, num_ctx: int | None = None) -> None:
-        """Switch role: model (if given), tools, MCP servers and read-only paths at once; recorded for the dashboard."""
+    def apply_route(self, route: dict, llm=None, num_ctx: int | None = None, thinking: bool | None = None) -> None:
+        """Switch role: model (if given), tools, MCP servers and read-only paths at once; recorded for the dashboard.
+        `thinking` is the effective setting the model was built with (None = the model's default)."""
         self.role = route["role"]
+        self.thinking = thinking
         self.allowed_tools = route.get("tools")
         self.allowed_mcp = route.get("mcp")
         self.ws.read_only = tuple(route.get("read_only") or ())
@@ -292,6 +301,46 @@ class ChatSession:
         self.rec.write("feedback", of_turn=self.turn_no, verdict=verdict, note=note[:1000], author="user")
         said = f' ("{self._last_user}")' if self._last_user else ""
         return f"Turn {self.turn_no}{said} marked {mark}{tail}"
+
+    def signal(self, name: str, of_turn: int | None = None, **info) -> None:
+        """A quiet sign of what you thought of a turn (D-068): rephrase, interrupt, undo, copy."""
+        if name not in SIG.SIGNALS:
+            raise ValueError(f"unknown signal {name!r}")
+        of = self.turn_no if of_turn is None else of_turn
+        if not of:
+            return
+        self.rec.write("signal", of_turn=of, signal=name, author="user", **info)
+
+    def _start_row(self, user: str) -> dict:
+        """The turn_start fields every path shares (D-068 step 0 adds kind, path, backend, thinking, notes)."""
+        from app.core import runinfo
+        return dict(turn=self.turn_no, mode=self.mode, user=str(user)[:2000], harness_version=self.harness.version,
+                    model=str(getattr(self.llm, "model", "") or ""), num_ctx=self.num_ctx,
+                    code_version=runinfo.code_version(), ram_free_gb=runinfo.ram_free_gb(), role=self.role,
+                    request_kind=self.request_kind, path=self.path, backend=self.backend_kind,
+                    thinking=self.thinking, notes_version=SIG.notes_version(self.ws.root))
+
+    def _new_turn(self, user: str) -> None:
+        """Count a turn; if you asked the same thing again, the turn before gets a rephrase signal."""
+        self.turn_no += 1
+        if self._prev_user_full and SIG.is_rephrase(self._prev_user_full, str(user)):
+            self.signal("rephrase", of_turn=self.turn_no - 1)
+        self._prev_user_full = str(user)
+        said = " ".join(str(user).split())
+        self._last_user = said if len(said) <= 50 else said[:49] + "…"
+
+    def note_request(self, user: str, kind: str, path: str, outcome: str, seconds: float = 0.0, **info) -> None:
+        """A request handled outside the chat loop (resume brief, plan first) is still a numbered turn in the records,
+        with its kind, path and outcome, so /good, /bad and the coach see it like any other (D-068)."""
+        self.request_kind, self.path = kind, path
+        self._new_turn(user)
+        self.last_night = None
+        self.rec.write("turn_start", **self._start_row(user))
+        end = dict(turn=self.turn_no, steps=0, stopped=False, reason="", text="", tokens_in=0, tokens_out=0,
+                   ctx_used=0, seconds=round(seconds, 1), outcome=outcome, changed=[])
+        end.update(info)  # e.g. choice, rounds, steps_passed, or the planner error as `reason`
+        self.rec.write("turn_end", **end)
+        self.request_kind, self.path = "", "loop"
 
     def night_started(self, plan: Path, started: float) -> None:
         """/run started a night: /good /bad judge it (E-052), and the files it may change are no longer watched for
@@ -442,19 +491,13 @@ class ChatSession:
         """Run the loop on `messages` (the user's message is already the last one). Appends to `messages`."""
         res = TurnResult()
         max_steps = max_steps or self.harness.limit("chat_max_steps")
-        self.turn_no += 1
         self._plans_run = {}
         self.last_night = None
         t0 = time.monotonic()
         user = next((m.content for m in reversed(messages) if isinstance(m, HumanMessage)), "")
-        said = " ".join(str(user).split())
-        self._last_user = said if len(said) <= 50 else said[:49] + "…"
-        from app.core import runinfo
+        self._new_turn(str(user))
         self._check_corrections(of_turn=self.turn_no - 1)  # attributed to the turn they correct
-        self.rec.write("turn_start", turn=self.turn_no, mode=self.mode, user=str(user)[:2000],
-                       harness_version=self.harness.version, model=str(getattr(self.llm, "model", "") or ""),
-                       num_ctx=self.num_ctx, code_version=runinfo.code_version(), ram_free_gb=runinfo.ram_free_gb(),
-                       role=self.role)
+        self.rec.write("turn_start", **self._start_row(str(user)))
         try:
             res = self._turn(messages, res, max_steps)
         except RemoteGone as exc:  # D-062 B3: not the model's failure; the chat switches to the laptop and reports
@@ -464,7 +507,7 @@ class ChatSession:
             self.rec.write("turn_end", turn=self.turn_no, steps=res.steps, stopped=True, reason=res.stop_reason,
                            text="", tokens_in=res.tokens_in, tokens_out=res.tokens_out, ctx_used=res.ctx_used,
                            seconds=round(time.monotonic() - t0, 1), outcome="kaggle_ended",
-                           changed=[e["path"] for e in res.journal])
+                           changed=[e["path"] for e in res.journal], first_s=res.first_s)
             self._remember_left(res.journal)
             self.turn_log.append({"no": self.turn_no, "user": str(user)[:300], "outcome": "kaggle_ended",
                                   "files": [e["path"] for e in res.journal]})
@@ -474,13 +517,15 @@ class ChatSession:
                            reason=f"interrupted ({type(exc).__name__})", text="", tokens_in=res.tokens_in,
                            outcome="interrupted" if isinstance(exc, KeyboardInterrupt) else "error",
                            tokens_out=res.tokens_out, seconds=round(time.monotonic() - t0, 1),
-                           changed=[e["path"] for e in res.journal])
+                           changed=[e["path"] for e in res.journal], first_s=res.first_s)
+            if isinstance(exc, KeyboardInterrupt):
+                self.signal("interrupt", steps=res.steps)
             self._remember_left(res.journal)
             raise
         self.rec.write("turn_end", turn=self.turn_no, steps=res.steps, stopped=res.stopped, reason=res.stop_reason,
                        text=res.text[:2000], tokens_in=res.tokens_in, tokens_out=res.tokens_out,
                        ctx_used=res.ctx_used, seconds=round(time.monotonic() - t0, 1), outcome=turn_outcome(res),
-                       changed=[e["path"] for e in res.journal])
+                       changed=[e["path"] for e in res.journal], first_s=res.first_s)
         self._remember_left(res.journal)
         self.turn_log.append({"no": self.turn_no, "user": str(user)[:300], "outcome": turn_outcome(res),
                               "files": [e["path"] for e in res.journal]})
@@ -531,9 +576,12 @@ class ChatSession:
                 messages.append(HumanMessage(content=BAD_TOOL_CALL_NOTE.format(error=exc)))
                 continue
             self._trace(messages, streamed, specs, step)
+            if step == 1:
+                res.first_s = getattr(streamed, "first_s", None)
             if streamed.stopped:
                 messages.append(AIMessage(content=streamed.text))
                 res.text, res.stopped, res.stop_reason = streamed.text, True, "stopped by you (esc)"
+                self.signal("interrupt", steps=res.steps, how="esc")
                 return res
             reply = streamed.message
             if reply is None:

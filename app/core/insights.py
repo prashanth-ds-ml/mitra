@@ -23,7 +23,7 @@ TRAINING_TARGET = 300     # SCOPE: a few hundred passing runs before any fine-tu
 USABLE_OUTCOMES = {"tests_passed", "passed"}  # chat turns / mitra solve runs whose tests passed
 TESTED_OUTCOMES = USABLE_OUTCOMES | {"tests_failed", "failed"}
 EDIT_TOOLS = {"write_file", "edit_file", "append_file"}
-USER_KINDS = {"feedback", "user_edit", "declined"}  # your judgment: never makes a turn "written by someone else"
+USER_KINDS = {"feedback", "user_edit", "declined", "signal"}  # your judgment: never makes a turn "written by someone else"
 RELOAD_S = 1.0            # an Ollama load time above this means the model was (re)loaded for that call
 
 
@@ -91,6 +91,14 @@ class Turn:
     declines: list = field(default_factory=list)      # {tool, path|command, reason}
     crashes: int = 0
     green_s: float | None = None            # first code edit -> first passing tests, within the turn
+    # D-068 step 0 (OLD / None in records from before)
+    request_kind: str = ""                  # how the request was sorted: resume | question | small | big | ...
+    path: str = ""                          # which path ran it: loop | plan_first | resume_brief | ...
+    backend: str = ""                       # laptop | remote
+    thinking: bool | None = None
+    notes_version: str = ""
+    first_s: float | None = None            # time to the first answer word or tool call
+    signals: list = field(default_factory=list)       # rephrase | interrupt | undo | copy (quiet signs from you)
     _first_edit_t: float = 0.0
 
     @property
@@ -172,7 +180,9 @@ def sessions(files: list[Path]) -> list[Session]:
                            mode=str(r.get("mode") or ""), model=str(r.get("model") or ""),
                            harness_version=int(r.get("harness_version") or 0),
                            code_version=str(r.get("code_version") or ""), started=t,
-                           ram_free_gb=r.get("ram_free_gb"))
+                           ram_free_gb=r.get("ram_free_gb"), request_kind=str(r.get("request_kind") or ""),
+                           path=str(r.get("path") or ""), backend=str(r.get("backend") or ""),
+                           thinking=r.get("thinking"), notes_version=str(r.get("notes_version") or ""))
                 cur.authors.add(r.get("author", "mitra"))
                 s.code_version = s.code_version or cur.code_version
                 s.turns.append(cur)
@@ -187,6 +197,11 @@ def sessions(files: list[Path]) -> list[Session]:
                 tt = _turn_by_no(s, r.get("of_turn"))
                 if tt:
                     tt.verdict, tt.verdict_note = str(r.get("verdict") or ""), str(r.get("note") or "")
+                continue
+            if k == "signal":
+                tt = _turn_by_no(s, r.get("of_turn"))
+                if tt:
+                    tt.signals.append(str(r.get("signal") or ""))
                 continue
             if k == "user_edit":
                 tt = _turn_by_no(s, r.get("of_turn"))
@@ -235,6 +250,7 @@ def sessions(files: list[Path]) -> list[Session]:
                 cur.seconds = float(r.get("seconds") or 0)
                 cur.tokens_in, cur.tokens_out = int(r.get("tokens_in") or 0), int(r.get("tokens_out") or 0)
                 cur.ctx_used = int(r.get("ctx_used") or 0)
+                cur.first_s = r.get("first_s")
                 if kind == "chat":
                     cur = None
         out.append(s)
@@ -393,9 +409,15 @@ class Signals:
     tok_s: list = field(default_factory=list)
     prompt_s: list = field(default_factory=list)
     reloads: int = 0
+    signals: dict = field(default_factory=dict)       # rephrase / interrupt / undo / copy -> count (D-068)
+    first_s: list = field(default_factory=list)
 
     def add(self, s: Session, t: Turn) -> None:
         self.turns += 1
+        for sig in t.signals:
+            self.signals[sig] = self.signals.get(sig, 0) + 1
+        if t.first_s is not None:
+            self.first_s.append(float(t.first_s))
         self.finished += t.finished
         self.tool_calls += sum(1 for st in t.steps if st.kind == "tool")
         self.tool_failures += sum(1 for st in t.steps if st.kind == "tool" and not st.ok)
@@ -437,6 +459,10 @@ class Signals:
     @property
     def median_ctx(self) -> int:
         return int(statistics.median(self.ctx)) if self.ctx else 0
+
+    @property
+    def median_first_s(self) -> float | None:
+        return _median(self.first_s) if self.first_s else None
 
     @property
     def median_green_s(self) -> float | None:
@@ -547,7 +573,7 @@ def _project_dirs() -> dict[str, Path]:
 
 
 def breakdown(sess: list[Session], by: str) -> list[Signals]:
-    """by="project" | "model" | "kind"."""
+    """by="project" | "model" | "kind" (of project) | "path" | "request" (how it was sorted) | "backend"."""
     dirs = _project_dirs() if by == "kind" else {}
     groups: dict[str, Signals] = {}
     for s, t in _turns(sess):
@@ -555,6 +581,8 @@ def breakdown(sess: list[Session], by: str) -> list[Signals]:
             key = s.project
         elif by == "model":
             key = t.model or s.machine.get("model") or OLD
+        elif by in ("path", "request", "backend"):
+            key = {"path": t.path, "request": t.request_kind, "backend": t.backend}[by] or OLD
         else:
             key = project_kind(dirs.get(s.project))
         groups.setdefault(key, Signals(label=key)).add(s, t)
