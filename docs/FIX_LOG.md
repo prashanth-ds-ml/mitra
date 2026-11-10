@@ -8,6 +8,7 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-065 | 2026-11-10 | E-065 | `six` added to Mitra's dependencies; the KaggleError names the real import error | `pyproject.toml`, `app/kaggle.py` | `tests/test_kaggle.py` (2) | works: installed `mitra kaggle status` shows the quota |
 | F-064 | 2026-11-09 | E-064 | The plan folder's Workspace shares the turn's journal (absolute paths) | `app/core/chat.py` | `tests/test_review_a.py::test_a_plan_in_a_subfolder_shares_the_turn_journal` | works |
 | F-063 | 2026-11-09 | E-063 | `plans.check_text` names each per-task problem once with all its tasks (`T1, T2, T3: paths ...`); self-needs listed after | `app/core/plans.py` | `tests/test_review_a.py::test_the_same_plan_problem_is_named_once_with_its_tasks` | works |
 | F-062 | 2026-11-09 | E-062 | `_utf8_streams()` at import: stdout/stderr that are not UTF-8 (a file or pipe on Windows) are reconfigured to UTF-8 with `errors="replace"`. Live: `mitra night <bad plan> > night.log` now writes the ✗ message | `app/main.py` | `tests/test_review_a.py::test_redirected_output_takes_any_character` | works |

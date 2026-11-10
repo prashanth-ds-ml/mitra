@@ -81,9 +81,9 @@ def client():
     """An authenticated KaggleApi, or KaggleError saying what to do."""
     try:
         from kaggle.api.kaggle_api_extended import KaggleApi
-    except ImportError as exc:
-        raise KaggleError("The `kaggle` package is missing. With Mitra closed, reinstall it: "
-                          "`uv tool install --reinstall -e <mitra folder>`.") from exc
+    except ImportError as exc:  # missing, or one of its own packages missing (E-065: six)
+        raise KaggleError(f"The `kaggle` package cannot load ({exc}). With Mitra closed, reinstall Mitra: "
+                          "`uv tool install --reinstall -e <mitra folder>` (forward slashes in Git Bash).") from exc
     except (SystemExit, OSError) as exc:  # older kaggle versions authenticate on import
         raise KaggleError(_CREDS_HELP) from exc
     api = KaggleApi()

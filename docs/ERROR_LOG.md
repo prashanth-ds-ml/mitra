@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-065 | 2026-11-10 | M4 | High | user's tool reinstall (live) | `mitra kaggle status` said "the `kaggle` package is missing" after the reinstall: kaggle 2.2.5 imports `six` without declaring it, so the fresh tool env could not load it (the dev venv happened to have six); the message hid the real import error | closed | F-065 |
 | E-064 | 2026-11-09 | M3 | High | deep dive (Claude, own F-050) | F-050 gave a plan in a subfolder its own Workspace with its own journal, so `/undo` and the corrections check missed every file the plan run changed | closed | F-064 |
 | E-063 | 2026-11-09 | M3 | Low | deep dive (live check of mitra-try/brick-breaker/plan.md) | The plan check repeated one problem per task (5 copies of the folder-prefix message for T1-T5) and stopped listing after 5, so other problems were hidden | closed | F-063 |
 | E-062 | 2026-11-09 | M3 | Medium | deep dive (live `mitra night` run, output piped) | `mitra night ... > night.log` crashed with `UnicodeEncodeError: 'charmap' codec can't encode character '✗'` before anything ran: redirected output on Windows is cp1252 (`/run` was safe: it sets PYTHONIOENCODING) | closed | F-062 |

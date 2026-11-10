@@ -184,3 +184,26 @@ def test_the_auto_notebook_stops_itself_and_reports_stages():
         assert needed in code
     manual = "".join("".join(c["source"]) for c in nb.build()["cells"])
     assert "IDLE_MIN = 0" in manual and "TOKEN = secrets.token_urlsafe(24)" in manual
+
+
+def test_kaggle_dependencies_include_what_kaggle_forgets():
+    """E-065: kaggle 2.2.5 imports `six` without declaring it; the fresh tool install could not load it."""
+    import tomllib
+    deps = tomllib.loads((pathlib.Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(
+        encoding="utf-8"))["project"]["dependencies"]
+    names = {d.split(">")[0].split("=")[0].split("<")[0].strip() for d in deps}
+    assert {"kaggle", "six"} <= names
+
+
+def test_a_broken_kaggle_install_says_why(monkeypatch):
+    import builtins
+    real = builtins.__import__
+
+    def fake(name, *a, **k):
+        if name.startswith("kaggle"):
+            raise ModuleNotFoundError("No module named 'six'")
+        return real(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", fake)
+    with pytest.raises(kaggle.KaggleError, match="No module named 'six'"):
+        kaggle.client()

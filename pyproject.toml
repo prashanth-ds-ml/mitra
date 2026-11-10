@@ -24,6 +24,7 @@ dependencies = [
     "pytest",  # run_tests falls back to Mitra's own Python for projects without a venv (E-028)
     "pyflakes",  # check_code: undefined names / unbound locals before a program runs (E4)
     "kaggle>=2.2",  # mitra kaggle start/stop/status: your Kaggle GPU hours (D-061)
+    "six",  # kaggle 2.2.5 imports six without declaring it (E-065)
 ]
 
 [project.optional-dependencies]
