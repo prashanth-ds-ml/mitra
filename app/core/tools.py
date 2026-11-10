@@ -151,12 +151,60 @@ def read_file(ws: Workspace, path: str, start: int = 1, end: int = 0) -> str:
     text = full.read_text(encoding="utf-8", errors="replace")
     lines = text.splitlines()
     ws.seen[ws.rel(full)] = full.stat().st_mtime
+    if int(start or 1) <= 1 and not int(end or 0) and len(lines) > OUTLINE_OVER:
+        return outline(ws.rel(full), text)  # D-065 P2: a map of a large file, then read only the part needed
     start = max(1, int(start or 1))
     end = int(end or 0) or min(len(lines), start + MAX_READ_LINES - 1)
     shown = lines[start - 1:end]
     body = "\n".join(f"{i:4} | {line}" for i, line in enumerate(shown, start))
     more = f"\n… {len(lines) - end} more lines (read_file with start={end + 1})" if end < len(lines) else ""
     return f"{ws.rel(full)} ({len(lines)} lines)\n{body}{more}" if lines else f"{ws.rel(full)} (empty file)"
+
+
+OUTLINE_OVER = 150     # lines: a larger file read without a range gives its outline first (D-065 P2)
+OUTLINE_MAX = 80       # outline entries shown
+HEAD_LINES = 20        # plus the first lines (imports, constants)
+_DEF_LINE = re.compile(r"^\s*(export\s+)?(default\s+)?(async\s+)?(def|class|function|interface|type|struct|enum|fn|func|"
+                       r"impl|trait|module)\b")
+
+
+def outline_entries(rel: str, text: str) -> list[tuple[int, str]]:
+    """(line, entry) for the definitions of a file: Python via ast (classes, functions, methods), Markdown headings,
+    other code by a definition pattern."""
+    lines = text.splitlines()
+    if rel.endswith(".py"):
+        import ast
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            tree = None
+        if tree is not None:
+            out = []
+            for node in tree.body:
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    out.append((node.lineno, f"def {node.name}({ast.unparse(node.args)})"))
+                elif isinstance(node, ast.ClassDef):
+                    out.append((node.lineno, f"class {node.name}"))
+                    for sub in node.body:
+                        if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            out.append((sub.lineno, f"    def {sub.name}({ast.unparse(sub.args)})"))
+            return out
+    if rel.lower().endswith((".md", ".markdown", ".rst", ".txt")):
+        return [(i, line.strip()) for i, line in enumerate(lines, 1) if line.startswith("#")]
+    return [(i, line.strip()[:120]) for i, line in enumerate(lines, 1) if _DEF_LINE.match(line)]
+
+
+def outline(rel: str, text: str) -> str:
+    lines = text.splitlines()
+    entries = outline_entries(rel, text)
+    head = "\n".join(f"{i:4} | {line}" for i, line in enumerate(lines[:HEAD_LINES], 1))
+    shown = "\n".join(f"{i:4} : {entry}" for i, entry in entries[:OUTLINE_MAX])
+    more = f"\n     … {len(entries) - OUTLINE_MAX} more" if len(entries) > OUTLINE_MAX else ""
+    return (f"{rel} ({len(lines)} lines: large, so its outline first. Read only the part you need: read_file with "
+            f"start and end, e.g. start={entries[0][0] if entries else 1} end="
+            f"{min(len(lines), (entries[0][0] if entries else 1) + 60)}.)\n"
+            f"First lines:\n{head}\n"
+            + (f"Outline (line : definition):\n{shown}{more}" if entries else "(no definitions found: read a part)"))
 
 
 def search(ws: Workspace, pattern: str, path: str = ".") -> str:
@@ -486,7 +534,8 @@ def run_tests(ws: Workspace, command: str | None = None, extra: list[str] | None
 TOOL_SPECS = [
     {"name": "list_files", "description": "List files in the workspace (or a folder).",
      "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}},
-    {"name": "read_file", "description": "Read a text file with line numbers. Read a file before editing it.",
+    {"name": "read_file", "description": "Read a text file with line numbers (large files: an outline first, then "
+                                        "read a part with start/end). Read a file before editing it.",
      "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "start": {"type": "integer"},
                                                      "end": {"type": "integer"}}, "required": ["path"]}},
     {"name": "search", "description": "Find a regex in files; returns file:line: text.",

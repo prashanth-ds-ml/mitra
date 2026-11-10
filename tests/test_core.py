@@ -58,7 +58,9 @@ def test_paths_stay_inside_the_workspace(ws):
     with pytest.raises(T.ToolError, match="outside"):
         T.read_file(ws, "../secret.txt")
     with pytest.raises(T.ToolError, match="relative"):
-        T.read_file(ws, str(ws.root / "x.py"))
+        T.read_file(ws, str(ws.root.parent / "elsewhere" / "x.py"))
+    (ws.root / "x.py").write_text("x = 1\n", encoding="utf-8")  # an absolute path INTO the workspace works (D-065 P0)
+    assert "x.py (1 lines)" in T.read_file(ws, str(ws.root / "x.py"))
 
 
 def test_repeated_workspace_name_is_not_nested(ws):

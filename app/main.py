@@ -2343,6 +2343,12 @@ def _chat():
         system_prompt += f"\n\n{startup_project_brief}"
         loaded.append("project brief")
 
+    from app.core import resume as resume_mod  # D-065 P1: where we stopped, from the records (before this session)
+    resume_brief = resume_mod.brief(pathlib.Path(cfg["workspace"]))
+    if resume_brief:
+        system_prompt += f"\n\n{resume_brief}\nFor 'where did we stop' questions answer from this; do not search."
+        loaded.append("where we stopped")
+
     plan_text = memory.load_plan(cfg["workspace"])
     if plan_text:
         system_prompt += f"\n\n## Active Plan (from .mitra/plan.md)\n{plan_text}"
