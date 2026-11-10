@@ -5,6 +5,7 @@
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
 ## Next session starts here (handoff 2026-11-08)
+000000000000. **2026-11-10, next: Kaggle/laptop switching** ([BACKENDS.md](BACKENDS.md), D-062): build order B0-B7 written, going through it with the user step by step; v0.1.2 (E-067 start-up fallback) pushed.
 00000000000. **2026-11-10, PUBLISHED v0.1.0 + v0.1.1** (pushed as prashanth-ds-ml; tags v0.1.0, v0.1.1; v0.1.0 GitHub release is up; the v0.1.1 release page was blocked by the permission check: the user creates it with gh). v0.1.1: `mitra kaggle setup <token>` for Kaggle's newer token, no library sign-in noise. Fresh clone from GitHub installs `mitra 0.1.1`. CI v0.1.0 green. Next: colleagues' feedback (issues labelled feedback), then fixes from it.
 0000000000. **2026-11-10, v0.1.0 colleague preview ready locally**: README for first-time users, issue forms (feedback, bug), pinned deps, fresh-clone install checked, secret scan clean. Waiting for the user's go to push + tag v0.1.0 + GitHub release; then colleagues clone and send feedback (issues labelled `feedback`).
 000000000. **2026-11-10: first live `mitra kaggle start` worked** (user's laptop, no browser): queued → install → download → mimo 14.5 GB at 262144, fully on GPU → tunnel → ready; `mitra kaggle status` ✓ answering, 1.3 h used of 30. Next: chat + `/kaggle stop` live check, then the laptop-vs-Kaggle brick-breaker experiment.
