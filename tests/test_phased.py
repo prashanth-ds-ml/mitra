@@ -103,3 +103,40 @@ def test_phased_in_the_real_chat_loop(harness):  # noqa: F811
     rows = [json.loads(x) for f in (ws / ".mitra" / "runs").glob("chat-*.jsonl")
             for x in f.read_text(encoding="utf-8").splitlines() if x.strip()]
     assert [r["path"] for r in rows if r["kind"] == "turn_start"] == ["phased", "resume_brief"]
+
+
+class Heard(Seen):
+    """Also keeps the messages each call received (what the model actually saw)."""
+
+    def __init__(self, *replies):
+        super().__init__(*replies)
+        self.heard = []
+
+    def stream(self, messages):
+        self.heard.append([m.content for m in messages])
+        return super().stream(messages)
+
+
+def test_the_decide_call_gets_the_talk_reminder_next_to_the_message_and_it_is_taken_out(tmp_path):
+    """E-101 (B2, B3): the small-talk and ask-back rules only in the system prompt were forgotten by a 9B."""
+    m = Heard(AIMessage(content="Doing well, thanks! Anything on your mind?"))
+    s = _session(tmp_path, m)
+    messages = _msgs("good what about you")
+    s.phased(messages)
+    assert m.heard[0][-2:] == [C.DECIDE_NOTE, "good what about you"]         # right before the message
+    assert C.DECIDE_NOTE not in [x.content for x in messages]                # not kept in the history
+
+
+def test_the_act_phase_does_not_get_the_talk_reminder(tmp_path):
+    m = Heard(AIMessage(content="", tool_calls=[tc("look_at_code", 1, what="step")]),
+              AIMessage(content="It adds one (game.py:2)."))
+    s = _session(tmp_path, m)
+    s.phased(_msgs("what does step do?"))
+    assert C.DECIDE_NOTE in m.heard[0] and C.DECIDE_NOTE not in m.heard[1]
+
+
+def test_ideas_about_the_project_code_are_sent_to_look_first():
+    """E-101 (I1): 'brainstorming is conversation' made it brainstorm about the snake game without reading it."""
+    assert "ideas or opinions about\nthis project's code" in C.PHASED_PROMPT
+    assert "Asked for ideas: 3-5 options" in C.PHASES["look_at_code"]["note"]
+    assert "keeps every name, number and date" in C.PHASED_PROMPT

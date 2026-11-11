@@ -137,7 +137,8 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
 - **I-20 Experiments registry + dashboard section** ([EXPERIMENTS.md](EXPERIMENTS.md), plan 2026-11-08): one result
   file per experiment run (question, setup, numbers, verdict, decision), written by `mitra night`, a new
   `mitra judge`, the screen and level runs; an Experiments section with comparisons and "what chose this default".
-- **I-21 `/free`: make room for the model — BUILT 2026-11-10 (D-059)** (user, 2026-11-10; RAM was 3.7 GB free, mimo 128K needs ~5.2 GB):
+
+- **I-21 `/free`: make room for the model — BUILT 2026-11-10 (D-059)** (user, 2026-11-10; RAM was 3.7 GB free, mimo 128K needs ~5.2 GB):
   shows need vs free, a tick list of programs (grouped, never-close list and Mitra's own terminal excluded, biggest
   pre-ticked by `fit.pick_to_close`), closes the ticked ones politely (like ✕; force only on a second yes), offers
   to unload other Ollama models and the smaller options, then re-checks. Offered at start (⚠/✗), before `/run`,
@@ -162,6 +163,18 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   (prompt_toolkit), the answer streams through Rich; v0.6.4 adds a working footer (machine + speed) instead. The
   real thing = one prompt_toolkit application for the whole session, output drawn above it, type-ahead visible.
   Several days; risks menus, esc to stop, paste folding and Windows quirks. Impact score before it is planned.
+
+- **I-27 Keep passing tests passing ("test anchors", AlphaCodium paper 2024)** (brainstorm 2026-11-11): before a
+  fix, note which tests pass; a fix that breaks one of them is rolled back, never accepted. Candidate for step 5 (the
+  small-change path: no false "done"). Cost: one test run per fix. A harness switch, so `mitra improve` can A/B it.
+- **I-28 Restate the task in bullets before coding** (AlphaCodium "problem reflection"): goal, inputs, outputs,
+  rules, edge cases as bullets, then code. One cheap call at the start of the change / plan phase; the paper's main
+  failure is the model ignoring small details. Candidate for step 5, judged on the `small` score. A harness switch.
+- **I-29 A fresh round starts from the best attempt, not the last** (AlphaCodium "closest output" base): when solve
+  starts a fresh round, roll back to the state with the most tests passing. Candidate for step 5. A harness switch.
+- **I-30 Tests first: generating tests is easier than code** (AlphaCodium's key observation): supports the
+  tester / builder split (B5); I-27 protects against a wrong model-written test. Their negative results also back the
+  small fix prompt: adding the run trace, the last K failed tries or the last diff gave no gain (keep it out).
 
 ## Later (not milestones)
 Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,

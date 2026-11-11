@@ -119,7 +119,11 @@ def relevant_text(message: str, root: Path | None = None, max_chars: int = RELEV
             break
         out.append(block)
         used += len(block)
-    return "\n\n".join(out)
+    if not out:
+        return ""
+    # E-101 (B10): with the folder's files in the prompt, a 9B mixed the folder's project into a continued thread
+    return ("[Earlier conversation(s) this message is about. If the user continues one, talk about that topic only; "
+            "it is not about the files in this folder unless its project says so.]\n\n" + "\n\n".join(out))
 
 
 # ── writing threads from the chat records ───────────────────────────────────────────────────────────────────

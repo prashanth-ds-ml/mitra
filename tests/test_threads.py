@@ -87,3 +87,11 @@ def test_the_score_seeds_a_thread_and_one_mitra_gets_it(tmp_path):
     out = S.run_behaviour(r, only={"B10_remembers"})
     assert [(c.id, c.passed) for c in out] == [("B10_remembers", True)]
     assert "## Thread: Web app that collects ratings" in seen[0] and "Our earlier conversations" in seen[0]
+
+
+def test_a_matched_thread_is_marked_as_its_own_topic_not_the_folders_project(tmp_path):
+    """E-101 (B10): continuing the web-app thread inside the snake folder, a 9B mixed in the snake game."""
+    T.save(WEB, tmp_path)
+    text = T.relevant_text("lets continue the web app idea from yesterday", tmp_path)
+    assert text.startswith("[Earlier conversation(s) this message is about.") and "not about the files" in text
+    assert T.relevant_text("hi", tmp_path) == ""                              # no header without a thread

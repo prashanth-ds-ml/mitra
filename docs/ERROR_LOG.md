@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-101 | 2026-11-11 | D-071 phased | Medium | v0.7.0 A/B (EVALS) | Four rule-type behaviour misses with qwen phased: small talk mentions the folder's project (B3); a continued thread drifts to the folder's project (B10); no question back when you are thinking (B2); a brainstorm about the code answers without reading it (I1) | closed (live re-score pending) | F-094 |
 | E-081 | 2026-11-11 | D-068 step 3 | High | first live `mitra score --quick` | The run hung for 12+ min in R1_review step 2: the model stream never returned (it was running over the Kaggle tunnel, E-082, which stalled; the chat's model stream has no read timeout) | fixed for scoring (F-080); a stream read timeout in the chat: open | F-080 |
 | E-100 | 2026-11-11 | D-068 step 3b A/B | High | score records | With thinking off, mimo sometimes thought invisibly until the output cap (8,192 tokens, ~6 min) and answered nothing: most failures of both arms | closed | F-093 |
 | E-099 | 2026-11-11 | D-068 step 3b A/B | High | Ollama log | No output cap: one looping call generated 18,400 tokens for 36 minutes and every later request queued behind it; a timed-out score case did not stop its stream | closed | F-092 |

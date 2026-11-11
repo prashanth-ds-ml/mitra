@@ -112,12 +112,17 @@ You have no file tools until you choose a phase. Choose one only when the messag
   project: a file, a folder, a part such as the game, the API, the tests). Never answer those from memory.
 - make_change: the user asked you to change, fix, add or build something small and clear in this project.
 - propose_plan: the user asked to build something bigger (several files) or said "build it" after a discussion.
-Deciding between options, brainstorming, opinions and ideas are conversation: answer them yourself.
+Deciding between options, opinions and ideas are conversation: answer them yourself. But ideas or opinions about
+this project's code (make the game harder, improve the API, review it) need look_at_code first.
 
 A mail or message the user wants drafted: you write it FOR the user, as the user, never as Mitra. A mail has a
 'Subject:' line, then the body, then the user's mail signature copied exactly from their notes, word for word,
 with no other closing (no signature in the notes: end with [your name]). Use only facts the user gave or that are
-in this conversation; write [placeholder] for anything missing. Output only the text itself, with no preamble."""
+in this conversation; write [placeholder] for anything missing. A summary keeps every name, number and date exactly
+as written. Output only the text itself, with no preamble."""
+
+DECIDE_NOTE = ("[Mitra: small talk gets one or two friendly sentences that do not mention the project or its files. "
+               "If the user is thinking out loud or deciding, end with one short question.]")
 
 PHASE_SPECS = [
     {"name": "look_at_code", "description": "Start looking at this project's files to answer a question about them.",
@@ -134,8 +139,8 @@ PHASES = {
                          note="[Mitra: look phase. Find what answers the question: search for a name or list_files, "
                               "read only the part you need, run_tests if the question is whether tests pass. Then "
                               "answer in a few plain sentences, citing each point as path:line with the file path "
-                              "(for example snake/game.py:40). Never state a number you did not check. Change "
-                              "nothing.]"),
+                              "(for example snake/game.py:40). Asked for ideas: 3-5 options, each tied to the code it "
+                              "would change (path:line). Never state a number you did not check. Change nothing.]"),
     "make_change": dict(tools=None, budget="chat_max_steps",
                         note="[Mitra: change phase. Read the file before you edit it, make small changes, run the "
                              "tests right after, fix what fails, stop when it works. Then tell the user in two or "
@@ -734,10 +739,16 @@ class ChatSession:
 
     def _phased_body(self, messages: list, res: TurnResult, max_steps: int) -> TurnResult:
         self.deciding = True
+        # E-101: the small-talk and ask-back rules sit in the system prompt, far from the message; a 9B forgot them
+        # (B2, B3 in the A/B). The reminder goes next to the message for the decide call only.
+        reminder = HumanMessage(content=DECIDE_NOTE)
+        at = max(i for i, m in enumerate(messages) if isinstance(m, HumanMessage))
+        messages.insert(at, reminder)
         try:
             res = self._turn(messages, res, 1)
         finally:
             self.deciding = False
+            messages[:] = [m for m in messages if m is not reminder]
         if not self.phase_request:
             return res  # talked: one call
         name = self.phase_request["name"]
