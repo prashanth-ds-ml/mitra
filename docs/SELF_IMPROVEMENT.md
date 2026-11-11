@@ -184,3 +184,26 @@ everything around it, so its *effective* reasoning (model + what it is told) get
 5. Anything else you want to see trending (e.g. per project, per kind of task: game / site / DB / app)?
 6. Experience recall (I-13): worth planning, and before or after the vault?
 7. Training: 4B locally first, and is a rented GPU for the 9B acceptable later?
+
+## 12. Where self-improvement stands (2026-11-11, v0.7.0)
+
+User: "as we use it, it will improve its harness right and that will resolve these issues right?" Not yet, and not
+by itself:
+
+- **Recorded today:** every turn (kind, path, machine, notes version, time to first word), quiet signals (rephrase,
+  interrupt, `/undo`, `/copy`), `/good` `/bad`, your edits after a turn, threads.
+- **`mitra improve` exists but is manual and coding-only:** a local model proposes one harness change for the top
+  *coding* pattern in the records (tool errors, repeats); the benchmark's tune half (coding tasks) decides. It cannot
+  see or prove a conversation fix. The harness is still v0 with no learned rules.
+- **Of the 6 misses left after the A/B,** about 4 are rule-type (small talk mentions the project folder; the memory
+  answer drifts to the folder's project; no question back when you are thinking; a brainstorm about the code does not
+  look first) and a learned rule could fix them; 2 are mostly model accuracy (a date in a summary, a missing detail).
+
+What is missing for "it improves as we use it" (Phase B in BUILD_ORDER):
+1. **The judge is `mitra score`** (behaviour, writing, explain, ideas, coding), not only the coding benchmark.
+2. **The proposer reads conversation signals** (rephrases, `/bad`, interrupts) and the score's failed cases.
+3. **It runs on a schedule** (nightly or every few sessions), keeps only changes that hold or raise the score, and
+   shows you what changed, with an undo.
+
+Next choice for the user: fix the 4 rule-type misses directly (fast, proven by the score), or first wire
+`mitra improve` to `mitra score` + conversation signals so such misses get proposed and tested automatically.
