@@ -6,6 +6,7 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 - **Four conversation misses fixed (E-101):** small talk no longer brings up the project; "I am thinking" gets a
   question back; ideas about the project's code read the code first (3-5 options tied to file:line); continuing an
   earlier conversation stays on that topic; summaries keep names, numbers and dates as written.
+- **From your live session (E-102..E-105):** asking Mitra to find or pull information now searches the web (a new look-up phase); Mitra knows what it is and what it can already do; "I said ... why aren't you following" counts as a correction for `mitra improve --chat`; reports written at start-up no longer claim a failed summary. `mitra score` behaviour set: 14 cases (look-up, knows itself, already has it, your pick then mine).
 - **`mitra improve --chat` (D-073):** Mitra learns one conversation rule from the failed `mitra score` cases and
   your `/bad` / rephrase / interrupt / undo signals, scores the quick set with and without it, and keeps it only if
   it passes at least 2 more cases with no category lower. `--rounds N`, `--dry-run`; undo with `mitra harness revert`.

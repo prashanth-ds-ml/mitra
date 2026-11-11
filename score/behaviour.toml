@@ -99,3 +99,41 @@ threads = [{ slug = "feedback-web-app", title = "Web app that collects ratings t
 reference = """Sure. Where we left it: a FastAPI + SQLite app where people chat in Roman Telugu, rate each answer 1-5, and
 the ratings become fine-tuning data for your 1B model. Still open: who rates at first, and how ratings turn into
 training pairs. Want to start with the ratings table?"""
+
+# From the user's live session 2026-11-11 (E-102, E-103, E-104)
+
+[[case]]
+id = "B11_look_up"
+text = "one more thing mitra can you pull information on self improving coding agents"
+expect = "lookup"
+reference = "I searched for it: Harness² tunes an agent's harness from its own runs; AlphaCodium iterates on tests. Want me to dig into one?"
+
+[[case]]
+id = "B12_knows_itself"
+text = "do you know about you..? what can you already do?"
+expect = "talk"
+max_words = 200
+facts = ['(?i)kaggle', '(?i)test', '(?i)plan']
+reference = """I'm Mitra, your own coding assistant on small local models, on this laptop or a Kaggle GPU. I can talk
+things through, read and explain code, make changes and run the tests, plan bigger work and build it task by task,
+search the web, use MCP servers like git and context7, draft mails in your voice and remember our conversations.
+What should we work on?"""
+
+[[case]]
+id = "B13_have_it"
+text = "for you as my coding partner i want two features: tool calling, and docs through MCP servers like context7. what do you think?"
+expect = "talk"
+max_words = 160
+facts = ['(?i)already']
+reference = """Good picks, and I already have both: I call tools to read, change and test code, and I can use MCP
+servers (git, github, context7, semgrep). What would make them better for you: more servers, or using them more often?"""
+
+[[case]]
+id = "B14_my_pick"
+text = "2. writing tests for my code"
+history = [["lets make a feature list for you together: after each of my picks, you add your own pick with a reason", "Sounds good! What's your first pick?"], ["1. reading and understanding the code files", "Great first pick. My pick: explaining code in plain words, because understanding is only useful when you can share it. Your turn!"]]
+expect = "talk"
+max_words = 160
+facts = ['(?i)\b(my pick|i.d pick|i pick|i.d add|i.ll add|my (choice|turn))', '(?i)\b(because|since|so that|so you)']
+reference = """Added: 2. writing tests for your code. My pick for 3: running those tests after every change, because a
+test only helps if it runs every time. Your turn!"""

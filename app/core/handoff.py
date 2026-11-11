@@ -101,8 +101,10 @@ def night_for_report(ns: dict | None, kaggle_started: float | None) -> dict | No
                        else f"up to {ns.get('hours')} h")}
 
 
-def build(*, reason: str, workspace: Path, turns: list[dict], laptop: str, summary: str = "",
+def build(*, reason: str, workspace: Path, turns: list[dict], laptop: str, summary: str | None = "",
           last_tests: str = "", night: dict | None = None, kaggle: dict | None = None, now: float | None = None) -> str:
+    """`summary`: None = no summary was tried (Kaggle ended while Mitra was closed: the conversation is gone);
+    "" = it was tried and failed."""
     now = now or time.time()
     when = time.strftime("%Y-%m-%d %H:%M", time.localtime(now))
     lines = [f"# Kaggle ended · {when}", "", f"**Why:** {reason}", f"**Now on:** {laptop}", ""]
@@ -130,8 +132,10 @@ def build(*, reason: str, workspace: Path, turns: list[dict], laptop: str, summa
     if night:
         lines += ["", f"**Night run:** {night.get('state', '?')} · {night.get('plan', '')} · "
                       f"{night.get('detail', '')}".rstrip(" ·")]
-    lines += ["", "## Summary (by the laptop model)", "", summary or "(the laptop model could not write a summary; "
-                                                                     "the facts above are complete)"]
+    # E-105: every start-up report said "could not write a summary" although none is tried there
+    if summary is not None:
+        lines += ["", "## Summary (by the laptop model)", "", summary or "(the laptop model could not write a "
+                                                                         "summary; the facts above are complete)"]
     lines += ["", "## Next", "",
               "Mitra stopped here and waits for you: carry on on the laptop by sending a message, or "
               "`/kaggle start` for the GPU again."]

@@ -358,6 +358,11 @@ def check_behaviour(case: dict, text: str, root: Path, *, tools: list[str], chan
         why = check_explain({"cite": case.get("cite", [])}, t, root)
         if why:
             return why
+    elif expect == "lookup":  # E-102: find / pull information = the web, never memory
+        if not [x for x in tools if x in ("web_search", "fetch_url")]:
+            return "answered from memory without looking it up"
+        if changed:
+            return "changed files: " + ", ".join(changed[:3])
     elif expect == "change":
         if not changed:
             return "changed nothing"
@@ -425,7 +430,7 @@ def _validate_behaviour() -> list[str]:
     data = _toml("behaviour.toml")
     project = SET / "projects" / data["project"]
     for c in data["case"]:
-        reads = ["read_file"] if c["expect"] == "look" else []
+        reads = {"look": ["read_file"], "lookup": ["web_search"]}.get(c["expect"], [])
         changed: list[str] = []
         err = ""
         if c["expect"] == "change":

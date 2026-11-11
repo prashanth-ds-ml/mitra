@@ -16,6 +16,13 @@ SIGNALS = ("rephrase", "interrupt", "undo", "copy")
 _AGAIN = re.compile(r"^\s*(no\b|nope\b|not (that|this|what)|i meant\b|i mean\b|that'?s (wrong|not)|wrong\b|"
                     r"try again\b|again\b|still (wrong|not|failing|broken)|it (still )?(doesn'?t|does not|didn'?t) work)",
                     re.IGNORECASE)
+# E-104 (live 2026-11-11): "i said you to pick and tell me with a reason right why are not following that mitra" was
+# not a signal: you correcting Mitra for not doing what you asked
+_CORRECTED = re.compile(
+    r"^\s*(i (already |just )?(said|told you|asked you)\b|you (didn'?t|did not|are not|aren'?t|forgot|ignored|missed)\b"
+    r"|(that'?s|this is|it'?s) not what i (asked|said|wanted|meant))"
+    r"|\bwhy (are|aren'?t|did|didn'?t|do|don'?t|is|isn'?t)( you| it)? (not |n'?t )?(follow|listen)",
+    re.IGNORECASE)
 REPHRASE_RATIO = 0.6  # this similar to the previous message = the same request asked again
 
 
@@ -49,6 +56,8 @@ def is_rephrase(previous: str, now: str) -> bool:
     if _AGAIN.match(cur):
         # a bare "no" answers Mitra's question ("shall I add tests too?"); "no, I meant ..." asks again
         return not re.fullmatch(r"(no|nope)\W*(thanks?|thank you)?\W*", cur)
+    if _CORRECTED.search(cur):
+        return True
     if len(cur.split()) < 4:
         return False
     return difflib.SequenceMatcher(None, prev, cur).ratio() >= REPHRASE_RATIO

@@ -40,7 +40,7 @@ def test_talk_is_one_call_with_only_the_phase_switches(tmp_path):
     s = _session(tmp_path, m)
     res = s.phased(_msgs("either the game or a web app, or a new idea"))
     assert res.text.startswith("Both are good") and m.calls == 1 and res.steps == 1
-    assert m.offered == [["look_at_code", "make_change", "propose_plan"]]       # no file tools to misuse
+    assert m.offered == [["look_at_code", "look_up", "make_change", "propose_plan"]]       # no file tools to misuse
     assert [r["path"] for r in _rows(s) if r["kind"] == "turn_start"] == ["phased"]
     assert s.allowed_tools is None and not s.deciding
 

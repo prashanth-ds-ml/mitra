@@ -2848,7 +2848,7 @@ def _chat():
             night = handoff.night_for_report(_night.status(n=5), st.get("started"))
         except Exception:
             pass
-        summary = ""
+        summary = None  # not tried (Mitra was closed, or nothing said): the report has no summary part (E-105)
         if summarize and len(messages) > 1:
             console.print(Text("  writing the report with the laptop model (the first load takes a moment; "
                                "ctrl+c skips the summary) …", style="m.faint"))

@@ -40,6 +40,19 @@ levels, so do not copy them unless the user asks for a level.
 When the work is done, or you need the user, reply in a few short lines: what you did, what is left. Do not describe
 changes you did not make."""
 
+# E-103 (live 2026-11-11): asked "do you know about you?" Mitra said it had no fixed identity, and when the user
+# planned its features it proposed ones it already has (tools, MCP, Kaggle, tests, learning from feedback)
+ABOUT_MITRA = """## About you (Mitra)
+You are Mitra, the user's own coding assistant: they build you (github.com/prashanth-ds-ml/mitra) to work with
+small local models, on this laptop (Ollama, qwen3.5, 64K context) or on a free Kaggle T4 GPU (256K; `mitra kaggle
+start`). What you can already do: talk things through; read and explain code; make changes and run the tests; plan
+bigger work (plan.md) and build it task by task with tests (run_plan, `mitra night` overnight); search the web and
+read pages; MCP servers (git, github, context7, semgrep); skills from skills/ folders (/skills); draft mails and
+summaries in the user's voice from their notes (me.md); remember earlier conversations as threads. Every turn is
+recorded; /good and /bad mark answers; `mitra score` measures you; `mitra improve` learns rules you keep only if
+the score improves (`mitra harness` shows them). Not built yet: tests written before code, checks that passing
+tests stay passing, charts and diagrams. When the user plans your features, say which ones you already have."""
+
 # D-071 one Mitra: one conversational loop; the model decides whether to talk, look or change (all tools offered)
 ONE_PROMPT = """You are Mitra, the user's thinking partner and coder, running on their own machine, in their project
 folder (its files are listed below).
@@ -67,7 +80,7 @@ If it is unclear what to look at or change, ask one short question instead of se
 A mail or message the user wants drafted: you write it FOR the user, as the user, never as Mitra. A mail has a
 'Subject:' line, then the body, then the user's mail signature copied exactly from their notes, word for word,
 with no other closing (no signature in the notes: end with [your name]). Use only facts the user gave or that are
-in this conversation; write [placeholder] for anything missing. Output only the text itself."""
+in this conversation; write [placeholder] for anything missing. Output only the text itself.""" + "\n\n" + ABOUT_MITRA
 OUTLINE_MAX_FILES = 60
 _OUTLINE_SKIP = {".git", ".mitra", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "dist", "build",
                  ".idea", ".vscode"}
@@ -110,6 +123,8 @@ decide. In small talk, do not bring up the project.
 You have no file tools until you choose a phase. Choose one only when the message needs it:
 - look_at_code: the message asks about this project's code, files, tests or status (it names something in the
   project: a file, a folder, a part such as the game, the API, the tests). Never answer those from memory.
+- look_up: the user asks you to find, pull or look up information, or about recent work, papers, tools, versions
+  or prices you may not know. Never answer those from memory.
 - make_change: the user asked you to change, fix, add or build something small and clear in this project.
 - propose_plan: the user asked to build something bigger (several files) or said "build it" after a discussion.
 Deciding between options, opinions and ideas are conversation: answer them yourself. But ideas or opinions about
@@ -119,7 +134,7 @@ A mail or message the user wants drafted: you write it FOR the user, as the user
 'Subject:' line, then the body, then the user's mail signature copied exactly from their notes, word for word,
 with no other closing (no signature in the notes: end with [your name]). Use only facts the user gave or that are
 in this conversation; write [placeholder] for anything missing. A summary keeps every name, number and date exactly
-as written. Output only the text itself, with no preamble."""
+as written. Output only the text itself, with no preamble.""" + "\n\n" + ABOUT_MITRA
 
 DECIDE_NOTE = ("[Mitra: small talk gets one or two friendly sentences that do not mention the project or its files. "
                "If the user is thinking out loud or deciding, end with one short question.]")
@@ -127,6 +142,9 @@ DECIDE_NOTE = ("[Mitra: small talk gets one or two friendly sentences that do no
 PHASE_SPECS = [
     {"name": "look_at_code", "description": "Start looking at this project's files to answer a question about them.",
      "parameters": {"type": "object", "properties": {"what": {"type": "string", "description": "what to find out"}},
+                    "required": ["what"]}},
+    {"name": "look_up", "description": "Start searching the web and reading pages to answer with current facts.",
+     "parameters": {"type": "object", "properties": {"what": {"type": "string", "description": "what to find"}},
                     "required": ["what"]}},
     {"name": "make_change", "description": "Start changing this project's files: a change the user asked for.",
      "parameters": {"type": "object", "properties": {"what": {"type": "string", "description": "the change"}},
@@ -141,6 +159,11 @@ PHASES = {
                               "answer in a few plain sentences, citing each point as path:line with the file path "
                               "(for example snake/game.py:40). Asked for ideas: 3-5 options, each tied to the code it "
                               "would change (path:line). Never state a number you did not check. Change nothing.]"),
+    # E-102: "pull information on self improving coding agents" was answered from memory: no phase had the web
+    "look_up": dict(tools=("web_search", "fetch_url"), budget="explain_max_steps",
+                    note="[Mitra: look-up phase. Search the web (web_search), open the 1-3 best results "
+                         "(fetch_url), then answer in a few plain sentences with what you found and where (name or "
+                         "link for each point). Say plainly when the search found nothing useful.]"),
     "make_change": dict(tools=None, budget="chat_max_steps",
                         note="[Mitra: change phase. Read the file before you edit it, make small changes, run the "
                              "tests right after, fix what fails, stop when it works. Then tell the user in two or "
@@ -753,8 +776,9 @@ class ChatSession:
             return res  # talked: one call
         name = self.phase_request["name"]
         if name not in PHASES:  # it called a real tool by name: the phase that has it
-            name = "make_change" if name in ("edit_file", "write_file", "append_file", "make_dir", "run_command",
-                                             "run_plan") else "look_at_code"
+            name = ("make_change" if name in ("edit_file", "write_file", "append_file", "make_dir", "run_command",
+                                              "run_plan")
+                    else "look_up" if name in ("web_search", "fetch_url") else "look_at_code")
         phase = PHASES[name]
         messages.append(HumanMessage(content=phase["note"]))
         self.allowed_tools = phase["tools"]
