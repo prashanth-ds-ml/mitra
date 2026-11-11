@@ -157,6 +157,11 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   (Claude, Gemini, DeepSeek, ...), meant for benchmarks. Legit use: publish Mitra's tasks as a benchmark and
   score frontier vs small open models, with an LLM judge. NOT as Mitra's chat backend (scoped to benchmark
   development; risky for the account).
+- **I-26 A Claude Code-style screen: the input box and status line stay on screen while Mitra works** (user,
+  2026-11-11: "the bottom lines disappear when we start a discussion"). Today the box exists only while Mitra waits
+  (prompt_toolkit), the answer streams through Rich; v0.6.4 adds a working footer (machine + speed) instead. The
+  real thing = one prompt_toolkit application for the whole session, output drawn above it, type-ahead visible.
+  Several days; risks menus, esc to stop, paste folding and Windows quirks. Impact score before it is planned.
 
 ## Later (not milestones)
 Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,

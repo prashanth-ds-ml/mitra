@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, Iterable
 
-from rich.console import Console
+from rich.console import Console, Group
 from rich.live import Live
 from rich.markdown import Markdown
 from rich.spinner import Spinner
@@ -76,6 +76,40 @@ def split_blocks(text: str) -> tuple[list[str], str]:
     return blocks, "\n".join(current)
 
 
+def _fence_open_at(lines: list[str], i: int) -> str | None:
+    """The code fence line (```lang) still open just before line i, or None."""
+    head = None
+    for line in lines[:i]:
+        if line.strip().startswith("```"):
+            head = None if head is not None else line.strip()
+    return head
+
+
+def block_part(block: str, start: int, end: int | None = None) -> str:
+    """Lines start..end of a markdown block, renderable on its own: a code fence open at a cut is reopened at the
+    start and closed at the end."""
+    lines = block.split("\n")
+    end = len(lines) if end is None else end
+    head = _fence_open_at(lines, start)
+    text = "\n".join(([head] if head else []) + lines[start:end])
+    if end < len(lines) and _fence_open_at(lines, end):
+        text += "\n```"
+    return text
+
+
+def overflow_cut(block: str, start: int, max_lines: int) -> int | None:
+    """The block being written is taller than the live area can show (live 2026-11-11: long lists and tables
+    vanished while they were written, the live area is cropped to the screen): the line to print it up to, keeping
+    only the line being written live. None while it fits."""
+    lines = block.split("\n")
+    if len(lines) - start <= max_lines:
+        return None
+    cut = len(lines) - 1
+    if lines[cut - 1].strip().startswith("```") and _fence_open_at(lines, cut):
+        cut -= 1  # do not leave an empty code block behind: keep its opening line with the live part
+    return cut if cut > start else None
+
+
 @dataclass
 class StreamResult:
     message: object = None          # merged AIMessageChunk (has .tool_calls, .usage_metadata)
@@ -115,20 +149,36 @@ def stream_reply(
     stop=None,
     folded=None,
     thinking_line: bool = True,
+    footer: Callable | None = None,
 ) -> StreamResult:
-    """Consume model chunks, drawing the thinking timer and the answer live. Returns the merged message."""
+    """Consume model chunks, drawing the thinking timer and the answer live. Returns the merged message.
+    `footer(live_speed, writing)`: a line under the live part while Mitra works (this machine, the speed);
+    `writing` is True once the answer (not the thinking timer) is on screen."""
     res = StreamResult()
     start = clock()
     splitter = ThinkSplitter()
     thinking = _Thinking(start, clock, label)
     say = ""
     printed_blocks = 0
+    cur_start = 0           # lines of the block being written that are already printed for good
     think_shown = False
     state = {"view": thinking}
+    pace = {"first": None, "n": 0}  # chunks since the first one: the live speed in the footer
+
+    def live_speed() -> float | None:
+        if pace["first"] is None:
+            return None
+        dt = clock() - pace["first"]
+        return pace["n"] / dt if dt >= 1.0 else None
 
     class _View:
         def __rich__(self_inner):
-            return state["view"]
+            if footer is None:
+                return state["view"]
+            return Group(state["view"], footer(live_speed(), state["view"] is not thinking))
+
+    def max_lines() -> int:
+        return max(8, console.size.height - 6)
 
     def show_thinking_line(live: Live) -> None:
         nonlocal think_shown
@@ -147,7 +197,7 @@ def stream_reply(
             live.console.print()
 
     def handle(parts: list[tuple[str, str]], live: Live) -> None:
-        nonlocal say, printed_blocks
+        nonlocal say, printed_blocks, cur_start
         for kind, piece in parts:
             if kind == "think":
                 res.thinking += piece
@@ -164,10 +214,18 @@ def stream_reply(
             say += piece
             done, current = split_blocks(say)
             for block in done[printed_blocks:]:
-                live.console.print(Markdown(block))
-                live.console.print()
+                part = block_part(block, cur_start)
+                if part.strip():
+                    live.console.print(Markdown(part))
+                    live.console.print()
+                cur_start = 0  # only the first new block was partly printed
             printed_blocks = len(done)
-            state["view"] = Markdown(current) if current.strip() else Text("")
+            cut = overflow_cut(current, cur_start, max_lines())
+            if cut is not None:  # taller than the screen: print it for good, keep the last line live
+                live.console.print(Markdown(block_part(current, cur_start, cut)))
+                cur_start = cut
+            rest = block_part(current, cur_start)
+            state["view"] = Markdown(rest) if rest.strip() else Text("")
 
     live = Live(_View(), console=console, refresh_per_second=10, transient=True)
     live.start()
@@ -177,6 +235,9 @@ def stream_reply(
                 res.stopped = True
                 break
             res.chunks.append(chunk)
+            pace["n"] += 1
+            if pace["first"] is None:
+                pace["first"] = clock()
             try:
                 res.message = chunk if res.message is None else res.message + chunk
             except Exception:
@@ -202,10 +263,14 @@ def stream_reply(
         show_thinking_line(live)
         done, current = split_blocks(say)
         for block in done[printed_blocks:]:
-            live.console.print(Markdown(block))
-            live.console.print()
-        if current.strip():
-            live.console.print(Markdown(current))
+            part = block_part(block, cur_start)
+            if part.strip():
+                live.console.print(Markdown(part))
+                live.console.print()
+            cur_start = 0
+        rest = block_part(current, cur_start)
+        if rest.strip():
+            live.console.print(Markdown(rest))
             live.console.print()
         state["view"] = Text("")
     finally:

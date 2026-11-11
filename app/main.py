@@ -2471,11 +2471,19 @@ def _chat():
     from app.core.chat import ChatSession, Hooks, repair_history
     from app.core.cli import EventPrinter
 
+    _turn_clock = {"start": time.monotonic()}
+
+    def _working_footer(live_speed, writing):
+        """Under the live answer while Mitra works: this machine and the speed (the status line is hidden then)."""
+        from app.ui import sysmon as _sysmon
+        return _sysmon.working_footer(time.monotonic() - _turn_clock["start"], _sysmon.current(),
+                                      speed=live_speed or chat.last_speed, writing=writing)
+
     def _chat_stream(chunks, step=1):
         with ui.KeyWatcher() as keys:
             streamed = ui.stream_reply(console, chunks, show_reasoning=show_reasoning, stop=keys.stop,
                                        folded=ui_state.folded, label=f"Thinking · step {step}",
-                                       thinking_line=False)
+                                       thinking_line=False, footer=_working_footer)
         typed_buffer.append(keys.take_typed())
         return streamed
 
@@ -3593,6 +3601,7 @@ def _chat():
 
         console.print()
         turn_started = time.monotonic()
+        _turn_clock["start"] = turn_started  # the working footer counts from here
         ui.notify.working(console)
 
         try:

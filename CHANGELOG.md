@@ -4,6 +4,10 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-11-11
+- Long answers no longer vanish while they are written: a long list, table or code block scrolls normally.
+- While Mitra works, a footer under the answer shows the time, the live speed and this machine (CPU, RAM, GPU).
+
 ## [0.6.3] - 2026-11-11 · the status line shows this machine
 - Right side of the status line: the last answer's speed (tok/s, from Ollama's own timing), CPU, RAM free, GPU
   memory / load / temperature; sampled every 2 s in the background. Orange only when you should act: a much

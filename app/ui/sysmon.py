@@ -115,3 +115,20 @@ def segments(s: Sample, *, speed: float | None = None, slow: bool = False, ram_w
         else:
             add(f"GPU {s.gpu_used_gb:.1f}/{s.gpu_total_gb:.0f}G {s.gpu_pct:.0f}% {s.gpu_temp_c:.0f}°C", hot)
     return out
+
+
+def working_footer(seconds: float, sample: Sample, *, speed: float | None = None, slow: bool = False,
+                   ram_warn_gb: float = 2.0, writing: bool = True):
+    """The line under the live part while Mitra works (user, 2026-11-11: the status line vanished during a turn):
+    '  working 12s · 24 tok/s · CPU 35% · RAM 4.1G free · GPU 5.2/8G 92% 74°C   esc to stop'. Rich Text."""
+    from rich.text import Text
+
+    t = Text(f"  working {seconds:.0f}s", style="m.faint")
+    parts = segments(sample, speed=speed, slow=slow, ram_warn_gb=ram_warn_gb)
+    if parts:
+        t.append(" · ", style="m.faint")
+    for style, piece in parts:  # segments() already holds the " · " separators
+        t.append(piece, style="m.err" if style == "class:status.warn" else "m.faint")
+    if writing:  # while thinking, the spinner above already says esc to stop
+        t.append("   esc to stop", style="m.faint")
+    return t
