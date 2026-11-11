@@ -344,8 +344,7 @@ def check_behaviour(case: dict, text: str, root: Path, *, tools: list[str], chan
             return f"used tools to talk: {', '.join(tools[:4])}"
         if changed:
             return "changed files: " + ", ".join(changed[:3])
-        if headings(t):
-            return f"report-style: {headings(t)} headings"
+        # D-076: headings are allowed now (the user wants every answer formatted); length still decides "report"
         if len(t.split()) > case.get("max_words", 150):
             return f"too long for a conversation: {len(t.split())} words (max {case.get('max_words', 150)})"
         if case.get("ask_back") and not asks_back(t):

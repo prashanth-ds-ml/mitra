@@ -125,3 +125,27 @@ def test_start_up_gets_one_line_naming_changed_files(tmp_path):
                     "report in .mitra/reports/")
     changed = HO.startup_line(_turns(2, files=[str(tmp_path / "game.py")]), tmp_path, None, report)
     assert "last session, 2 turns, 1 file changed: game.py" in changed
+
+
+# ── D-076: formatted answers, your messages in amber ───────────────────────────────────────────────────────────
+
+def test_answers_are_formatted_and_mail_drafts_stay_plain():
+    for prompt in (C.PHASED_PROMPT, C.ONE_PROMPT):
+        assert "Format every answer in Markdown" in prompt and "Never use headings" not in prompt
+        assert "plain text" in prompt and "no Markdown" in prompt          # a mail is copied into a mail
+    case = {"expect": "talk", "max_words": 60}
+    assert S.check_behaviour(case, "## Short\nFine, **thanks**! What's next?", None, tools=[], changed=[]) == ""
+
+
+def test_your_messages_are_amber_and_code_blocks_use_the_phosphor_palette():
+    from rich.console import Console
+
+    from app.ui import theme
+    assert theme.prompt_style().get_attrs_for_style_str("").color == "ffb84d"
+    import io
+    c = theme.apply(Console(width=60, record=True, color_system="truecolor", force_terminal=True, file=io.StringIO()))
+    c.print(theme.md('**Key**\n\n```python\nx = "s"\n```'))
+    styles = {s.text.strip(): str(s.style) for s in c._record_buffer if s.text.strip()}
+    assert "bold #5cff7a" in styles["Key"]                             # bold = bright phosphor green
+    assert "#ffb84d" in styles["s"]                                    # a string in amber
+    assert all("#272822" not in st for st in styles.values())          # not monokai's grey

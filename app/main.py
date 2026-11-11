@@ -13,7 +13,7 @@ import typer
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from rich.console import Console
-from rich.markdown import Markdown
+from app.ui.theme import md as Markdown  # D-076: theme styles + Phosphor code
 from rich.table import Table
 from rich.text import Text
 

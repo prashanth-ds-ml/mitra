@@ -11,7 +11,7 @@ from typing import Callable, Iterable
 
 from rich.console import Console, Group
 from rich.live import Live
-from rich.markdown import Markdown
+from app.ui.theme import md as Markdown  # D-076: theme styles + Phosphor code
 from rich.spinner import Spinner
 from rich.text import Text
 

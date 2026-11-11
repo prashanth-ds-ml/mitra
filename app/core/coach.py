@@ -32,7 +32,7 @@ WORK_PHASES = ("look_at_code", "look_up", "make_change", "propose_plan")
 COACH_PROMPT = """You are the coach of Mitra, a local coding assistant that runs small models (qwen3.5 9B) on the
 user's laptop or a Kaggle GPU. Below is a digest of Mitra's recorded conversations since the last review. Find where
 Mitra did worse than a good assistant would: wrong or invented answers, answering from memory when it should have
-read the code or searched the web, ignoring what the user asked, too long or report-like answers, slow or empty
+read the code or searched the web, ignoring what the user asked, too long answers, slow or empty
 turns, tool errors, missed signals. Quote the turn for each finding.
 
 Write the report in Markdown with exactly these sections:
