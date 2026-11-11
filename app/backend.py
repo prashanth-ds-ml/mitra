@@ -34,6 +34,17 @@ def route(mode: str, role: str) -> str:
     return REMOTE
 
 
+TALK_FIT = 0.8  # the conversation may fill this much of the laptop's context, the rest is the answer's room
+
+
+def talk_on_laptop(kind: str, architecture: str, ctx_used: int, laptop_ctx: int) -> bool:
+    """D-074: while the work runs on the remote, a phased turn's decide / talk call runs on the laptop, but only when
+    the whole conversation fits the laptop's context (a chat grown on Kaggle's 256K is never cut to talk on 64K:
+    that turn stays on the remote)."""
+    return (kind == REMOTE and architecture == "phased" and laptop_ctx > 0
+            and (ctx_used or 0) <= TALK_FIT * laptop_ctx)
+
+
 def why(kind: str, mode: str, role: str) -> str:
     if kind == LAPTOP:
         return "plan mode: read work on the laptop" if (mode or "").lower() in LAPTOP_MODES else \

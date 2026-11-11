@@ -2837,6 +2837,26 @@ def _chat():
         console.print(Text(f"  ☁ {reason} → {cfg.get('remote') or 'remote'} · {model} {num_ctx // 1024}K",
                            style="m.tool"))
 
+    _talk_cache: dict = {}
+
+    def _laptop_talk():
+        """D-074: the laptop model for the talk call while the work runs remote -> (llm, num_ctx), or None when this
+        machine cannot hold it (it is kept loaded 30 min, so talking stays quick)."""
+        local = cfg.get("_local") or {}
+        base = local.get("ollama_local_base_url") or "http://127.0.0.1:11434"
+        r = roles_mod.route(chat.role, cfg)
+        key = (r["model"], base)
+        if key not in _talk_cache:
+            local_cfg = {**cfg, "num_ctx": local.get("num_ctx")}
+            pick, ctx, note = backend_mod.laptop_choice(
+                r["model"], roles_mod.context_for(r["model"], local_cfg), roles_mod.installed(),
+                lambda m, c: fit_mod.check(m, c, base_url=base, local=True).verdict, cfg.get("laptop_models"))
+            short = note.startswith("RAM is short even")  # nothing fits: talking stays on the remote too
+            _talk_cache[key] = None if (not pick or short) else (
+                get_local_llm(pick, temperature, base_url=base, num_ctx=ctx, num_gpu=num_gpu, reasoning=False,
+                              keep_alive="30m"), ctx)
+        return _talk_cache[key]
+
     def _kaggle_report(reason: str, note: str = "", turns=None, summarize: bool = True) -> None:
         """B3: facts from Mitra's records + a short summary by the laptop model; written, shown, then Mitra waits."""
         from app.core import handoff
@@ -3722,7 +3742,16 @@ def _chat():
             typed_buffer.clear()
             if one_mitra and chat.role == "chat" and not force_kind:  # D-071: the model decides
                 _extra = "\n\n".join(x for x in (_fresh_notes(), threads_mod.relevant_text(user_input)) if x)
-                turn = (chat.phased if architecture == "phased" else chat.converse)(messages, notes=_extra)
+                _talk = None
+                if bsession.kind == backend_mod.REMOTE and architecture == "phased":
+                    _talk = _laptop_talk()  # D-074: talk on the laptop, the work on the remote GPU
+                    if _talk and not backend_mod.talk_on_laptop(bsession.kind, architecture, ctx_used, _talk[1]):
+                        _talk = None  # the conversation is bigger than the laptop's context: all on the remote
+                if architecture == "phased":
+                    turn = chat.phased(messages, notes=_extra, talk_llm=_talk[0] if _talk else None,
+                                       talk_ctx=_talk[1] if _talk else 0)
+                else:
+                    turn = chat.converse(messages, notes=_extra)
             elif request_kind in intent_mod.EVERYDAY:  # D-068 step 1: one call, no tools, thinking off
                 turn = chat.reply(messages, request_kind, _reply_llm(),
                                   notes=_fresh_notes())

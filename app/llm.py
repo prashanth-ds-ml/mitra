@@ -26,6 +26,7 @@ def get_llm(
     num_gpu: int | None = None,
     num_predict: int | None = None,
     reasoning: bool | None = None,
+    keep_alive: str | None = None,
 ) -> ChatOllama:
     """Return a ChatOllama instance for the given model name."""
     kwargs = {
@@ -42,6 +43,8 @@ def get_llm(
         kwargs["base_url"] = base_url
     if reasoning is not None:
         kwargs["reasoning"] = reasoning
+    if keep_alive:
+        kwargs["keep_alive"] = keep_alive
     client_kwargs = _make_client_kwargs(api_key)
     if client_kwargs:
         kwargs["client_kwargs"] = client_kwargs
@@ -62,8 +65,10 @@ def get_local_llm(
     num_gpu: int | None = None,
     num_predict: int | None = None,
     reasoning: bool | None | str = "auto",
+    keep_alive: str | None = None,
 ) -> ChatOllama:
-    """Return a client for the local Ollama daemon.
+    """Return a client for the local Ollama daemon. `keep_alive` ("30m"): how long Ollama keeps the model loaded
+    after a call (default: Ollama's own, 5 min).
 
     reasoning="auto" turns thinking on for models that report the `thinking` capability, so the model's reasoning
     arrives separately (shown as the thinking line) instead of being dropped by langchain-ollama (E-016).
@@ -78,6 +83,7 @@ def get_local_llm(
         num_gpu=num_gpu,
         num_predict=num_predict if num_predict is not None else MAX_OUTPUT_TOKENS,
         reasoning=reasoning,
+        keep_alive=keep_alive,
     )
 
 

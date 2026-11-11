@@ -62,3 +62,40 @@ def test_the_lookup_check_needs_a_web_tool(tmp_path):
     assert S.check_behaviour(case, "Self-improving agents learn from RL.", tmp_path, tools=[], changed=[]) \
         == "answered from memory without looking it up"
     assert S.check_behaviour(case, "I found Harness².", tmp_path, tools=["web_search"], changed=[]) == ""
+
+
+# ── D-074: talk on the laptop, the work on Kaggle ─────────────────────────────────────────────────────────────────
+
+def test_talk_goes_to_the_laptop_only_when_the_whole_conversation_fits():
+    from app import backend as B
+    assert B.talk_on_laptop(B.REMOTE, "phased", ctx_used=5_200, laptop_ctx=65_536)
+    assert not B.talk_on_laptop(B.REMOTE, "phased", ctx_used=60_000, laptop_ctx=65_536)   # grown on Kaggle: stays
+    assert not B.talk_on_laptop(B.LAPTOP, "phased", ctx_used=0, laptop_ctx=65_536)        # already on the laptop
+    assert not B.talk_on_laptop(B.REMOTE, "one", ctx_used=0, laptop_ctx=65_536)           # only phased decides first
+
+
+def test_the_decide_call_runs_on_the_laptop_and_the_work_on_the_remote(tmp_path):
+    work = Seen(AIMessage(content="", tool_calls=[tc("read_file", 2, path="game.py")]),
+                AIMessage(content="It adds one (game.py:2)."))
+    talk = Seen(AIMessage(content="", tool_calls=[tc("look_at_code", 1, what="step")]))
+    s = _session(tmp_path, work)
+    s.backend_kind = "remote"
+    res = s.phased(_msgs("what does step do?"), talk_llm=talk, talk_ctx=65_536)
+    assert talk.calls == 1 and work.calls == 2 and res.text.startswith("It adds one")
+    assert s.llm is work and s.backend_kind == "remote" and s._talk is None              # restored after the turn
+    import json
+    rows = [json.loads(x) for x in s.rec.path.read_text(encoding="utf-8").splitlines() if x.strip()]
+    assert [r for r in rows if r["kind"] == "talk_route"][0]["backend"] == "laptop"
+
+
+def test_plain_talk_never_touches_the_remote(tmp_path):
+    work, talk = Seen(), Seen(AIMessage(content="Doing well, thanks! What's on your mind?"))
+    s = _session(tmp_path, work)
+    s.backend_kind = "remote"
+    s.phased(_msgs("good what about you"), talk_llm=talk, talk_ctx=65_536)
+    assert talk.calls == 1 and work.calls == 0
+
+
+def test_the_laptop_talk_model_can_stay_loaded():
+    from app.llm import get_local_llm
+    assert get_local_llm("qwen3.5:latest", keep_alive="30m", reasoning=False).keep_alive == "30m"

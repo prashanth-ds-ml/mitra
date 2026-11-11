@@ -744,19 +744,22 @@ class ChatSession:
             messages.append(call[-1])  # the history keeps your message and the answer, not the instruction
         return res
 
-    def phased(self, messages: list, notes: str = "") -> TurnResult:
+    def phased(self, messages: list, notes: str = "", talk_llm=None, talk_ctx: int = 0) -> TurnResult:
         """D-071 phased: decide first (talk in text, or pick look / change / plan with no real tools), then act in that
-        phase with only its tools, its note and its budget, all inside one turn. Recorded as path "phased"."""
+        phase with only its tools, its note and its budget, all inside one turn. Recorded as path "phased".
+        D-074: `talk_llm` (the laptop model, context `talk_ctx`) takes the decide call while the work runs on the
+        remote; the caller passes it only when the whole conversation fits the laptop's context."""
         saved = (self.path, self.answer_on_last_step, self.last_step_note, self.allowed_tools)
         note = SystemMessage(content=notes) if notes else None
         if note is not None:
             messages.insert(len(messages) - 1, note)
         self.path, self.phase_request = "phased", None
+        self._talk = (talk_llm, talk_ctx) if talk_llm is not None else None
         try:
             return self.turn(messages, body=self._phased_body)
         finally:
             self.path, self.answer_on_last_step, self.last_step_note, self.allowed_tools = saved
-            self.deciding, self.phase_request = False, None
+            self.deciding, self.phase_request, self._talk = False, None, None
             messages[:] = [m for m in messages if m is not note and not (isinstance(m, HumanMessage) and m.content in (
                 ONE_LAST_STEP_NOTE, LAST_STEP_NOTE, EMPTY_ANSWER_NOTE))]
 
@@ -767,10 +770,16 @@ class ChatSession:
         reminder = HumanMessage(content=DECIDE_NOTE)
         at = max(i for i, m in enumerate(messages) if isinstance(m, HumanMessage))
         messages.insert(at, reminder)
+        work = (self.llm, self.num_ctx, self.backend_kind)
+        talk = getattr(self, "_talk", None)
+        if talk:  # D-074: talking is on the laptop; only the work goes to the remote GPU
+            self.llm, self.num_ctx, self.backend_kind = talk[0], talk[1], "laptop"
+            self.rec.write("talk_route", turn=self.turn_no, backend="laptop", num_ctx=talk[1], work=work[2])
         try:
             res = self._turn(messages, res, 1)
         finally:
             self.deciding = False
+            self.llm, self.num_ctx, self.backend_kind = work
             messages[:] = [m for m in messages if m is not reminder]
         if not self.phase_request:
             return res  # talked: one call
