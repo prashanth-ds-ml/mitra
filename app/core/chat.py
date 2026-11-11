@@ -87,13 +87,18 @@ def _project_files(root: Path, cap: int = 20_000) -> list[str]:
 
 def cited_files(text: str, root: Path) -> list[str]:
     """Files an answer names (with or without :line) that exist in the workspace; a bare name matches anywhere."""
-    names = [n.replace("\\", "/").lstrip("./") for n in _CITE.findall(text or "")]
+    # only a leading "./" goes: lstrip("./") also ate the dot of ".github/..." and ".env.example"
+    names = [re.sub(r"^(\./)+", "", n.replace("\\", "/")) for n in _CITE.findall(text or "")]
     if not names:
         return []
-    files = _project_files(root)
+    files: list[str] | None = None  # walked only when a name is not a path from the root
     out: list[str] = []
     for rel in names:
-        hit = rel if rel in files else next((f for f in files if f.endswith("/" + rel)), None)
+        if not set(Path(rel).parts) & (_SKIP_DIRS | {".."}) and (Path(root) / rel).is_file():
+            hit = rel
+        else:
+            files = _project_files(root) if files is None else files
+            hit = rel if rel in files else next((f for f in files if f.endswith("/" + rel)), None)
         if hit and hit not in out:
             out.append(hit)
     return out
@@ -324,6 +329,8 @@ class ChatSession:
         self._prev_user_full = ""   # the last request in full, to notice when you ask the same thing again
         self.answer_on_last_step = False  # D-068 step 2: the last step gets no tools, so a turn always ends answered
         self.end_info: dict = {}    # extra fields for this turn's turn_end row (the explainer's budget, files cited)
+        self.cancelled = False      # set from another thread (a score case that timed out): stop before the next
+                                    # model call or tool, so an abandoned turn does not keep working in the background
 
     def apply_route(self, route: dict, llm=None, num_ctx: int | None = None, thinking: bool | None = None) -> None:
         """Switch role: model (if given), tools, MCP servers and read-only paths at once; recorded for the dashboard.
@@ -590,9 +597,9 @@ class ChatSession:
         read = []
         for m in messages[getattr(self, "_explain_from", 0):]:  # this turn only
             for tc in getattr(m, "tool_calls", None) or []:
-                p = str((tc.get("args") or {}).get("path") or "")
+                p = str((tc.get("args") or {}).get("path") or "").replace("\\", "/")
                 if tc.get("name") == "read_file" and p and p not in read:
-                    read.append(p.replace("\\", "/"))
+                    read.append(p)
         return {"budget_hit": res.steps >= self.end_info.get("budget", 0), "files_read": read[:20],
                 "files_cited": cited_files(res.text, self.ws.root)[:20],
                 "line_refs": bool(_LINE_REF.search(res.text or "")), "asked": res.text.rstrip().endswith("?")}
@@ -655,6 +662,9 @@ class ChatSession:
         bad_calls = 0
         conn_retried = False
         for step in range(1, max_steps + 1):
+            if self.cancelled:
+                res.stopped, res.stop_reason = True, "cancelled (timed out)"
+                return res
             res.steps = step
             last = self.answer_on_last_step and step == max_steps and step > 1
             if last:  # D-068 step 2: no tools on the last step, so the turn ends with an answer
@@ -733,6 +743,10 @@ class ChatSession:
                     messages.append(ToolMessage(content="✗ Not run: the turn was stopped.", tool_call_id=tc["id"]))
                     continue
                 name, args = tc["name"], tc.get("args") or {}
+                if self.cancelled:
+                    messages.append(ToolMessage(content="✗ Not run: the turn was cancelled.", tool_call_id=tc["id"]))
+                    stop = "cancelled (timed out)"
+                    continue
                 refused = guard.before(name, args)
                 if refused:
                     out, ok = refused, False
@@ -770,6 +784,8 @@ class ChatSession:
         """The loop was cut short: one call without tools, so the user still hears what was done (E-024)."""
         res.stopped, res.stop_reason = True, reason
         self.rec.write("stopped", turn=self.turn_no, reason=reason)
+        if self.cancelled:  # nobody is waiting for this turn any more: no wrap-up call
+            return res
         messages.append(HumanMessage(content=(
             f"[Mitra stopped the tools: {reason}.] Tell the user in a few short lines what you did, "
             "what failed and what is left. Do not call tools.")))

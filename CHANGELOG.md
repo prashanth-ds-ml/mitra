@@ -4,6 +4,16 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-11 · deep dive: code review of steps 0-3 + debugging on real records
+- Follow-ups keep their tools: "still not working", "try again", "no, use pytest" after a fix; "why?" after
+  a code question reads the code. "run the tests", "commit the changes", "the tests are failing" work with
+  tools; "write a prd" / "rewrite this paragraph" are writing; "rename X" is a small change.
+- `/plan` never gets an old discussion; "can you fix X? think it through" fixes it.
+- `thinking = "on"|"off"` in mitra.toml wins again; your notes are no longer sent twice.
+- `mitra report` no longer counts planned or "where did we stop" turns as empty answers.
+- Test and dev workspaces never reach your ~/.mitra store; a timed-out score case stops for real.
+- 10 review findings + 3 from debugging: E-083..E-095.
+
 ## [0.6.0] - 2026-11-11 · `mitra score`: the measuring set (D-068 step 3) + fixes from a live session
 - `mitra score` runs the measuring set and keeps one row per run in results/scores.jsonl: sorting (no model),
   writing, explain, ideas/review, small and medium coding tasks (hidden tests). `--quick` skips the coding

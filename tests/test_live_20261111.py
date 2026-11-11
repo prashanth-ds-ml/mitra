@@ -64,3 +64,75 @@ def test_the_kaggle_report_names_only_a_night_from_this_session():
         "state": "finished", "plan": "plan.md", "detail": "up to 4.0 h"}
     running = {**old, "running": True}
     assert handoff.night_for_report(running, kaggle_started=now)["detail"] == "4176 min so far, up to 4.0 h"
+
+
+def test_planned_and_resume_turns_are_not_empty_answers(tmp_path):
+    """Deep dive 2026-11-11: `mitra report` counted plan-first and "where did we stop" turns (no answer text by
+    design) and esc stops as the model's empty answers, which the coach would read as failures."""
+    import json as _json
+
+    from app.core import analyze
+
+    runs = tmp_path / "proj" / ".mitra" / "runs"
+    runs.mkdir(parents=True)
+    rows = [{"kind": "turn_start", "turn": 1, "path": "plan_first"}, {"kind": "turn_end", "turn": 1, "text": "",
+                                                                        "outcome": "plan_cancelled"},
+            {"kind": "turn_start", "turn": 2, "path": "resume_brief"}, {"kind": "turn_end", "turn": 2, "text": "",
+                                                                          "outcome": "answered"},
+            {"kind": "turn_start", "turn": 3, "path": "loop"}, {"kind": "turn_end", "turn": 3, "text": "",
+                                                                  "outcome": "stopped_by_user"},
+            {"kind": "turn_start", "turn": 4, "path": "loop"}, {"kind": "turn_end", "turn": 4, "text": "",
+                                                                  "outcome": "answered"},
+            {"kind": "turn_start", "turn": 5}]
+    f = runs / "chat-20261111.jsonl"
+    f.write_text("\n".join(_json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    rep = analyze.analyze([f])
+    empty = rep.pattern("empty_answer")
+    assert empty.count == 1 and "turn 4" in empty.examples[0]
+
+
+def test_a_workspace_in_the_temp_folder_is_never_mirrored_to_your_store(tmp_path, monkeypatch):
+    """Deep dive 2026-11-11: dev checks and a leaked test thread put 10 temp workspaces into ~/.mitra/data."""
+    import tempfile as _tf
+    from pathlib import Path as _P
+
+    from app.core import harness as _H
+    from app.core import store
+
+    home = _P(_tf.gettempdir()).parent / "not-temp-home-for-test"   # a real home outside the temp folder
+    monkeypatch.setattr(_H, "home", lambda: home)
+    rec = _P(_tf.gettempdir()) / "mitra-score-x" / "snake" / ".mitra" / "runs" / "chat-20261111.jsonl"
+    assert store.mirror_path(rec) is None
+    project = _P("C:/Users/someone/projects/game/.mitra/runs/chat-20261111.jsonl")
+    assert store.mirror_path(project) is not None
+
+
+def test_your_mitra_toml_thinking_wins_over_the_role_table():
+    """Review 2026-11-11: with every role set to on/off, `thinking = "on"` in mitra.toml changed nothing."""
+    from app.core import roles
+
+    assert roles.thinking_for("chat") is False and roles.thinking_for("planner") is True
+    assert roles.thinking_for("chat", {"thinking": "on"}) is True
+    assert roles.thinking_for("planner", {"thinking": "off"}) is False
+    assert roles.thinking_for("builder", {"thinking": "auto"}) is False      # auto = the table
+
+
+SWEEP = [  # deep dive 2026-11-11: realistic follow-ups and requests that went to the wrong path
+    ("small", "still not working", "small"), ("small", "no, use pytest not unittest", "small"),
+    ("small", "try again", "small"), ("question", "why?", "question"),
+    ("question", "and where is the score kept?", "question"), ("question", "and fix it", "small"),
+    ("", "run the tests", "small"), ("", "commit the changes", "small"),
+    ("", "the tests are failing, can you check", "small"), ("", "why is the test failing?", "question"),
+    ("", "rename paddle to player in the game", "small"),
+    ("", "rewrite this paragraph to sound more professional: we done the work", "writing"),
+    ("", "help me write a prd for a roman telugu chat app", "writing"),
+    ("", "write a story generator app with flask", "big"),
+    ("", "i need a script that downloads hf datasets and saves them as parquet", "small"),
+    ("", "what changed since yesterday", "question"), ("small", "thanks, that worked", "chat"),
+]
+
+
+def test_the_sweep_of_everyday_follow_ups_is_sorted_right():
+    pw = {"brick-breaker", "plan", "tests", "game", "paddle", "ball", "readme", "src", "app", "main", "api"}
+    got = [(p, t, classify(t, previous=p, project_words=pw)) for p, t, _ in SWEEP]
+    assert got == [(p, t, w) for p, t, w in SWEEP]

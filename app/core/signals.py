@@ -47,8 +47,9 @@ def is_rephrase(previous: str, now: str) -> bool:
     if not prev or not cur:
         return False
     if _AGAIN.match(cur):
-        return True
-    if len(cur.split()) < 4 or cur == prev and len(cur.split()) < 4:
+        # a bare "no" answers Mitra's question ("shall I add tests too?"); "no, I meant ..." asks again
+        return not re.fullmatch(r"(no|nope)\W*(thanks?|thank you)?\W*", cur)
+    if len(cur.split()) < 4:
         return False
     return difflib.SequenceMatcher(None, prev, cur).ratio() >= REPHRASE_RATIO
 

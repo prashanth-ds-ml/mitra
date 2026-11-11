@@ -68,6 +68,17 @@ THINKING: dict[str, str | None] = {
     "chat": "off", "planner": "on", "tester": "off", "builder": "off", "debugger": "on",
     "reviewer": "off", "deployer": "off", "reporter": "off",
 }
+def thinking_for(role: str, cfg: dict | None = None) -> bool | str:
+    """True / False / "auto" for a role. Your explicit `thinking = "on"|"off"` in mitra.toml wins for every role;
+    otherwise the table above (review 2026-11-11: the table silently overrode mitra.toml)."""
+    from app.llm import thinking_setting
+
+    mine = str((cfg or {}).get("thinking") or "").strip().lower()
+    if mine in ("on", "off", "true", "false", "yes", "no"):
+        return thinking_setting(mine)
+    return {"on": True, "off": False}.get(THINKING.get(role) or "", thinking_setting(None))
+
+
 # Paths the role may read but not change: the builder cannot edit the tests it must pass (D-049).
 READ_ONLY: dict[str, tuple[str, ...]] = {"builder": ("tests",)}
 

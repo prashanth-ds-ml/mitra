@@ -31,6 +31,9 @@ PATTERNS = {
     "model_error": "A model call failed.",
 }
 CODE_SUFFIXES = (".py", ".js", ".ts", ".html", ".css")
+# turns that end without answer text by design (D-068): plan-first shows a plan and a menu, "where did we stop" is
+# printed from the records, a stop by you or a failed planner is not the model's empty answer
+NO_ANSWER_PATHS = {"plan_first", "resume_brief"}  # an esc stop (stopped_by_user) is your "interrupt" signal row
 
 
 @dataclass
@@ -124,7 +127,7 @@ def analyze(files: list[Path], harness_version: int | None = None) -> Report:
             rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
         except (OSError, json.JSONDecodeError):
             continue
-        started, ended = [], set()
+        started, ended, paths = [], set(), {}
         units: dict[str, dict] = defaultdict(lambda: {"cmd_fail": Counter(), "code": False, "tests": 0,
                                                      "tests_ok": False, "steps": 0})
         for r in rows:
@@ -133,6 +136,7 @@ def analyze(files: list[Path], harness_version: int | None = None) -> Report:
             where = f"{_project(path)}/{path.name}"
             if kind == "turn_start":
                 started.append(r.get("turn"))
+                paths[r.get("turn")] = r.get("path")
             elif kind == "turn_end":
                 ended.add(r.get("turn"))
             if kind in ("start", "turn_start"):
@@ -180,7 +184,9 @@ def analyze(files: list[Path], harness_version: int | None = None) -> Report:
                     rep.pattern("guard_stop").add(f"{where}: {reason[:120]}")
                 if kind == "turn_end" and r.get("interrupted"):
                     rep.pattern("interrupted").add(f"{where}: turn {r.get('turn')} after {r.get('steps', 0)} steps")
-                elif kind == "turn_end" and not str(r.get("text") or "").strip():
+                elif kind == "turn_end" and not str(r.get("text") or "").strip() \
+                        and paths.get(r.get("turn")) not in NO_ANSWER_PATHS \
+                        and r.get("outcome") != "stopped_by_user":
                     rep.pattern("empty_answer").add(f"{where}: turn {r.get('turn')}")
                 if kind in ("end", "turn_end"):
                     rep.units += 1

@@ -47,7 +47,7 @@ GRADE_TIMEOUT_S = 120
 CASE_TIMEOUT_S = {"writing": 300, "explain": 600, "ideas": 600, "small": 1800, "medium": 2700}
 
 
-def _timed(fn, seconds: float):
+def _timed(fn, seconds: float, session=None):
     box: dict = {}
 
     def go() -> None:
@@ -60,10 +60,14 @@ def _timed(fn, seconds: float):
     t.start()
     t.join(seconds)
     if t.is_alive():
+        if session is not None:
+            session.cancelled = True  # it stops at its next model call or tool
         raise TimeoutError(f"timed out after {seconds:.0f} s (no answer from the model)")
     if "e" in box:
         raise box["e"]
     return box["v"]
+
+
 _IGNORE = shutil.ignore_patterns("__pycache__", ".pytest_cache", "*.pyc", ".mitra")
 
 
@@ -229,7 +233,7 @@ def run_writing(r: Runner, on_case: Callable[[Case], None] = lambda c: None, onl
             t0 = time.monotonic()
             try:
                 res = _timed(lambda: s.reply(messages, "writing", r.llm, notes=data["notes"]),
-                             CASE_TIMEOUT_S["writing"])
+                             CASE_TIMEOUT_S["writing"], s)
                 steps = res.steps
                 why = check_writing(c, res.text) if kind == "writing" else f"sorted as {kind}, not writing"
             except Exception as exc:  # noqa: BLE001 - a crash or a hang is a failed case, never a pass
@@ -256,7 +260,7 @@ def run_explain(r: Runner, on_case: Callable[[Case], None] = lambda c: None, cat
             messages = [r.system(), HumanMessage(content=c["question"])]
             t0 = time.monotonic()
             try:
-                res = _timed(lambda: s.explain(messages), CASE_TIMEOUT_S[c["category"]])
+                res = _timed(lambda: s.explain(messages), CASE_TIMEOUT_S[c["category"]], s)
                 steps = res.steps
                 why = (check_explain(c, res.text, ws, changed=_changed(before, _digest(ws))) if kind == "question"
                        else f"sorted as {kind}, not question")
@@ -271,7 +275,8 @@ def run_explain(r: Runner, on_case: Callable[[Case], None] = lambda c: None, cat
 # ── coding tasks: the bench's payments app, or a task folder here ───────────────────────────────────────────────
 
 def _bench():
-    sys.path.insert(0, str(ROOT / "bench"))
+    if str(ROOT / "bench") not in sys.path:  # called per task: insert once, not once per call
+        sys.path.insert(0, str(ROOT / "bench"))
     import bench  # noqa: PLC0415 - bench/ is a script folder, not a package
     return bench
 
@@ -304,6 +309,8 @@ class Task:
         tampered = [t.name for t in (self.dir / "visible").glob("test_*.py")
                     if not (ws / "tests" / t.name).is_file()
                     or (ws / "tests" / t.name).read_bytes() != t.read_bytes()]
+        if tampered:  # fails whatever the tests say: no need to run them
+            return False, "changed the tests: " + ", ".join(tampered)
         with tempfile.TemporaryDirectory(prefix=f"mitra-grade-{self.id}-") as tmp:
             copy = Path(tmp) / "ws"
             shutil.copytree(ws, copy, ignore=_IGNORE)
@@ -316,8 +323,6 @@ class Task:
                                    timeout=GRADE_TIMEOUT_S)
             except subprocess.TimeoutExpired:
                 return False, f"grading timed out after {GRADE_TIMEOUT_S}s"
-        if tampered:
-            return False, "changed the tests: " + ", ".join(tampered)
         return p.returncode == 0, "" if p.returncode == 0 else _last_line(p.stdout + p.stderr)
 
 
@@ -352,11 +357,11 @@ def run_coding(r: Runner, tasks: list[Task], on_case: Callable[[Case], None] = l
             messages = [r.system(), HumanMessage(content=task.prompt)]
             t0 = time.monotonic()
             try:
-                res = _timed(lambda: s.turn(messages, max_steps=r.max_steps or None), CASE_TIMEOUT_S[task.size])
+                res = _timed(lambda: s.turn(messages, max_steps=r.max_steps or None), CASE_TIMEOUT_S[task.size], s)
                 steps = res.steps
                 passed, why = task.grade(ws)
             except Exception as exc:  # noqa: BLE001 - a crash is a failed case, recorded, never a pass
-                steps, passed, why = 0, False, f"crashed: {type(exc).__name__}: {str(exc)[:150]}"
+                steps, passed, why = 0, False, ("" if isinstance(exc, TimeoutError) else "crashed: ") + f"{type(exc).__name__}: {str(exc)[:150]}"
         case = Case(task.id, task.size, passed, why, round(time.monotonic() - t0, 1), steps)
         on_case(case)
         out.append(case)
@@ -421,7 +426,10 @@ def run(categories=CATEGORIES, *, runner: Runner | None = None, model: str = "",
     """Run the chosen categories, append one row to results/scores.jsonl, return it."""
     t0, cases = time.monotonic(), []
     if "sorting" in categories:
-        cases += [c for c in run_sorting(on_case) if not only or c.id in only]
+        for c in run_sorting():  # only the cases asked for are shown and scored
+            if not only or c.id in only:
+                on_case(c)
+                cases.append(c)
     needs_model = [c for c in categories if c != "sorting"]
     if needs_model and runner is None:
         raise ValueError("a model is needed for: " + ", ".join(needs_model))

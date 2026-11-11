@@ -38,7 +38,8 @@ SMALL_TALK = {"hi", "hello", "hey", "hii", "yo", "thanks", "thank", "thx", "ok",
 WRITING_NOUNS = {"mail", "email", "e-mail", "mails", "emails", "message", "messages", "letter", "post", "tweet",
                  "announcement", "invite", "invitation", "memo", "note", "reply", "response", "bio", "caption",
                  "slack", "whatsapp", "linkedin", "cover", "proposal", "summary", "minutes", "agenda", "apology",
-                 "wish", "wishes", "greeting"}
+                 "wish", "wishes", "greeting", "paragraph", "sentence", "prd", "spec", "blog", "article", "essay",
+                 "story", "poem", "cv", "sop"}
 WRITING_VERBS = {"draft", "compose", "proofread", "rephrase", "paraphrase", "translate", "summarise", "summarize",
                  "polish", "reword", "shorten", "tldr"}
 REFINE = re.compile(r"^(make it|now make it|can you make it|a bit|slightly|more|less|shorter|longer|simpler|"
@@ -58,6 +59,17 @@ BUILD_NOW = re.compile(r"\b(build it|build this|start building|go ahead|implemen
 # folder names that are also everyday words: "a web app" in a discussion does not mean the web/ folder
 GENERIC_NAMES = frozenset({"web", "app", "api", "data", "model", "models", "src", "docs", "static", "templates",
                            "scripts", "config", "server", "client", "main", "utils", "frontend", "backend", "database"})
+# deep dive 2026-11-11: follow-ups keep the working turn's tools ("still not working" after a fix was answered with
+# no tools at all; "why?" after a code question was answered without reading the code)
+FOLLOW_UP = re.compile(r"^(no\b|nope\b|not that|still\b|try again|again\b|i meant|that'?s (wrong|not)|wrong\b|"
+                       r"it (still|doesn'?t|does not|didn'?t|is still)|same (error|issue|problem)|use\b|instead\b|"
+                       r"and\b|also\b|what about|why\b|how come|but\b|so\b|then\b|ok,? but|okay,? but)")
+# something is broken: the working loop (it can run things), not the read-only explainer
+FAILING = re.compile(r"\b(fail(s|ing|ed)?|broken|not working|doesn'?t work|does not work|crash(es|ed|ing)?|"
+                     r"traceback|exception)\b")
+HOW_TO = ("how do i", "how can i", "how to", "how should i", "how would i", "how do we", "how can we")
+NEED = re.compile(r"^(i|we) (need|want) (a|an|you to|to (build|make|write|create|add|have|get))\b")
+SMALL_VERBS = {"rename", "remove", "delete", "move", "run", "commit", "revert", "install", "push"}
 # picking one of the options Mitra just gave ("go with option 2", "the first idea", "let's do 3")
 PICK = re.compile(r"\b(option|idea|approach|choice|number|no\.?) ?#?\d\b|\b(first|second|third|fourth|fifth|last) "
                   r"(one|idea|option|approach)\b|^(go with|let'?s do|lets do|do|pick|take|choose|use) \S+$|"
@@ -70,7 +82,10 @@ PROJECT_WORDS = {"this", "our", "code", "codebase", "project", "repo", "reposito
                  "functions", "class", "classes", "method", "test", "tests", "bug", "error", "errors", "module",
                  "script", "here", "mitra", "folder", "game", "app", "commit", "branch", "diff", "logic",
                  "variable", "import", "config", "readme", "traceback", "exception", "fails",
-                 "failing", "crash", "crashes", "build", "setup", "kaggle", "we"}
+                 "failing", "crash", "crashes", "build", "setup", "kaggle", "we",
+                 # "where is the score stored?" asks where in this code, not general knowledge
+                 "defined", "implemented", "stored", "handled", "configured", "declared", "initialized",
+                 "initialised", "changed", "changes"}
 
 
 # "ok", "yes", "go" right after a working turn answer Mitra's question ("shall I run the tests?"): not small talk
@@ -97,11 +112,14 @@ def _writing(words: list[str], low: str, raw: str) -> bool:
         if re.search(r"\b(mail|email|message|reply|response|note|summary)s? (function|endpoint|class|test|tests|api|"
                      r"script|module|file|handler|parser|template|model|field|table)\b", low):
             return False  # "add a reply endpoint": code
+        if ws & {"prd", "spec", "blog", "article", "essay", "poem", "cv", "sop", "proposal", "memo"}:
+            return True  # "write a prd for a chat app": a document about an app, not the app
         # "a mail to my manager ... for a family function" is a mail; "send an email when the test fails" is code
         to_person = re.search(r"\bto (my|the|our|a|an) (manager|team|boss|client|customer|hr|friend|colleagues?|"
                               r"lead|teacher|landlord|professor|recruiter|vendor)\b", low)
         return bool(to_person) or not (ws & {"function", "endpoint", "class", "test", "tests", "api", "script",
-                                             "module", "file"})
+                                             "module", "file", "app", "application", "website", "tool", "bot",
+                                             "generator", "cli", "service"})
     return False
 
 
@@ -137,6 +155,10 @@ def classify(text: str, previous: str = "", project_words: frozenset | set = fro
         return "chat"
     if previous not in ("", "resume") + EVERYDAY and 0 < len(short) <= 6 and set(short) <= SMALL_TALK | ANSWERS:
         return "small"  # "ok" / "yes go ahead" answers the working turn's question: continue it with its tools
+    if previous in ("small", "big") and len(short) <= 15 and FOLLOW_UP.match(low):
+        return "small"  # "still not working", "try again", "no, use pytest": keep working on it, with tools
+    if previous == "question" and len(short) <= 12 and FOLLOW_UP.match(low) and not CHANGE_VERBS & set(short):
+        return "question"  # "why?", "and where is the score kept?": the explainer, building on what it read
     if previous in ("question", "small", "big") and len(short) <= 8 and PICK.search(low) and not low.endswith("?"):
         return "small"  # "go with option 2" after Mitra's ideas: build the one you picked, with tools
     if DAILY.match(low):
@@ -149,7 +171,10 @@ def classify(text: str, previous: str = "", project_words: frozenset | set = fro
     if previous == "general" and BUILD_NOW.search(low) and len(short) <= 12:
         return "big"  # "ok lets build it" after talking an idea through: plan it first (with the discussion)
     starts_with_change = bool(words) and words[0] in CHANGE_VERBS
-    if not BUILD_NOW.search(low) and not starts_with_change and (
+    # "can you fix the crash? think it through" asks for a change, not a discussion
+    asks_change = re.search(r"\b(please|can you|could you|and|then)\s+(also\s+)?(" + "|".join(CHANGE_VERBS) + r")\b",
+                            low)
+    if not BUILD_NOW.search(low) and not starts_with_change and not asks_change and (
             DISCUSS.search(low) or (previous in ("general", "question") and MUSING.match(low))):
         # a new idea is talked through in one answer; only one that names the code reads it first (explainer)
         code = bool(any(c in raw for c in "/\\`") or named - GENERIC_NAMES
@@ -160,7 +185,11 @@ def classify(text: str, previous: str = "", project_words: frozenset | set = fro
         return "writing"
     if _writing(words, low, raw):
         return "writing"
-    verbs = [w for w in words if w in CHANGE_VERBS]
+    if low.startswith(HOW_TO):
+        return "question" if about else "general"  # asks how; "fix it" then does it
+    if FAILING.search(low) and not low.startswith(QUESTION_START):
+        return "small"  # "the tests are failing, can you check": the loop can run them, the explainer cannot
+    verbs = [w for w in words if w in CHANGE_VERBS | SMALL_VERBS] + (["make"] if NEED.match(low) else [])
     if not verbs:  # a follow-up that points back ("what is option 2 exactly?", "why that?") stays on the project
         back = previous == "question" and re.search(r"\b(option|idea|approach|it|that|those|these|them|one)\b", low)
         return "question" if about or back else "general"
@@ -168,8 +197,10 @@ def classify(text: str, previous: str = "", project_words: frozenset | set = fro
     if asks and not re.search(r"\b(please|can you|could you|let's|lets)\b", low) and len(set(verbs)) == 1 \
             and low.endswith("?"):
         return "question"  # "what does the fix in X change?" asks; "add a test" does
-    if DOC_TARGET.search(low) and not set(verbs) & {"build", "implement", "develop"}:
+    if DOC_TARGET.search(low) and len(set(verbs)) == 1 and not set(verbs) & {"build", "implement", "develop"}:
         return "small"  # "update the plan with a level system": edit plan.md, do not plan a new feature
+    if len(set(verbs)) == 1 and verbs[0] in SMALL_VERBS:
+        return "small"  # "rename paddle to player in the game", "run the tests", "commit the changes"
     big = (len(set(verbs)) >= 2 or len(words) > 35 or raw.count("\n") >= 2
            or any(w in BIG_WORDS for w in words))
     return "big" if big else "small"

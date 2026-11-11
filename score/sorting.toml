@@ -55,6 +55,15 @@ cases = [
   # several changes or a whole feature: plan first
   { text = "add a reply endpoint to the api", want = "big" },
   { text = "update the plan and implement the level system", want = "big" },
+  # follow-ups and everyday dev requests (deep dive 2026-11-11)
+  { text = "still not working", previous = "small", want = "small" },
+  { text = "no, use pytest not unittest", previous = "small", want = "small" },
+  { text = "why?", previous = "question", want = "question" },
+  { text = "and where is the score kept?", previous = "question", want = "question" },
+  { text = "run the tests", want = "small" },
+  { text = "the tests are failing, can you check", want = "small" },
+  { text = "rename paddle to player in the game", want = "small" },
+  { text = "help me write a prd for a roman telugu chat app", want = "writing" },
   # from Mitra's records
   { text = "where did we stop", want = "resume" },
 ]

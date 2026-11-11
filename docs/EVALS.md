@@ -43,6 +43,7 @@ Every run appends a row to `results/scores.jsonl` (versions, model, machine, eve
 | Date | Mitra | Model | Machine | Score | Failed |
 |---|---|---|---|---|---|
 | 2026-11-11 01:03 | 0.5.1 | mimo-v2.6:9b | laptop | sorting 46/46 · writing 0/3 · explain 4/4 · ideas 1/2 | W1_team_mail: signature not exactly: Regards, / Prashanth; W2_leave_mail: signature not exactly: Regards, / Prashanth; W3_summary: missing: 1 February; I1_harder: 10 options (want 3-5) |
+| 2026-11-11 10:22 | 0.6.0 | mimo-v2.6:9b | laptop | writing 1/1 · explain 1/1 (only W1_team_mail, X4_wall: live check after the deep dive) | none |
 
 ## Results
 

@@ -93,10 +93,49 @@ def test_a_hung_model_fails_its_case_and_the_run_goes_on(tmp_path, monkeypatch):
             yield AIMessage(content="late")
 
     monkeypatch.setitem(S.CASE_TIMEOUT_S, "writing", 0.3)
+    before = set(threading.enumerate())
     out = S.run_writing(_runner(Hangs(), tmp_path), only={"W1_team_mail", "W2_leave_mail"})
     gate.set()
+    for t in set(threading.enumerate()) - before:  # the hung cases finish here, inside this test's MITRA_HOME
+        t.join(5)                                    # (a late write after the test leaked into the real store)
     assert [(c.id, c.passed) for c in out] == [("W1_team_mail", False), ("W2_leave_mail", False)]
     assert all(c.why.startswith("TimeoutError: timed out after") for c in out)
+
+
+def test_a_timed_out_turn_stops_before_its_next_tool(tmp_path, monkeypatch):
+    """Review 2026-11-11: an abandoned case kept running tools in a deleted workspace while the next case ran."""
+    import threading
+
+    gate, ran = threading.Event(), []
+
+    class SlowThenTool(Model):
+        def stream(self, messages):
+            self.calls += 1
+            gate.wait(5)
+            yield AIMessage(content="", tool_calls=[tc("write_file", self.calls, path="x.py", content="x = 1\n")])
+
+    monkeypatch.setitem(S.CASE_TIMEOUT_S, "small", 0.3)
+    task = S.load_tasks(only={"D1"})[0]
+    r = _runner(SlowThenTool(), tmp_path)
+    real_session = r.session
+
+    def session(ws, case_id):
+        s = real_session(ws, case_id)
+        orig = s._run
+        s._run = lambda name, args, *a: ran.append(name) or orig(name, args, *a)
+        sessions.append(s)
+        return s
+
+    sessions = []
+    monkeypatch.setattr(r, "session", session)
+    before = set(threading.enumerate())
+    out = S.run_coding(r, [task])
+    gate.set()
+    for t in set(threading.enumerate()) - before:
+        t.join(5)
+    assert not out[0].passed and out[0].why.startswith("TimeoutError")
+    assert sessions[0].cancelled and ran == []                  # the late tool call was not run
+    assert r.llm.calls == 1                                    # and no wrap-up call after it
 
 
 def test_an_explain_case_runs_the_explainer_and_fails_an_edit(tmp_path):

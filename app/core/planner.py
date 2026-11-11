@@ -70,7 +70,8 @@ def with_discussion(request: str, messages: list, max_chars: int = DISCUSSION_MA
 
     talk = [m for m in messages if isinstance(m, (HumanMessage, AIMessage)) and str(m.content or "").strip()
             and not getattr(m, "tool_calls", None)]
-    users = [str(m.content).strip() for m in talk if isinstance(m, HumanMessage)][-4:]
+    users = [str(m.content).strip() for m in talk if isinstance(m, HumanMessage)
+             and not str(m.content).lstrip().startswith(("[Mitra", "✗"))][-4:]  # Mitra's own notes are not yours
     answer = next((str(m.content).strip() for m in reversed(talk) if isinstance(m, AIMessage)), "")
     parts = [f"- {u[:1200]}" for u in users]
     text = "\n".join(parts) + (f"\n\nMitra's last answer:\n{answer[:2000]}" if answer else "")

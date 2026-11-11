@@ -2452,10 +2452,16 @@ def _chat():
         system_prompt += f"\n\n{notes_now}"
         loaded.append("your notes")
 
+    def _fresh_notes() -> str:
+        """Your notes again for this turn only when me.md or the project notes changed since the start (they are
+        in the system prompt already; review 2026-11-11: ~2K characters were sent twice every turn)."""
+        now = signals_mod.notes_text(pathlib.Path(cfg["workspace"]))
+        return now if now != notes_now else ""
+
 
     cloud_api_key = ""  # Mitra is local-only (D-025)
-    from app.core.roles import THINKING as _ROLE_THINKING
-    _chat_think = {"on": True, "off": False}.get(_ROLE_THINKING.get("chat") or "", thinking_setting(cfg.get("thinking")))
+    from app.core.roles import thinking_for as _thinking_for
+    _chat_think = _thinking_for("chat", cfg)  # your mitra.toml `thinking` wins over the role table
     local_llm = get_local_llm(model, temperature, base_url=cfg.get("ollama_local_base_url"),
                               num_ctx=num_ctx, num_gpu=num_gpu, reasoning=_chat_think)
     review_llm = codegen_llm = local_llm  # one model for everything (M1)
@@ -2664,7 +2670,7 @@ def _chat():
         r = roles_mod.route(role_name, cfg)
         if model_override:
             r = {**r, "model": model_override, "num_ctx": ctx_override or r["num_ctx"]}
-        think = {"on": True, "off": False}.get(r["thinking"] or "", thinking_setting(cfg.get("thinking")))
+        think = roles_mod.thinking_for(role_name, cfg)
         swapped = r["model"] != model or r["num_ctx"] != num_ctx
         model, num_ctx = r["model"], r["num_ctx"]
         local_llm = get_local_llm(model, temperature, base_url=cfg.get("ollama_local_base_url"), num_ctx=num_ctx,
@@ -3525,7 +3531,8 @@ def _chat():
 
         # ── What kind of request (D-065 P3) ───────────────────────────────────
         request_kind = force_kind or intent_mod.classify(user_input, previous=last_kind, project_words=project_words)
-        talked_first = last_kind in ("general", "question")  # "ok lets build it" after a discussion
+        # "ok lets build it" after a discussion; an explicit `/plan <task>` is its own task
+        talked_first = not force_kind and last_kind in ("general", "question")
         last_kind = request_kind
         if request_kind == "resume":  # from Mitra's records: instant, no model call, no searching
             _brief = resume_mod.brief(pathlib.Path(cfg["workspace"]))
@@ -3576,9 +3583,9 @@ def _chat():
             typed_buffer.clear()
             if request_kind in intent_mod.EVERYDAY:  # D-068 step 1: one call, no tools, thinking off
                 turn = chat.reply(messages, request_kind, _reply_llm(),
-                                  notes=signals_mod.notes_text(pathlib.Path(cfg["workspace"])))
+                                  notes=_fresh_notes())
             elif request_kind == "question" and chat.role == "chat":  # D-068 step 2: read only, 6 steps, an answer
-                turn = chat.explain(messages, notes=signals_mod.notes_text(pathlib.Path(cfg["workspace"])))
+                turn = chat.explain(messages, notes=_fresh_notes())
             else:
                 turn = chat.turn(messages)
             if chat.noticed:  # your edits since the last turn: recorded as corrections (self-improvement)

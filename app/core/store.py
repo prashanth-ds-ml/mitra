@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import tempfile
 import time
 from pathlib import Path
 
@@ -58,6 +59,10 @@ def mirror_path(record: Path) -> Path | None:
     record = Path(record).resolve()
     home, store = H.home().resolve(), runs_root().resolve()
     if _within(record, root().resolve()):
+        return None
+    if _within(record, Path(tempfile.gettempdir()).resolve()) and not _within(home, Path(tempfile.gettempdir())):
+        # a workspace in the temp folder is a test, a score case or a dev check, never one of your projects: it
+        # would show up as a project and feed the coach (deep dive 2026-11-11: 8 such folders were found)
         return None
     if _within(record, home):
         return store / HOME_SLUG / record.relative_to(home)
