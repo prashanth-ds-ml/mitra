@@ -123,8 +123,11 @@ def test_kaggle_dead_at_start_reports_on_the_last_session(harness, capsys):
     Inputs.script = ["exit"]
     main._chat()
     out = " ".join(capsys.readouterr().out.split())
-    assert "ended while Mitra was closed" in out and "build the paddle" in out
-    assert list((ws / ".mitra" / "reports").glob("kaggle-ended-*.md"))
+    # E-107: one line at start-up; the full report (with the turns) only in its file
+    assert "Kaggle ended while Mitra was closed" in out and "1 turn, no files changed" in out
+    assert "build the paddle" not in out and "is not answering" not in out and "What you asked" not in out
+    reports = list((ws / ".mitra" / "reports").glob("kaggle-ended-*.md"))
+    assert reports and "build the paddle" in reports[0].read_text(encoding="utf-8")
 
 
 def test_write_work_without_kaggle_asks_once_per_session(harness, monkeypatch, tmp_path):
@@ -137,9 +140,26 @@ def test_write_work_without_kaggle_asks_once_per_session(harness, monkeypatch, t
     backend.save_prefs(later_day=__import__("time").strftime("%Y-%m-%d"))  # not decided; already asked today
     asked = []
     monkeypatch.setattr(main.ui.menu, "choose", lambda console, q, opts, default=None: asked.append(q) or "no")
+    _working_model(monkeypatch)  # D-074: Kaggle is offered after a turn that works, never for talk
     Inputs.script = ["write a test", "write another", "/mode plan", "explain it", "exit"]
     main._chat()
     assert len(asked) == 1 and "Kaggle GPU" in asked[0]
+
+
+def _working_model(monkeypatch):
+    """Every message is work: the decide call picks make_change, then the change phase answers."""
+    from tests.test_chat_core import tc
+
+    def fake(model, temperature=0.2, *, base_url=None, num_ctx=None, **kw):
+        replies = []
+        for i in range(10):
+            replies += [AIMessage(content="", tool_calls=[tc("make_change", i, what="x")]),
+                        AIMessage(content=f"done {i}")]
+        m = Model(*replies)
+        m.base_url, m.model = base_url, model
+        return m
+
+    monkeypatch.setattr(main, "get_local_llm", fake)
 
 
 def _menu(monkeypatch, answer):
@@ -206,7 +226,7 @@ def test_case2_key_works_asks_when_with_when_needed_first(harness, monkeypatch, 
     Inputs.script = ["exit"]
     main._chat()  # case 3: said yes: one line, no question
     out = " ".join(capsys.readouterr().out.split())
-    assert asked == [] and "Kaggle ready · 28.1 h left · starts on your first write work" in out
+    assert asked == [] and "Kaggle ready · 28.1 h left · starts when you ask for work" in out
 
 
 def test_case3_now_starts_in_the_background_at_start(harness, monkeypatch, tmp_path):
@@ -239,6 +259,7 @@ def test_when_needed_starts_kaggle_on_write_work_without_asking(harness, monkeyp
     backend.save_prefs(kaggle_use="when-needed")
     started = _key_ready(monkeypatch, tmp_path)
     asked = _menu(monkeypatch, "no")
+    _working_model(monkeypatch)
     Inputs.script = ["/mode plan", "explain it", "/mode auto", "write a test", "exit"]
     main._chat()
     import time as _t
@@ -398,3 +419,14 @@ def test_do_skips_planning(harness, monkeypatch):
     Inputs.script = ["/do build a score system for the game with a high score file and a menu", "exit"]
     main._chat()
     assert turns == ["build a score system for the game with a high score file and a menu"]
+
+
+def test_when_needed_does_not_start_kaggle_for_talk(harness, monkeypatch, tmp_path):
+    """D-074: "hi mitra" is talk (the laptop answers): Kaggle hours are only spent once a turn does work."""
+    from app import backend
+    backend.save_prefs(kaggle_use="when-needed")
+    started = _key_ready(monkeypatch, tmp_path)
+    asked = _menu(monkeypatch, "no")
+    Inputs.script = ["hi mitra", "good what about you", "exit"]   # the default model only talks
+    main._chat()
+    assert asked == [] and started == []

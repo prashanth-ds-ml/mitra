@@ -99,3 +99,29 @@ def test_plain_talk_never_touches_the_remote(tmp_path):
 def test_the_laptop_talk_model_can_stay_loaded():
     from app.llm import get_local_llm
     assert get_local_llm("qwen3.5:latest", keep_alive="30m", reasoning=False).keep_alive == "30m"
+
+
+# ── E-107: the Kaggle-ended screen ─────────────────────────────────────────────────────────────────────────────
+
+def _turns(n, files=()):
+    return [{"no": i, "user": f"{i}. feature {i}" if i % 2 else f"message {i}", "outcome": "answered",
+             "files": list(files) if i == n else []} for i in range(1, n + 1)]
+
+
+def test_the_screen_shows_the_last_turns_the_file_keeps_all(tmp_path):
+    turns = _turns(30)
+    full = HO.build(reason="r", workspace=tmp_path, turns=turns, laptop="m", summary=None)
+    short = HO.build(reason="r", workspace=tmp_path, turns=turns, laptop="m", summary=None, max_turns=8)
+    assert "- 1 · 1. feature 1 → answered" in full and "- 30 · message 30" in full
+    assert "- … 22 earlier" in short and "- 23 · 23. feature 23" in short and "- 22 ·" not in short
+    assert "## Files changed" not in full                          # nothing changed: no empty section
+    assert "- **Why:** r" in full and "- **Now on:** m" in full     # one fact per line
+
+
+def test_start_up_gets_one_line_naming_changed_files(tmp_path):
+    report = tmp_path / ".mitra" / "reports" / "kaggle-ended-1.md"
+    line = HO.startup_line(_turns(30), tmp_path, 111, report)
+    assert line == ("☁ Kaggle ended while Mitra was closed · last session 111 min, 30 turns, no files changed · "
+                    "report in .mitra/reports/")
+    changed = HO.startup_line(_turns(2, files=[str(tmp_path / "game.py")]), tmp_path, None, report)
+    assert "last session, 2 turns, 1 file changed: game.py" in changed

@@ -499,6 +499,7 @@ class ChatSession:
         self.last_step_note = LAST_STEP_NOTE  # what the model is told on that last step
         self.deciding = False       # D-071 phased: the first call offers only the phase switches (PHASE_SPECS)
         self.phase_request: dict | None = None  # {"name", "args"} when the model chose a phase
+        self.last_phase: str | None = None       # phased: the phase the last turn worked in (None = talk only)
         self.end_info: dict = {}    # extra fields for this turn's turn_end row (the explainer's budget, files cited)
         self.last_speed: float | None = None  # tokens/s of the last answer (Ollama's eval_count / eval_duration)
         self.best_speed: dict[str, float] = {}  # per machine this session: a much slower answer = spilled to CPU
@@ -754,6 +755,7 @@ class ChatSession:
         if note is not None:
             messages.insert(len(messages) - 1, note)
         self.path, self.phase_request = "phased", None
+        self.last_phase = None  # the phase this turn worked in; None = it only talked (Kaggle starts on work only)
         self._talk = (talk_llm, talk_ctx) if talk_llm is not None else None
         try:
             return self.turn(messages, body=self._phased_body)
@@ -789,6 +791,7 @@ class ChatSession:
                                               "run_plan")
                     else "look_up" if name in ("web_search", "fetch_url") else "look_at_code")
         phase = PHASES[name]
+        self.last_phase = name
         messages.append(HumanMessage(content=phase["note"]))
         self.allowed_tools = phase["tools"]
         self.answer_on_last_step, self.last_step_note = True, ONE_LAST_STEP_NOTE

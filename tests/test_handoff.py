@@ -18,8 +18,8 @@ def test_the_report_holds_the_facts_and_the_summary(tmp_path):
                    last_tests="3 passed", night={"state": "running", "plan": "plan.md", "detail": "40 min of up to 4 h"},
                    kaggle={"session_min": 52, "left_h": 27.3}, now=time.mktime((2026, 11, 10, 15, 4, 0, 0, 0, -1)))
     for needed in ("# Kaggle ended · 2026-11-10 15:04", "the Kaggle GPU stopped answering", "qwen3.5:4b at 64K",
-                   "this session 52 min", "27.3 h left", "1. add a score counter → ✓ tests passed",
-                   "2. now the level screen → cut off: Kaggle ended", "`game/score.py`", "/undo",
+                   "used 52 min", "27.3 h left", "- 1 · add a score counter → ✓ tests passed",
+                   "- 2 · now the level screen → cut off: Kaggle ended", "`game/score.py`", "/undo",
                    "**Last test run:** 3 passed", "**Night run:** running · plan.md", "- level screen half done",
                    "/kaggle start"):
         assert needed in text, needed

@@ -2432,9 +2432,14 @@ def _chat():
 
     cfg = config.load()
     from app import remote as _remote
-    _remote.check_alive(cfg, echo=lambda s: console.print(Text("  " + s, style="m.info")))  # E-067
+    _alive_lines: list[str] = []
+    _remote.check_alive(cfg, echo=_alive_lines.append)  # E-067
     _kaggle_died_turns = None
-    if cfg.pop("_remote_died", "") == "kaggle":  # D-062 B3 at start-up: report on the last session's records
+    _died = cfg.pop("_remote_died", "")
+    if _died != "kaggle":  # E-107: a Kaggle that ended gets one line after the header instead (startup_line)
+        for _line in _alive_lines:
+            console.print(Text("  " + _line, style="m.info"))
+    if _died == "kaggle":  # D-062 B3 at start-up: report on the last session's records
         from app.core import handoff as _handoff
         _rec = _handoff.latest_record(pathlib.Path(cfg["workspace"]))
         _kaggle_died_turns = _handoff.turns_from_record(_rec) if _rec else []
@@ -2857,7 +2862,8 @@ def _chat():
                               keep_alive="30m"), ctx)
         return _talk_cache[key]
 
-    def _kaggle_report(reason: str, note: str = "", turns=None, summarize: bool = True) -> None:
+    def _kaggle_report(reason: str, note: str = "", turns=None, summarize: bool = True,
+                       startup: bool = False) -> None:
         """B3: facts from Mitra's records + a short summary by the laptop model; written, shown, then Mitra waits."""
         from app.core import handoff
         st = kaggle_mod.load_state()
@@ -2876,13 +2882,24 @@ def _chat():
                 summary = handoff.summarize(local_llm, messages)
             except KeyboardInterrupt:
                 summary = ""
-        text = handoff.build(reason=reason, workspace=pathlib.Path(cfg["workspace"]),
-                             turns=chat.turn_log if turns is None else turns,
-                             laptop=f"{model} at {num_ctx // 1024}K" + (f" ({note})" if note else ""),
-                             summary=summary, last_tests=last_test_summary, night=night,
-                             kaggle={"session_min": session_min, "left_h": health.s.hours_left})
-        path = handoff.write(pathlib.Path(cfg["workspace"]), text)
-        console.print(Markdown(text))
+        ws_path = pathlib.Path(cfg["workspace"])
+        all_turns = chat.turn_log if turns is None else turns
+        if startup and st.get("started"):  # the session ended while Mitra was closed: its record's last write
+            rec = handoff.latest_record(ws_path)
+            try:
+                end = rec.stat().st_mtime if rec else None
+            except OSError:
+                end = None
+            session_min = int((end - st["started"]) / 60) if end and end > st["started"] else None
+        facts = dict(reason=reason, workspace=ws_path, turns=all_turns,
+                     laptop=f"{model} at {num_ctx // 1024}K" + (f" ({note})" if note else ""),
+                     summary=summary, last_tests=last_test_summary, night=night,
+                     kaggle={"session_min": session_min, "left_h": health.s.hours_left})
+        path = handoff.write(ws_path, handoff.build(**facts))  # the file keeps every turn
+        if startup:  # E-107: one line; the last session is in the file and in "where did we stop"
+            console.print(Text("  " + handoff.startup_line(all_turns, ws_path, session_min, path), style="m.info"))
+            return
+        console.print(Markdown(handoff.build(**facts, max_turns=handoff.SHOWN_TURNS)))
         console.print(Text(f"  report saved: {path}", style="m.faint"))
 
     def _kaggle_ended(reason: str) -> None:
@@ -2992,7 +3009,7 @@ def _chat():
         if use == "now":                                             # case 3: said yes
             _start_kaggle_background()
         else:
-            _say_line(f"☁ Kaggle ready · {r['left_h']:.1f} h left · starts on your first write work "
+            _say_line(f"☁ Kaggle ready · {r['left_h']:.1f} h left · starts when you ask for work "
                       "(`/kaggle start` now)", "m.faint")
 
     def _maybe_offer_kaggle() -> None:
@@ -3166,7 +3183,8 @@ def _chat():
                 "total": len(results)}
 
     if _kaggle_died_turns is not None:
-        _kaggle_report("the Kaggle GPU ended while Mitra was closed", turns=_kaggle_died_turns, summarize=False)
+        _kaggle_report("the Kaggle GPU ended while Mitra was closed", turns=_kaggle_died_turns, summarize=False,
+                       startup=True)
     _kaggle_at_start()
 
     while True:
@@ -3716,8 +3734,9 @@ def _chat():
             if _want != bsession.kind:
                 (_to_remote if _want == backend_mod.REMOTE else _to_laptop)(
                     backend_mod.why(_want, session_mode, chat.role))
-        elif backend_mod.route(session_mode, chat.role) == backend_mod.REMOTE:
-            _maybe_offer_kaggle()
+        elif backend_mod.route(session_mode, chat.role) == backend_mod.REMOTE and not (
+                architecture == "phased" and chat.role == "chat" and not force_kind):
+            _maybe_offer_kaggle()  # phased chat: only after a turn that worked (below), never for talk (D-074)
 
         if request_kind == "big" and (force_kind or not one_mitra):  # D-065 P4/P5: plan first (one Mitra: /plan)
             _t_plan = time.monotonic()
@@ -3750,6 +3769,9 @@ def _chat():
                 if architecture == "phased":
                     turn = chat.phased(messages, notes=_extra, talk_llm=_talk[0] if _talk else None,
                                        talk_ctx=_talk[1] if _talk else 0)
+                    if (chat.last_phase and bsession.kind != backend_mod.REMOTE
+                            and backend_mod.route(session_mode, chat.role) == backend_mod.REMOTE):
+                        _maybe_offer_kaggle()  # D-074: this turn did work, so Kaggle starts for the next ones
                 else:
                     turn = chat.converse(messages, notes=_extra)
             elif request_kind in intent_mod.EVERYDAY:  # D-068 step 1: one call, no tools, thinking off

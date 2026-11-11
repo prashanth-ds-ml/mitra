@@ -101,30 +101,45 @@ def night_for_report(ns: dict | None, kaggle_started: float | None) -> dict | No
                        else f"up to {ns.get('hours')} h")}
 
 
+SHOWN_TURNS = 8  # on screen; the saved report keeps every turn
+
+
+def _turn_line(t: dict) -> str:
+    """'- 12 · you: 1. reading the code → answered': a bullet, so your own '1.' never starts a nested list (E-107)."""
+    out = OUTCOME_WORDS.get(t.get("outcome") or "", t.get("outcome") or "")
+    text = " ".join(str(t.get("user", "")).split())
+    text = text[:120] + ("…" if len(text) > 120 else "")
+    return f"- {t['no']} · {text}" + (f" → {out}" if out else "")
+
+
 def build(*, reason: str, workspace: Path, turns: list[dict], laptop: str, summary: str | None = "",
-          last_tests: str = "", night: dict | None = None, kaggle: dict | None = None, now: float | None = None) -> str:
+          last_tests: str = "", night: dict | None = None, kaggle: dict | None = None, now: float | None = None,
+          max_turns: int | None = None) -> str:
     """`summary`: None = no summary was tried (Kaggle ended while Mitra was closed: the conversation is gone);
-    "" = it was tried and failed."""
+    "" = it was tried and failed. `max_turns`: the last N turns only (the screen); None = all (the saved file)."""
     now = now or time.time()
     when = time.strftime("%Y-%m-%d %H:%M", time.localtime(now))
-    lines = [f"# Kaggle ended · {when}", "", f"**Why:** {reason}", f"**Now on:** {laptop}", ""]
+    # E-107: one fact per line ("Why" and "Now on" ran together); "used" (the session is over), not "this session"
+    lines = [f"# Kaggle ended · {when}", "", f"- **Why:** {reason}", f"- **Now on:** {laptop}"]
     if kaggle:
         used = kaggle.get("session_min")
-        lines.append("**Kaggle:** " + " · ".join(x for x in (
-            f"this session {used} min" if used is not None else "",
-            f"{kaggle['left_h']:.1f} h left this week" if kaggle.get("left_h") is not None else "") if x))
-        lines.append("")
-    lines += ["## What you asked (this session)", ""]
+        facts = " · ".join(x for x in (
+            f"used {used} min" if used is not None else "",
+            f"{kaggle['left_h']:.1f} h left this week" if kaggle.get("left_h") is not None else "") if x)
+        if facts:
+            lines.append(f"- **Kaggle:** {facts}")
+    lines += ["", "## What you asked", ""]
     if turns:
-        for t in turns:
-            out = OUTCOME_WORDS.get(t.get("outcome") or "", t.get("outcome") or "")
-            lines.append(f"{t['no']}. {t['user'][:160].strip()}" + (f" → {out}" if out else ""))
+        shown = turns if max_turns is None else turns[-max_turns:]
+        if len(shown) < len(turns):
+            lines.append(f"- … {len(turns) - len(shown)} earlier")
+        lines += [_turn_line(t) for t in shown]
     else:
         lines.append("(no turns recorded)")
     files = sorted({_rel(f, workspace) for t in turns for f in t.get("files", [])})
-    lines += ["", "## Files changed", ""]
-    lines += [f"- `{f}`" for f in files] or ["(none)"]
-    if files:
+    if files:  # E-107: "Files changed (none)" said nothing
+        lines += ["", "## Files changed", ""]
+        lines += [f"- `{f}`" for f in files]
         lines.append("")
         lines.append("`/undo` undoes the last change set; `git diff` shows everything.")
     if last_tests:
@@ -140,6 +155,24 @@ def build(*, reason: str, workspace: Path, turns: list[dict], laptop: str, summa
               "Mitra stopped here and waits for you: carry on on the laptop by sending a message, or "
               "`/kaggle start` for the GPU again."]
     return "\n".join(lines) + "\n"
+
+
+def startup_line(turns: list[dict], workspace: Path, session_min: int | None, report: Path) -> str:
+    """E-107: Kaggle ended while Mitra was closed: one line at start-up, the full report stays in its file.
+    '☁ Kaggle ended while Mitra was closed · last session 111 min, 30 turns, no files changed · report: …'"""
+    files = sorted({_rel(f, workspace) for t in turns for f in t.get("files", [])})
+    parts = [f"last session {session_min} min" if session_min is not None else "last session",
+             f"{len(turns)} turn{'s' if len(turns) != 1 else ''}"]
+    if files:
+        named = ", ".join(files[:3]) + (f" +{len(files) - 3}" if len(files) > 3 else "")
+        parts.append(f"{len(files)} file{'s' if len(files) != 1 else ''} changed: {named}")
+    else:
+        parts.append("no files changed")
+    try:
+        where = report.parent.relative_to(workspace).as_posix() + "/"
+    except ValueError:
+        where = str(report.parent)
+    return f"☁ Kaggle ended while Mitra was closed · {', '.join(parts)} · report in {where}"
 
 
 def write(workspace: Path, text: str, now: float | None = None) -> Path:
