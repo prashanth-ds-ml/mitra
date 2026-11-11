@@ -3529,6 +3529,15 @@ def _chat():
             _say(f"Unknown command `{unknown}`. Type `/help` for the list.")
             continue
 
+        _cli = intent_mod.terminal_command(user_input)
+        if _cli:  # live 2026-11-11: "mitra score" typed in the chat was explained as a question about the project
+            chat.note_request(user_input, "terminal_command", "cli_hint", "answered")
+            _say(f"`{_cli}` is a terminal command, not a chat message. Run it in **another terminal** "
+                 f"(this chat can stay open)" + (": `mitra score --remote` uses the Kaggle GPU, `mitra score` the "
+                                                  "laptop; it takes a while, don't chat on the same GPU meanwhile."
+                                                  if _cli.startswith("mitra score") else "."))
+            continue
+
         # ── What kind of request (D-065 P3) ───────────────────────────────────
         request_kind = force_kind or intent_mod.classify(user_input, previous=last_kind, project_words=project_words)
         # "ok lets build it" after a discussion; an explicit `/plan <task>` is its own task

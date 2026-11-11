@@ -136,3 +136,35 @@ def test_the_sweep_of_everyday_follow_ups_is_sorted_right():
     pw = {"brick-breaker", "plan", "tests", "game", "paddle", "ball", "readme", "src", "app", "main", "api"}
     got = [(p, t, classify(t, previous=p, project_words=pw)) for p, t, _ in SWEEP]
     assert got == [(p, t, w) for p, t, w in SWEEP]
+
+
+def test_a_mitra_command_typed_in_the_chat_is_recognised():
+    """Live 2026-11-11: the user typed `mitra score` in the chat; it was explained as a question about the project."""
+    from app.core.intent import terminal_command
+
+    assert terminal_command("mitra score") == "mitra score"
+    assert terminal_command("  `mitra score --remote` ") == "mitra score --remote"
+    assert terminal_command("$ mitra kaggle stop") == "$ mitra kaggle stop"
+    assert terminal_command("how does mitra score the tasks?") == ""
+    assert terminal_command("mitra, explain the score module") == ""
+    assert terminal_command("mitra") == ""
+
+
+def test_the_chat_answers_a_terminal_command_with_a_hint(harness, capsys):  # noqa: F811
+    from app import main
+    from tests.test_backend_chat import Inputs
+
+    state, ws = harness
+    Inputs.script = ["mitra score", "exit"]
+    main._chat()
+    out = " ".join(capsys.readouterr().out.split())
+    assert "is a terminal command" in out and "another terminal" in out and "mitra score --remote" in out
+    import json as _json
+    rows = [_json.loads(x) for f in (ws / ".mitra" / "runs").glob("chat-*.jsonl")
+            for x in f.read_text(encoding="utf-8").splitlines() if x.strip()]
+    starts = [r for r in rows if r["kind"] == "turn_start"]
+    assert [(r["path"], r["request_kind"]) for r in starts] == [("cli_hint", "terminal_command")]
+    assert not [r for r in rows if r["kind"] == "model"]           # answered without the model
+
+
+from tests.test_backend_chat import harness  # noqa: E402,F401 - the driven chat fixture

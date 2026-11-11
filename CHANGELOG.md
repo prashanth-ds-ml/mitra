@@ -4,6 +4,9 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-11
+- `mitra score` (or any `mitra <command>`) typed in the chat now says to run it in another terminal, instead of being explained as a question.
+
 ## [0.6.1] - 2026-11-11 · deep dive: code review of steps 0-3 + debugging on real records
 - Follow-ups keep their tools: "still not working", "try again", "no, use pytest" after a fix; "why?" after
   a code question reads the code. "run the tests", "commit the changes", "the tests are failing" work with

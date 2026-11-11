@@ -139,6 +139,17 @@ def project_words(root: Path) -> frozenset:
     return frozenset(w for w in out if len(w) > 2)
 
 
+CLI_COMMANDS = ("score", "kaggle", "report", "dashboard", "solve", "night", "harness", "improve", "init", "status",
+                "config", "models", "test", "mcp", "logs", "remote")
+
+
+def terminal_command(text: str) -> str:
+    """'mitra score --remote' typed in the chat: a terminal command (the CLI), not a request. Returns it, or ''."""
+    t = " ".join((text or "").strip().strip("`").split())
+    m = re.match(r"^\$?\s*mitra\s+(" + "|".join(CLI_COMMANDS) + r")\b[^\n]{0,80}$", t, re.I)
+    return t if m else ""
+
+
 def classify(text: str, previous: str = "", project_words: frozenset | set = frozenset()) -> str:
     """`previous`: the kind of the last request (a "make it shorter" after a mail is writing). `project_words`: names
     in the workspace (files, folders), so a question that names one is about the project."""
