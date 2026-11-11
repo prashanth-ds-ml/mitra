@@ -329,6 +329,8 @@ class ChatSession:
         self._prev_user_full = ""   # the last request in full, to notice when you ask the same thing again
         self.answer_on_last_step = False  # D-068 step 2: the last step gets no tools, so a turn always ends answered
         self.end_info: dict = {}    # extra fields for this turn's turn_end row (the explainer's budget, files cited)
+        self.last_speed: float | None = None  # tokens/s of the last answer (Ollama's eval_count / eval_duration)
+        self.best_speed: dict[str, float] = {}  # per machine this session: a much slower answer = spilled to CPU
         self.cancelled = False      # set from another thread (a score case that timed out): stop before the next
                                     # model call or tool, so an abandoned turn does not keep working in the background
 
@@ -718,6 +720,7 @@ class ChatSession:
             res.tokens_in += int(meta.get("input_tokens", 0) or 0)
             res.tokens_out += int(meta.get("output_tokens", 0) or 0)
             res.ctx_used = int(meta.get("input_tokens", 0) or 0) or res.ctx_used
+            self._note_speed(getattr(reply, "response_metadata", None) or {})
             if not reply.tool_calls and streamed.text and not last:
                 calls, parse_error = text_tool_calls(streamed.text, {s["name"] for s in specs})
                 if calls or parse_error:
@@ -763,6 +766,22 @@ class ChatSession:
             if stop:
                 return self._wrap_up(messages, res, stop)
         return self._wrap_up(messages, res, f"step limit ({max_steps} model calls)")
+
+    SLOW_FRACTION = 0.5  # slower than half this machine's best answer this session: shown in orange
+
+    def _note_speed(self, meta: dict) -> None:
+        """Generation speed from Ollama's own timing (thinking included, prompt reading and loading not)."""
+        n, ns = int(meta.get("eval_count") or 0), int(meta.get("eval_duration") or 0)
+        if n < 10 or ns <= 0:
+            return  # too short to say anything
+        self.last_speed = n / (ns / 1e9)
+        key = self.backend_kind
+        self.best_speed[key] = max(self.best_speed.get(key, 0.0), self.last_speed)
+
+    @property
+    def speed_is_slow(self) -> bool:
+        best = self.best_speed.get(self.backend_kind, 0.0)
+        return bool(self.last_speed and best and self.last_speed < best * self.SLOW_FRACTION)
 
     def _trace(self, messages, streamed, specs, step: int) -> None:
         reply = streamed.message if streamed.message is not None else AIMessage(content=streamed.text or "")

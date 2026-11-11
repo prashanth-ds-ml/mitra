@@ -12,6 +12,11 @@ machine or your judgment. Updated every release.
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
 
+## 2026-11-11 · The status line (v0.6.3)
+
+- [ ] Restart Mitra: bottom right shows CPU · RAM free · GPU; after an answer also tok/s
+- [ ] Open Chrome tabs until RAM is low: RAM turns orange; a slow answer turns tok/s orange
+
 ## 2026-11-11 · `mitra score` and talking ideas through (D-068 step 3, v0.6.0)
 
 - [ ] Restart Mitra; "can we brainstorm on <an idea>" answers (no plan); then "ok lets build it" plans it with what you discussed

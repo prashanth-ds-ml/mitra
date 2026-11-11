@@ -130,11 +130,11 @@ def test_stream_with_only_a_tool_call_prints_no_answer():
 
 # ── status line ─────────────────────────────────────────────────────────────
 
-def test_status_line_shows_model_mode_context_tokens_folder_branch():
+def test_status_line_shows_model_mode_context_folder_branch():
     parts = ui.status_line(model="qwen3.5:9b", mode="approve", total_tokens=4100, context_limit=41000,
                            cwd=r"C:\dev\snake_game", branch="main", background_tasks=1)
     text = "".join(t for _, t in parts)
-    assert text.startswith("  qwen3.5:9b · approve · ctx 10% · 4.1K tokens · snake_game (main) · 1 running")
+    assert text.startswith("  qwen3.5:9b · approve · ctx 10% · snake_game (main) · 1 running")
     assert "shift+tab mode" in text
     assert ("class:status.accent", "approve") in parts
 

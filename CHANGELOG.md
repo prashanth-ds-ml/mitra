@@ -4,6 +4,13 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-11-11 · the status line shows this machine
+- Right side of the status line: the last answer's speed (tok/s, from Ollama's own timing), CPU, RAM free, GPU
+  memory / load / temperature; sampled every 2 s in the background. Orange only when you should act: a much
+  slower answer than this machine's best (spilled to the CPU), RAM below 2 GB or below what the model needs, a
+  GPU at 85 C or more. A shorter block on narrow terminals, none on very narrow ones.
+- The token count left the status line (no cost, no limit on a local model); ctx % stays (D-070).
+
 ## [0.6.2] - 2026-11-11
 - `mitra score` (or any `mitra <command>`) typed in the chat now says to run it in another terminal, instead of being explained as a question.
 

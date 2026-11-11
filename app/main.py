@@ -2636,6 +2636,16 @@ def _chat():
         console.print(ui.tool_line(ui_state.folded.title or "Folded output"))
         console.print(ui.detail_block(ui_state.folded.text, max_lines=400))
 
+    from app.ui import sysmon
+
+    def _machine_block() -> dict:
+        """Right side of the status line: last answer's speed, CPU, RAM free, GPU (only what you can act on).
+        RAM is orange below 2 GB, or below what the model still needs before its first load."""
+        need = (getattr(_fit, "need_ram_gb", 0) or 0) if (_fit is not None and not chat.turn_no) else 0
+        sample = sysmon.current()
+        args = dict(speed=chat.last_speed, slow=chat.speed_is_slow, ram_warn_gb=max(2.0, need))
+        return {"right": sysmon.segments(sample, **args), "right_compact": sysmon.segments(sample, compact=True, **args)}
+
     input_box = ui.InputBox(
         workspace=cfg["workspace"],
         commands=list(_COMMAND_HELP),
@@ -2651,6 +2661,7 @@ def _chat():
             notice=ui_state.current_notice(),
             **dict(zip(("backend", "backend_level"),
                        backend_mod.status_text(bsession.kind, model, num_ctx, health.s))),
+            **_machine_block(),
         ),
         print_folded=_print_folded,
     )

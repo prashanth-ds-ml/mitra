@@ -1,4 +1,5 @@
-"""The status line under the input: model · mode · ctx % · tokens · folder (branch)."""
+"""The status line under the input: model · mode · ctx % · folder (branch), and on the right this machine:
+speed of the last answer · CPU · RAM free · GPU (user, 2026-11-11: only what you can act on)."""
 from __future__ import annotations
 
 import re
@@ -6,7 +7,6 @@ import shutil
 import subprocess
 import time
 
-from app.ui.render import format_tokens
 
 _branch_cache: dict[str, tuple[float, str]] = {}
 
@@ -42,6 +42,9 @@ def status_line(
     notice: str = "",
     backend: str = "",
     backend_level: str = "ok",
+    right: list[tuple[str, str]] | None = None,
+    right_compact: list[tuple[str, str]] | None = None,
+    width: int | None = None,
 ) -> list[tuple[str, str]]:
     """prompt_toolkit formatted text for the bottom toolbar. `backend` (D-062 B1), e.g. '☁ kaggle · mimo 256K ·
     28.1 h left', replaces the model name: where the model runs, and the hours left."""
@@ -58,7 +61,7 @@ def status_line(
         ("class:status.accent", mode),
         ("class:status", " · "),
         (ctx_style, f"ctx {pct}%"),
-        ("class:status", f" · {format_tokens(total_tokens)} tokens · {folder}"),
+        ("class:status", f" · {folder}"),
     ]
     if branch:
         parts.append(("class:status", f" ({branch})"))
@@ -68,9 +71,23 @@ def status_line(
         parts.append(("class:status.warn", "  /compact soon"))
     if notice:
         parts.append(("class:status.accent", f"   {notice}"))
-    else:
+    elif not right:
         parts.append(("class:status.rule", "   shift+tab mode · /help"))
-    return parts
+    return parts + _right_aligned(parts, right, right_compact, width)
+
+
+def _text_len(parts: list[tuple[str, str]]) -> int:
+    return sum(len(t) for _, t in parts)
+
+
+def _right_aligned(left, right, compact, width) -> list[tuple[str, str]]:
+    """The machine block at the right edge; the compact one if the full one does not fit; none if neither does."""
+    width = width or shutil.get_terminal_size((100, 24)).columns
+    used = _text_len(left)
+    for block in (right, compact):
+        if block and used + 3 + _text_len(block) <= width - 1:
+            return [("class:status", " " * (width - 1 - used - _text_len(block)))] + list(block)
+    return []
 
 
 def _rule() -> str:
