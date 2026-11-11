@@ -46,7 +46,7 @@ def status_line(
     right_compact: list[tuple[str, str]] | None = None,
     width: int | None = None,
 ) -> list[tuple[str, str]]:
-    """prompt_toolkit formatted text for the bottom toolbar. `backend` (D-062 B1), e.g. '☁ kaggle · mimo 256K ·
+    """prompt_toolkit formatted text for the bottom toolbar. `backend` (D-062 B1), e.g. '☁ kaggle · qwen3.5 256K ·
     28.1 h left', replaces the model name: where the model runs, and the hours left."""
     pct = min(100, int(total_tokens / max(context_limit, 1) * 100))
     folder = re.split(r"[\\\\/]", str(cwd).rstrip("\\\\/"))[-1] or str(cwd)  # Windows or POSIX path

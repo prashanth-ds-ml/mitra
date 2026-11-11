@@ -3,7 +3,7 @@
 Pure decisions live here so they can be tested; the chat (app/main.py) applies them between turns:
 - `Health`: a background check of the remote every 60 s (status calls only: never counts as Kaggle use) and the
   Kaggle hours left (every 10 min).                                                                        (B0)
-- `status_text`: `☁ kaggle · mimo 256K · 28.1 h left` / `💻 laptop · mimo 128K`.                         (B1)
+- `status_text`: `☁ kaggle · qwen3.5 256K · 28.1 h left` / `💻 laptop · qwen3.5 64K`.                         (B1)
 - `laptop_choice`: the laptop model + context that fits the free memory, quietly smaller when RAM is short. (B2)
 - `route`: read work (plan mode, planner, reviewer) on the laptop, write work on the remote.               (B5)
 - `prefs`: remembered answers (first-start Kaggle offer, "not this session").                              (B6)

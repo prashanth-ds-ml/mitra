@@ -4,6 +4,15 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-11 · One Mitra (D-071) + qwen3.5 as the model (D-072)
+- **qwen3.5:latest is Mitra's model** (chat, all roles, Kaggle at 256K); mimo turned conversation into builds.
+- **One conversational loop** behind `architecture = "one"` or `"phased"` in mitra.toml: the model decides whether
+  to talk, look or change (phased: decide first with no file tools, then act in that phase with only its tools).
+  The router stays the default until the A/B decides (EVALS).
+- **Conversation memory as threads** (~/.mitra/threads): said / decided / open per discussion, written at exit.
+- **Every model call has an output cap (8,192 tokens) and a runaway guard;** an empty answer is asked for once.
+- `mitra score`: a *behaviour* category (10 cases), `--arch router|one|phased`, `--ctx`.
+
 ## [0.6.4] - 2026-11-11
 - Long answers no longer vanish while they are written: a long list, table or code block scrolls normally.
 - While Mitra works, a footer under the answer shows the time, the live speed and this machine (CPU, RAM, GPU).

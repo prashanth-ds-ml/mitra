@@ -13,7 +13,7 @@ def test_defaults_follow_d051_and_fall_back_to_the_chat_model(monkeypatch):
     monkeypatch.setattr(config, "load_last_model", lambda: "qwen3.5:latest")
     have = {"qwen3.5:latest", "mimo-v2.6:9b", "deepseek-r1:8b"}
     assert R.resolve("planner", {}, have) == ("deepseek-r1:8b", "default")
-    assert R.resolve("builder", {}, have) == ("mimo-v2.6:9b", "default")
+    assert R.resolve("builder", {}, have) == ("qwen3.5:latest", "default")
     assert R.resolve("chat", {}, have) == ("qwen3.5:latest", "chat model")
     model, source = R.resolve("planner", {}, {"qwen3.5:latest"})  # not downloaded yet: nothing breaks
     assert model == "qwen3.5:latest" and "not installed" in source

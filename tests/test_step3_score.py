@@ -157,8 +157,12 @@ def test_a_coding_task_is_graded_by_hidden_tests(tmp_path):
                  AIMessage(content="", tool_calls=[tc("edit_file", 2, path="clean.py", old="out = []",
                                                       new="out = []  # todo")]),
                  AIMessage(content="Done."))
-    good = S.run_coding(_runner(fixer, tmp_path), [task])[0]
-    bad = S.run_coding(_runner(lazy, tmp_path), [task])[0]
+    def loop_only(r):  # grading is tested here, not routing (the router sorts this prompt as a mail: E-098)
+        r.respond = lambda s, messages, ws, previous="": (s.turn(messages), "loop")
+        return r
+
+    good = S.run_coding(loop_only(_runner(fixer, tmp_path)), [task])[0]
+    bad = S.run_coding(loop_only(_runner(lazy, tmp_path)), [task])[0]
     assert good.passed and good.why == "" and good.steps == 3
     assert not bad.passed and bad.why
     assert "out = []" in start                                            # the edit above really applied

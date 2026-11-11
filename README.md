@@ -24,7 +24,7 @@ too small, it can borrow a free Kaggle GPU for a few hours.
    | Your machine | Model | Command |
    |---|---|---|
    | 8 GB GPU, or no GPU (slow) | Qwen3.5 4B (3.4 GB) | `ollama pull qwen3.5:4b` |
-   | 12 GB+ GPU, or 32 GB RAM | MiMo v2.6 9B or Qwen3.5 9B (6.6 GB) | `ollama pull mimo-v2.6:9b` |
+   | 12 GB+ GPU, or 32 GB RAM | Qwen3.5 9B (6.6 GB) | `ollama pull qwen3.5:latest` |
    | Small laptop | use a free Kaggle GPU instead | see [Kaggle](#no-big-gpu-use-a-free-kaggle-gpu) |
 
 3. **Install uv** (Python tool manager), if you do not have it:
@@ -122,7 +122,7 @@ Change it any time: `/kaggle use when-needed` (start on your first write work, t
 (start with Mitra), `/kaggle use never`. `/kaggle` shows the setting and your hours.
 
 **How Mitra switches** (you do not have to think about it):
-- The status line always shows where the model runs: `☁ kaggle · mimo 256K · 28.1 h left` or `💻 laptop · …`.
+- The status line always shows where the model runs: `☁ kaggle · qwen3.5 256K · 28.1 h left` or `💻 laptop · …`.
 - **Read work** (plan mode, the planner and reviewer roles) runs on the laptop; **write work** (edits, tests,
   `/run` nights) runs on Kaggle when it is up. Mitra switches between turns, never in the middle of one, and compacts
   a long chat first if the laptop's context is smaller.

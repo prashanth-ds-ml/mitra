@@ -12,6 +12,14 @@ machine or your judgment. Updated every release.
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
 
+## 2026-11-11 · One Mitra + qwen3.5 (v0.7.0)
+
+- [ ] Restart Mitra: the header shows qwen3.5:latest; "hi", "i am thinking…", "either X or Y" get short replies, no file reading
+- [ ] "how does the paddle move?" reads the code and cites file:line; "make … " changes and tests it
+- [ ] "build a feedback web app" shows a plan and asks before building
+- [ ] Talk about an idea, type `exit` ("remembering this conversation"), restart, "let's continue the … idea"
+- [ ] `mitra kaggle start`: qwen3.5:latest at 256K, fully on the GPU
+
 ## 2026-11-11 · The status line (v0.6.3)
 
 - [ ] Restart Mitra: bottom right shows CPU · RAM free · GPU; after an answer also tok/s

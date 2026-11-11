@@ -67,6 +67,27 @@ Template per step: **What we build · What Mitra does after it · Why · Done wh
 - **Done when:** every reference solution passes its checks; `mitra score` runs on the laptop and on Kaggle.
 - **Records:** the score history, the coach's main input.
 
+### Step 3b. One Mitra: one conversational loop instead of routed paths (D-071)
+**✓ Built 2026-11-11 (v0.7.0):** behaviour category (10 cases), `--arch router|one|phased`, one Mitra, the phased loop (decide with only look_at_code / make_change / propose_plan, then act with that phase's tools), threads, runaway guard + 8,192-token cap + empty-answer nudge; qwen3.5:latest replaces mimo (D-072). A/B on the laptop at 64K with qwen3.5: **phased 13/19 (8.3 min)**, router 12/19 (13.1 min), one 11/19 (8.6 min); mimo's best was 11/19 in 25 min. Phased is the default. Still failing: small talk mentions the project folder, the memory case adds the snake game, brainstorms about the code do not look first, a summary date slip.
+- **Build:** (1) a *behaviour* category in `mitra score` (talk turns use no tools, stay short, no report headings,
+  ask back when you are deciding; code questions read the right file; a change request changes it) and every score
+  case run through the chat's own entry, so the architecture is a switch; baseline of today's router.
+  (2) One Mitra behind a switch (`architecture = "one"`): one prompt ("your thinking partner and coder: talk
+  naturally, use tools only when the answer needs your files or you asked for a change"), all tools, thinking off,
+  the last step always answers, a lighter context (your notes + a short "where we are", no night runs or stale
+  plans every turn). Fixed rules stay only where they are faster or exact: /commands, `mitra ...` typed in the chat,
+  "where did we stop". (3) Conversation memory as threads: what was said, decided and left open per discussion;
+  ideas in a global store, project work in the project; the relevant thread loaded per turn.
+  (4) A/B on the same score, laptop and Kaggle; the winner becomes the default; the losing paths are deleted.
+- **Mitra after:** you talk with it like with Claude; it looks at the code only when that is needed; "let's continue
+  the web app idea" works in a new session.
+- **Why:** the user's live sessions (2026-11-11): every substantial reply was a 190-320 word report with 3-8 headings;
+  conversation went to the code reader; ideas were forgotten. Root causes R1-R7 (STATUS 2026-11-11). One loop is also
+  simpler to self-improve: one prompt and one harness to tune instead of six paths.
+- **Done when:** the behaviour category runs on both architectures; the A/B result is in EVALS.md; the default is set
+  by the score, not by opinion.
+- **Records:** architecture per turn (path "one"), tool calls per talk turn, reply length and headings, threads used.
+
 ### Step 4. Tolerant shell and clear test results
 - **Build:** `run_command` quietly handles `| tail/head`, `2>&1`, `cd x &&`, bare `pytest` instead of refusing;
   `run_tests` returns each failure as name, file:line, error and a few lines of context.

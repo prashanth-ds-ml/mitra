@@ -154,6 +154,7 @@ def test_the_budget_is_a_harness_limit():
 
 def test_a_code_question_goes_to_the_explainer_end_to_end(harness, monkeypatch):  # noqa: F811
     state, ws = harness
+    (ws / "mitra.toml").write_text('architecture = "router"\n', encoding="utf-8")  # D-071: router paths
     (ws / "game.py").write_text("def step(s):\n    return s\n", encoding="utf-8")
     made = []
     orig = main.get_local_llm

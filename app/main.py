@@ -397,7 +397,7 @@ def cmd_kaggle(
     action: str = typer.Argument("status", help="setup [token|path] | start | stop | status | use <now|when-needed|never>"),
     path: str = typer.Argument("", help="For setup: the downloaded kaggle.json (default: look in Downloads)."),
     model: str = typer.Option("", "--model", help="Model to run there (default: your chat model)."),
-    ctx: int = typer.Option(262_144, "--ctx", help="Context (default 256K, mimo's maximum)."),
+    ctx: int = typer.Option(262_144, "--ctx", help="Context (default 256K, the model's maximum)."),
     idle: int = typer.Option(30, "--idle", help="Stop by itself after this many minutes unused."),
     hours: float = typer.Option(11.5, "--hours", help="Hard time limit for the run."),
 ) -> None:
@@ -512,6 +512,10 @@ def cmd_score(
                              "case ids (W1_team_mail,T01,...), comma-separated."),
     model: str = typer.Option("", "--model", help="Model (default: your chat model)."),
     remote: bool = typer.Option(False, "--remote", help="Run on the remote GPU in use (Kaggle) instead of the laptop."),
+    ctx: int = typer.Option(0, "--ctx", help="Context size for this run (0 = your setting). Both sides of an A/B "
+                            "use the same; 32768 is the fastest on an 8 GB GPU."),
+    arch: str = typer.Option("phased", "--arch", help="How Mitra handles a message: router (today's paths) or one "
+                             "(one conversational loop, D-071)."),
     check: bool = typer.Option(False, "--validate", help="Only check the set: every reference passes, every start "
                                "state fails. No model."),
     show: bool = typer.Option(False, "--history", help="Show the last scores."),
@@ -553,7 +557,7 @@ def cmd_score(
         local_cfg = {**cfg, "num_ctx": local.get("num_ctx")} if "_local" in cfg else cfg
         base_url = (local.get("ollama_local_base_url") if "_local" in cfg else cfg.get("ollama_local_base_url")) \
             or "http://127.0.0.1:11434"
-        num_ctx, backend = roles_mod.context_for(model_name, local_cfg), "laptop"
+        num_ctx, backend = (ctx or roles_mod.context_for(model_name, local_cfg)), "laptop"
         if remote:
             from app import remote as remote_mod
             info = remote_mod.active()
@@ -564,9 +568,13 @@ def cmd_score(
         think = False if model_supports_thinking(model_name) else None
         llm = get_local_llm(model_name, base_url=base_url, num_ctx=num_ctx, reasoning=think)
         stamp = time.strftime("%Y%m%d-%H%M%S")
+        if arch not in S.ARCHITECTURES:
+            console.print(Text(f"--arch is one of: {', '.join(S.ARCHITECTURES)}", style="m.err"))
+            raise typer.Exit(2)
         runner = S.Runner(llm=llm, harness=harness_mod.load(), num_ctx=num_ctx, backend=backend,
-                          records=store_mod.root() / "score-runs" / stamp)
-        console.print(Text(f"  scoring {', '.join(cats)} · {model_name} · {backend} · {num_ctx // 1024}K", style="m.tool"))
+                          records=store_mod.root() / "score-runs" / stamp, arch=arch)
+        console.print(Text(f"  scoring {', '.join(cats)} · {model_name} · {backend} · {num_ctx // 1024}K · {arch}",
+                           style="m.tool"))
 
     def line(c) -> None:
         if as_json:
@@ -579,7 +587,7 @@ def cmd_score(
                            style="m.tool" if c.passed else "m.err"))
 
     before = [r for r in S.history(last=50) if r.get("categories") == list(cats) and r.get("model") == model_name
-              and not r.get("only")]
+              and not r.get("only") and r.get("arch", "router") == arch]
     row = S.run(cats, runner=runner, model=model_name, cwd=pathlib.Path.cwd(), only=ids, on_case=line)
     if as_json:
         print(json.dumps(row, indent=2, ensure_ascii=False))
@@ -2400,10 +2408,15 @@ def _chat():
 
     # Build system prompt, appending project rules + memory context
     from app.core import harness as harness_mod
-    from app.core.chat import CHAT_PROMPT
+    from app.core.chat import CHAT_PROMPT, ONE_PROMPT, PHASED_PROMPT
 
+    # D-071: "one" = one conversational loop (the model decides to talk, look or change); "router" = D-068 paths
+    architecture = str(cfg.get("architecture") or "").strip().lower()
+    architecture = architecture if architecture in ("one", "phased", "router") else "phased"  # D-071 A/B winner
+    one_mitra = architecture in ("one", "phased")  # one loop: the model decides (phased: decide, then act)
     harness = harness_mod.load()
-    system_prompt = harness_mod.apply_prompt(CHAT_PROMPT, harness)  # learned rules (self-improvement, step 1)
+    system_prompt = harness_mod.apply_prompt(
+        {"one": ONE_PROMPT, "phased": PHASED_PROMPT}.get(architecture, CHAT_PROMPT), harness)  # + learned rules
     if cfg.get("rules"):
         system_prompt += f"\n\n## Project Rules (from MITRA.md)\n{cfg['rules']}"
         loaded.append("MITRA.md")
@@ -2425,6 +2438,8 @@ def _chat():
     # (workspace plugins were removed with the old engine, M1 stage 2)
 
     ctx_text = memory.load_context(cfg["workspace"])
+    if ctx_text and one_mitra:  # lighter context (D-071): only what you wrote under "## Notes", not recent topics
+        ctx_text = memory.context_notes(ctx_text)
     if ctx_text:
         system_prompt += f"\n\n## Project Memory (from .mitra/context.md)\n{ctx_text}"
         loaded.append("project memory")
@@ -2436,12 +2451,12 @@ def _chat():
 
     from app.core import resume as resume_mod  # D-065 P1: where we stopped, from the records (before this session)
     resume_brief = resume_mod.brief(pathlib.Path(cfg["workspace"]))
-    if resume_brief:
+    if resume_brief and not one_mitra:  # one Mitra: "where did we stop" is answered from the records on request
         system_prompt += f"\n\n{resume_brief}\nFor 'where did we stop' questions answer from this; do not search."
         loaded.append("where we stopped")
 
     plan_text = memory.load_plan(cfg["workspace"])
-    if plan_text:
+    if plan_text and not one_mitra:  # one Mitra reads the plan when the work needs it
         system_prompt += f"\n\n## Active Plan (from .mitra/plan.md)\n{plan_text}"
         loaded.append("plan")
 
@@ -2451,6 +2466,17 @@ def _chat():
     if notes_now:
         system_prompt += f"\n\n{notes_now}"
         loaded.append("your notes")
+
+    from app.core import threads as threads_mod  # D-071: what was said, decided and left open, per discussion
+    if one_mitra:
+        from app.core.chat import project_outline
+        _outline = project_outline(pathlib.Path(cfg["workspace"]))  # so "the snake" means the code, not biology
+        if _outline:
+            system_prompt += "\n\n" + _outline
+        _thread_index = threads_mod.index_text()
+        if _thread_index:
+            system_prompt += "\n\n" + _thread_index
+            loaded.append("threads")
 
     def _fresh_notes() -> str:
         """Your notes again for this turn only when me.md or the project notes changed since the start (they are
@@ -2931,6 +2957,21 @@ def _chat():
         return get_local_llm(model, temperature, base_url=cfg.get("ollama_local_base_url"), num_ctx=num_ctx,
                              num_gpu=num_gpu, reasoning=False if _think_cache[model] else None)
 
+    if one_mitra:  # sessions closed without `exit` were not remembered yet: catch up in the background (D-071)
+        _runs_dir = pathlib.Path(cfg["workspace"]) / ".mitra" / "runs"
+        _behind = [f for f in sorted(_runs_dir.glob("chat-*.jsonl"))[-3:] if threads_mod.pending_turns(f)]
+        if _behind:
+            import threading as _threading
+
+            def _catch_up(files=_behind, llm=_reply_llm(), project=pathlib.Path(cfg["workspace"]).name):
+                for f in files:
+                    try:
+                        threads_mod.summarize(llm, f, project)
+                    except Exception:  # noqa: BLE001 - memory never breaks the chat; tried again next start
+                        pass
+
+            _threading.Thread(target=_catch_up, name="mitra-threads", daemon=True).start()
+
     project_words = intent_mod.project_words(pathlib.Path(cfg["workspace"]))
 
     def _plan_first(task: str) -> dict:
@@ -3072,6 +3113,17 @@ def _chat():
                 context=hook_ctx,
             ))
             _rebuild_dashboard(quiet=True)  # the page always shows every session so far (D-041)
+            if one_mitra and threads_mod.pending_turns(chat.rec.path):
+                console.print(Text("  remembering this conversation (ctrl+c skips) …", style="m.faint"))
+                try:
+                    _titles = threads_mod.summarize(_reply_llm(), chat.rec.path,
+                                                    pathlib.Path(cfg["workspace"]).name)
+                    if _titles:
+                        console.print(Text("  ✎ threads: " + " · ".join(_titles[:4]), style="m.faint"))
+                except KeyboardInterrupt:
+                    pass
+                except Exception as _exc:  # noqa: BLE001 - memory must never block leaving
+                    console.print(Text(f"  could not save the threads: {str(_exc)[:120]}", style="m.faint"))
             console.print(Text("  Bye.", style="m.dim"))
             break
 
@@ -3589,7 +3641,7 @@ def _chat():
         elif backend_mod.route(session_mode, chat.role) == backend_mod.REMOTE:
             _maybe_offer_kaggle()
 
-        if request_kind == "big":  # D-065 P4/P5: plan first, then small checked steps
+        if request_kind == "big" and (force_kind or not one_mitra):  # D-065 P4/P5: plan first (one Mitra: /plan)
             _t_plan = time.monotonic()
             _plan_info = _plan_first(planner_mod.with_discussion(user_input, messages) if talked_first
                                      else user_input) or {}
@@ -3610,7 +3662,10 @@ def _chat():
             chat.mode = session_mode
             chat.request_kind, chat.path = request_kind, "loop"  # D-068: recorded with the turn
             typed_buffer.clear()
-            if request_kind in intent_mod.EVERYDAY:  # D-068 step 1: one call, no tools, thinking off
+            if one_mitra and chat.role == "chat" and not force_kind:  # D-071: the model decides
+                _extra = "\n\n".join(x for x in (_fresh_notes(), threads_mod.relevant_text(user_input)) if x)
+                turn = (chat.phased if architecture == "phased" else chat.converse)(messages, notes=_extra)
+            elif request_kind in intent_mod.EVERYDAY:  # D-068 step 1: one call, no tools, thinking off
                 turn = chat.reply(messages, request_kind, _reply_llm(),
                                   notes=_fresh_notes())
             elif request_kind == "question" and chat.role == "chat":  # D-068 step 2: read only, 6 steps, an answer

@@ -134,6 +134,14 @@ def load_context(workspace: str) -> str | None:
     return None
 
 
+def context_notes(text: str | None) -> str | None:
+    """Only what you wrote under '## Notes' in context.md (one Mitra, D-071): the auto-kept topic list is the
+    first line of each request, which steered every answer back to old work. None when there is nothing."""
+    m = re.search(r"^## Notes\s*$(.*?)(?=^## |\Z)", text or "", re.M | re.S)
+    body = re.sub(r"<!--.*?-->", "", m.group(1), flags=re.S).strip() if m else ""
+    return f"## Notes\n{body}" if body else None
+
+
 _TOPIC_CMD = re.compile(r"^- `[^`]*` [/!]")
 
 

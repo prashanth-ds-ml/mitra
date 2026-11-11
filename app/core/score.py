@@ -38,13 +38,14 @@ from app.core.intent import classify, project_words
 ROOT = Path(__file__).resolve().parents[2]
 SET = ROOT / "score"
 RESULTS = ROOT / "results" / "scores.jsonl"
-CATEGORIES = ("sorting", "writing", "explain", "ideas", "small", "medium")
-QUICK = ("sorting", "writing", "explain", "ideas")      # no coding tasks: a few minutes
+CATEGORIES = ("sorting", "behaviour", "writing", "explain", "ideas", "small", "medium")
+QUICK = ("sorting", "behaviour", "writing", "explain", "ideas")
+ARCHITECTURES = ("router", "one", "phased")  # D-071: routed paths (D-068), one loop, or decide-then-act      # no coding tasks: a few minutes
 SHELL_TIMEOUT_S = 120
 GRADE_TIMEOUT_S = 120
 # a case that gets no result in time fails and the run goes on (live 2026-11-11: a model stream hung for 12 min
 # with nothing loaded in Ollama; an unattended score must never hang)
-CASE_TIMEOUT_S = {"writing": 300, "explain": 600, "ideas": 600, "small": 1800, "medium": 2700}
+CASE_TIMEOUT_S = {"behaviour": 600, "writing": 300, "explain": 600, "ideas": 600, "small": 1800, "medium": 2700}
 
 
 def _timed(fn, seconds: float, session=None):
@@ -161,9 +162,17 @@ def run_sorting(on_case: Callable[[Case], None] = lambda c: None) -> list[Case]:
 
 # ── the model runs ──────────────────────────────────────────────────────────────────────────────────────────────
 
-def _stream(chunks, step: int = 1):
+def _stream(chunks, step: int = 1, cancelled: Callable[[], bool] = lambda: False):
+    """Consume a model stream. A cancelled case closes the stream, so Ollama aborts the request instead of
+    generating on while the next cases queue behind it (E-099: one ran 36 minutes)."""
     t0, first, msg, think = time.monotonic(), None, None, 0
     for c in chunks:
+        if cancelled():
+            close = getattr(chunks, "close", None)
+            if callable(close):
+                close()
+            return SimpleNamespace(message=msg, text=(msg.content if msg else "") or "", stopped=True, printed=True,
+                                   first_s=first, seconds=time.monotonic() - t0, thinking="x" * think)
         msg = c if msg is None else msg + c
         if (getattr(c, "additional_kwargs", {}) or {}).get("reasoning_content"):
             think += 1
@@ -193,11 +202,15 @@ class Runner:
     records: Path
     backend: str = "laptop"
     max_steps: int = 0                  # coding: 0 = the harness's chat_max_steps
+    arch: str = "router"                # D-071: "router" (D-068 paths) or "one" (one conversational loop)
+    threads_root: Path | None = None    # one Mitra's conversation memory for a case (a temp folder, seeded)
 
     def session(self, ws: Path, case_id: str):
         from app.core import chat as C
 
-        hooks = C.Hooks(stream=_stream, show=lambda *a: None, confirm=lambda *a: True, run_shell=_run_shell(ws),
+        box: dict = {}
+        hooks = C.Hooks(stream=lambda chunks, step=1: _stream(chunks, step, lambda: box["s"].cancelled),
+                        show=lambda *a: None, confirm=lambda *a: True, run_shell=_run_shell(ws),
                         web_search=lambda q: "web search is off in scoring", fetch_url=lambda u: "fetch is off in scoring",
                         mcp_find=lambda q: "no MCP in scoring", mcp_call=lambda *a: "no MCP in scoring")
         s = C.ChatSession(workspace=ws, llm=self.llm, hooks=hooks, num_ctx=self.num_ctx, harness=self.harness,
@@ -205,11 +218,41 @@ class Runner:
         self.records.mkdir(parents=True, exist_ok=True)
         s.rec.path = self.records / f"{case_id}.jsonl"   # inside the store: kept for the coach, never mirrored
         s.backend_kind, s.thinking = self.backend, False
+        box["s"] = s
         return s
 
-    def system(self) -> SystemMessage:
-        from app.core.chat import CHAT_PROMPT
-        return SystemMessage(content=H.apply_prompt(CHAT_PROMPT, self.harness))
+    def system(self, notes: str = "", ws: Path | None = None) -> SystemMessage:
+        from app.core import chat as C
+        prompt = {"one": C.ONE_PROMPT, "phased": C.PHASED_PROMPT}.get(self.arch, C.CHAT_PROMPT)
+        base = H.apply_prompt(prompt, self.harness)
+        if self.arch in ("one", "phased") and ws is not None:  # what is in the folder, as the chat gives it
+            outline = C.project_outline(ws)
+            base += ("\n\n" + outline) if outline else ""
+        if self.arch in ("one", "phased") and self.threads_root is not None:
+            from app.core import threads
+            index = threads.index_text(self.threads_root)
+            base += ("\n\n" + index) if index else ""
+        return SystemMessage(content=base + ("\n\n" + notes if notes else ""))
+
+    def respond(self, s, messages: list, ws: Path, previous: str = ""):
+        """One message through the chat's own entry, as the chosen architecture handles it. Returns (result, path).
+        router: sorted by intent rules, then the one-call reply, the explainer or the working loop (D-068);
+        one: the single conversational loop decides itself (D-071)."""
+        if self.arch in ("one", "phased"):
+            from app.core import threads
+            root = self.threads_root if self.threads_root is not None else Path(tempfile.gettempdir()) / "no-threads"
+            notes = threads.relevant_text(str(messages[-1].content), root)
+            if self.arch == "phased":
+                return s.phased(messages, notes=notes), "phased"
+            return s.converse(messages, notes=notes), "one"
+        from app.core.intent import EVERYDAY
+        text = str(messages[-1].content)
+        kind = classify(text, previous=previous, project_words=project_words(ws))
+        if kind in EVERYDAY:
+            return s.reply(messages, kind, self.llm), "reply"
+        if kind == "question":
+            return s.explain(messages), "explain"
+        return s.turn(messages, max_steps=self.max_steps or None), "loop"
 
 
 def _digest(root: Path) -> dict[str, str]:
@@ -228,14 +271,12 @@ def run_writing(r: Runner, on_case: Callable[[Case], None] = lambda c: None, onl
             continue
         with tempfile.TemporaryDirectory(prefix="mitra-score-", ignore_cleanup_errors=True) as tmp:
             s = r.session(Path(tmp), c["id"])
-            kind = classify(c["request"])
-            messages = [r.system(), HumanMessage(content=c["request"])]
+            messages = [r.system(data["notes"]), HumanMessage(content=c["request"])]
             t0 = time.monotonic()
             try:
-                res = _timed(lambda: s.reply(messages, "writing", r.llm, notes=data["notes"]),
-                             CASE_TIMEOUT_S["writing"], s)
+                res, _path = _timed(lambda: r.respond(s, messages, Path(tmp)), CASE_TIMEOUT_S["writing"], s)
                 steps = res.steps
-                why = check_writing(c, res.text) if kind == "writing" else f"sorted as {kind}, not writing"
+                why = check_writing(c, res.text)
             except Exception as exc:  # noqa: BLE001 - a crash or a hang is a failed case, never a pass
                 steps, why = 0, f"{type(exc).__name__}: {str(exc)[:150]}"
         case = Case(c["id"], "writing", not why, why, round(time.monotonic() - t0, 1), steps)
@@ -256,20 +297,153 @@ def run_explain(r: Runner, on_case: Callable[[Case], None] = lambda c: None, cat
             shutil.copytree(project, ws, ignore=_IGNORE)
             before = _digest(ws)
             s = r.session(ws, c["id"])
-            kind = classify(c["question"], project_words=project_words(ws))
-            messages = [r.system(), HumanMessage(content=c["question"])]
+            messages = [r.system(ws=ws), HumanMessage(content=c["question"])]
             t0 = time.monotonic()
             try:
-                res = _timed(lambda: s.explain(messages), CASE_TIMEOUT_S[c["category"]], s)
+                res, _path = _timed(lambda: r.respond(s, messages, ws), CASE_TIMEOUT_S[c["category"]], s)
                 steps = res.steps
-                why = (check_explain(c, res.text, ws, changed=_changed(before, _digest(ws))) if kind == "question"
-                       else f"sorted as {kind}, not question")
+                why = check_explain(c, res.text, ws, changed=_changed(before, _digest(ws)))
             except Exception as exc:  # noqa: BLE001 - a crash or a hang is a failed case, never a pass
                 steps, why = 0, f"{type(exc).__name__}: {str(exc)[:150]}"
         case = Case(c["id"], c["category"], not why, why, round(time.monotonic() - t0, 1), steps)
         on_case(case)
         out.append(case)
     return out
+
+
+# ── behaviour: how it holds a conversation (D-071) ─────────────────────────────────────────────────────────────
+
+_HEADING = re.compile(r"^\s{0,3}(#{1,4} \S|\*\*[^*\n]{2,60}\*\*:?\s*$)", re.M)
+
+
+def headings(text: str) -> int:
+    """Report-style headings: '## What we have', a bold line on its own ('**What's risky:**')."""
+    return len(_HEADING.findall(text or ""))
+
+
+def asks_back(text: str) -> bool:
+    """Ends by asking the user something (a question in its last two sentences)."""
+    tail = re.split(r"(?<=[.!?])\s+", (text or "").strip())[-2:]
+    return any(t.rstrip().endswith("?") for t in tail)
+
+
+def check_behaviour(case: dict, text: str, root: Path, *, tools: list[str], changed: list[str],
+                    check_error: str = "") -> str:
+    t = (text or "").strip()
+    if not t:
+        return "empty answer"
+    for pat in case.get("must_not", []):
+        if re.search(pat, t):
+            return f"should not match: {pat}"
+    for pat in case.get("facts", []):
+        if not re.search(pat, t, re.I):
+            return f"missing fact: {pat}"
+    expect = case["expect"]
+    if expect == "talk":
+        if tools:
+            return f"used tools to talk: {', '.join(tools[:4])}"
+        if changed:
+            return "changed files: " + ", ".join(changed[:3])
+        if headings(t):
+            return f"report-style: {headings(t)} headings"
+        if len(t.split()) > case.get("max_words", 150):
+            return f"too long for a conversation: {len(t.split())} words (max {case.get('max_words', 150)})"
+        if case.get("ask_back") and not asks_back(t):
+            return "did not ask back (you were deciding)"
+    elif expect == "look":
+        if not [x for x in tools if x in ("read_file", "search", "list_files")]:
+            return "answered about the code without reading it"
+        if changed:
+            return "changed files: " + ", ".join(changed[:3])
+        why = check_explain({"cite": case.get("cite", [])}, t, root)
+        if why:
+            return why
+    elif expect == "change":
+        if not changed:
+            return "changed nothing"
+        if check_error:
+            return "the change does not work: " + check_error
+    return ""
+
+
+def _run_check(code: str, ws: Path) -> str:
+    try:
+        p = subprocess.run([sys.executable, "-c", code], cwd=ws, capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=60)
+    except subprocess.TimeoutExpired:
+        return "check timed out"
+    return "" if p.returncode == 0 else _last_line(p.stderr or p.stdout)
+
+
+def _tools_used(s) -> list[str]:
+    try:
+        rows = [json.loads(x) for x in s.rec.path.read_text(encoding="utf-8").splitlines() if x.strip()]
+    except OSError:
+        return []
+    return [str(r.get("name")) for r in rows if r.get("kind") == "tool" and r.get("turn") == s.turn_no]
+
+
+def run_behaviour(r: Runner, on_case: Callable[[Case], None] = lambda c: None, only: set | None = None) -> list[Case]:
+    from langchain_core.messages import AIMessage
+
+    data, out = _toml("behaviour.toml"), []
+    project = SET / "projects" / data["project"]
+    for c in data["case"]:
+        if only and c["id"] not in only:
+            continue
+        with tempfile.TemporaryDirectory(prefix="mitra-score-", ignore_cleanup_errors=True) as tmp:
+            ws = Path(tmp) / data["project"]
+            shutil.copytree(project, ws, ignore=_IGNORE)
+            before = _digest(ws)
+            s = r.session(ws, c["id"])
+            r.threads_root = Path(tmp) / "threads"   # empty unless the case seeds earlier conversations
+            from app.core import threads
+            for t in c.get("threads", []):
+                threads.save(t, r.threads_root)
+            messages, previous = [r.system(ws=ws)], ""
+            for you, mitra in c.get("history", []):
+                messages += [HumanMessage(content=you), AIMessage(content=mitra)]
+                previous = classify(you, previous=previous, project_words=project_words(ws))
+            messages.append(HumanMessage(content=c["text"]))
+            t0 = time.monotonic()
+            try:
+                res, path = _timed(lambda: r.respond(s, messages, ws, previous=previous),
+                                   CASE_TIMEOUT_S["behaviour"], s)
+                steps, changed = res.steps, _changed(before, _digest(ws))
+                err = _run_check(c["check"], ws) if c.get("check") else ""
+                why = check_behaviour(c, res.text, ws, tools=_tools_used(s), changed=changed, check_error=err)
+            except Exception as exc:  # noqa: BLE001 - a crash or a hang is a failed case, never a pass
+                steps, why = 0, f"{type(exc).__name__}: {str(exc)[:150]}"
+        case = Case(c["id"], "behaviour", not why, why, round(time.monotonic() - t0, 1), steps)
+        on_case(case)
+        out.append(case)
+    return out
+
+
+def _validate_behaviour() -> list[str]:
+    problems = []
+    data = _toml("behaviour.toml")
+    project = SET / "projects" / data["project"]
+    for c in data["case"]:
+        reads = ["read_file"] if c["expect"] == "look" else []
+        changed: list[str] = []
+        err = ""
+        if c["expect"] == "change":
+            with tempfile.TemporaryDirectory(prefix="mitra-validate-", ignore_cleanup_errors=True) as tmp:
+                ws = Path(tmp) / "p"
+                shutil.copytree(project, ws, ignore=_IGNORE)
+                if _run_check(c["check"], ws) == "":
+                    problems.append(f"behaviour {c['id']}: the check passes before any change")
+                f = ws / c["solution"]["file"]
+                text = f.read_text(encoding="utf-8")
+                if c["solution"]["old"] not in text:
+                    problems.append(f"behaviour {c['id']}: the solution's old text is not in the file")
+                f.write_text(text.replace(c["solution"]["old"], c["solution"]["new"]), encoding="utf-8")
+                err, changed = _run_check(c["check"], ws), [c["solution"]["file"]]
+        why = check_behaviour(c, c["reference"], project, tools=reads, changed=changed, check_error=err)
+        if why:
+            problems.append(f"behaviour {c['id']}: reference fails: {why}")
+    return problems
 
 
 # ── coding tasks: the bench's payments app, or a task folder here ───────────────────────────────────────────────
@@ -354,10 +528,10 @@ def run_coding(r: Runner, tasks: list[Task], on_case: Callable[[Case], None] = l
             task.prepare(ws)
             s = r.session(ws, task.id)
             s.request_kind, s.path = classify(task.prompt, project_words=project_words(ws)), "loop"
-            messages = [r.system(), HumanMessage(content=task.prompt)]
+            messages = [r.system(ws=ws), HumanMessage(content=task.prompt)]
             t0 = time.monotonic()
             try:
-                res = _timed(lambda: s.turn(messages, max_steps=r.max_steps or None), CASE_TIMEOUT_S[task.size], s)
+                res, _path = _timed(lambda: r.respond(s, messages, ws), CASE_TIMEOUT_S[task.size], s)
                 steps = res.steps
                 passed, why = task.grade(ws)
             except Exception as exc:  # noqa: BLE001 - a crash is a failed case, recorded, never a pass
@@ -371,7 +545,7 @@ def run_coding(r: Runner, tasks: list[Task], on_case: Callable[[Case], None] = l
 # ── validation: every reference passes its checks, every start state fails ─────────────────────────────────────
 
 def validate() -> list[str]:
-    problems = []
+    problems = _validate_behaviour()
     s = _toml("sorting.toml")
     if len(s["cases"]) < 30:
         problems.append("sorting: fewer than 30 cases")
@@ -433,6 +607,8 @@ def run(categories=CATEGORIES, *, runner: Runner | None = None, model: str = "",
     needs_model = [c for c in categories if c != "sorting"]
     if needs_model and runner is None:
         raise ValueError("a model is needed for: " + ", ".join(needs_model))
+    if "behaviour" in categories:
+        cases += run_behaviour(runner, on_case, only)
     if "writing" in categories:
         cases += run_writing(runner, on_case, only)
     if {"explain", "ideas"} & set(categories):
@@ -442,7 +618,7 @@ def run(categories=CATEGORIES, *, runner: Runner | None = None, model: str = "",
         cases += run_coding(runner, load_tasks(sizes, only), on_case)
     row = {"t": time.time(), "date": time.strftime("%Y-%m-%d %H:%M"), "mitra_version": mitra_version(),
            "harness_version": runner.harness.version if runner else H.load().version,
-           "notes_version": SIG.notes_version(cwd or Path.cwd()), "model": model,
+           "notes_version": SIG.notes_version(cwd or Path.cwd()), "model": model, "arch": runner.arch if runner else "",
            "backend": runner.backend if runner else "", "num_ctx": runner.num_ctx if runner else 0,
            "categories": list(categories), "only": sorted(only) if only else None,
            "score": totals(cases), "seconds": round(time.monotonic() - t0, 1),

@@ -103,6 +103,7 @@ def test_thinking_is_off_by_default_except_planner_and_debugger():
 
 def test_everyday_chat_end_to_end(harness, monkeypatch, capsys):  # noqa: F811
     state, ws = harness
+    (ws / "mitra.toml").write_text('architecture = "router"\n', encoding="utf-8")  # D-071: router paths
     H.home().mkdir(parents=True, exist_ok=True)
     (H.home() / "me.md").write_text("Name: Prashanth\nMail signature:\n    Regards,\n    Prashanth\n",
                                     encoding="utf-8")

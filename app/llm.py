@@ -48,6 +48,11 @@ def get_llm(
     return ChatOllama(**kwargs)
 
 
+# E-099 (2026-11-11): with no output cap a looping small model generated 18,400 tokens for 36 minutes and every
+# later request queued behind it. A long answer or a big file is far below this; thinking counts too.
+MAX_OUTPUT_TOKENS = 8192
+
+
 def get_local_llm(
     model: str,
     temperature: float = 0.2,
@@ -71,7 +76,7 @@ def get_local_llm(
         base_url=base_url or _LOCAL_BASE_URL,
         num_ctx=num_ctx,
         num_gpu=num_gpu,
-        num_predict=num_predict,
+        num_predict=num_predict if num_predict is not None else MAX_OUTPUT_TOKENS,
         reasoning=reasoning,
     )
 

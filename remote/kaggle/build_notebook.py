@@ -33,8 +33,8 @@ run `mitra remote off`. A session ends by itself after 12 hours; the URL changes
 The token is new every session and is part of the URL: anyone without it gets 404. Your code and prompts pass through
 this Kaggle machine and Cloudflare's tunnel."""
 
-SETTINGS_MANUAL = """# Settings: the model and the context Mitra will use (mimo's maximum is 256K)
-MODEL = "mimo-v2.6:9b"
+SETTINGS_MANUAL = """# Settings: the model and the context Mitra will use (qwen3.5's maximum is 256K)
+MODEL = "qwen3.5:latest"
 CONTEXT = 262144
 PORT = 8000
 IDLE_MIN = 0  # by hand: run until you stop the session

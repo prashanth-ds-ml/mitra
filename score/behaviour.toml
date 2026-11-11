@@ -1,0 +1,101 @@
+# The measuring set (D-068 step 3b, D-071): how Mitra behaves in a conversation, whatever the architecture.
+# Every case is typed in the snake project (score/projects/snake), as you would in one of yours.
+# expect = "talk": answer without tools, short, no report headings; ask_back: ends by asking you something.
+# expect = "look": reads the code (at least one read) and answers with the right file and facts.
+# expect = "change": changes the code; `check` (python, run in the project) must pass afterwards.
+# history: earlier turns of the same conversation ([you, Mitra], ...). reference: an answer that passes (validated).
+project = "snake"
+
+[[case]]
+id = "B1_hello"
+text = "hi mitra"
+expect = "talk"
+max_words = 40
+reference = "Hi Prashanth! What are we working on today?"
+
+[[case]]
+id = "B2_thinking"
+text = "i am thinking mitra"
+expect = "talk"
+max_words = 60
+ask_back = true
+reference = "Sounds good. What's on your mind: something in this project, or a new idea?"
+
+[[case]]
+id = "B3_how_are_you"
+text = "good what about you"
+history = [["hi mitra", "Hi Prashanth! How's it going?"]]
+expect = "talk"
+max_words = 60
+must_not = ['(?i)\bsnake\b']
+reference = "Doing well, thanks for asking! Anything you want to dig into today?"
+
+[[case]]
+id = "B4_deciding"
+text = "yeah, either we continue on the snake game or start the web app with a feedback mechanism, or a new idea"
+history = [["i am thinking mitra", "Sounds good. What's on your mind?"]]
+expect = "talk"
+max_words = 160
+ask_back = true
+reference = """All three are good options. The snake game is nearly done, so it is a quick win; the feedback web app is
+bigger but closer to your AI work; a new idea is open. What matters more to you this week: finishing something, or
+starting the bigger one?"""
+
+[[case]]
+id = "B5_think_with_me"
+text = "lets think deep: a web app where users rate the answers, and we use the ratings to fine tune our model"
+expect = "talk"
+max_words = 220
+ask_back = true
+facts = ['(?i)rat(e|ing)', '(?i)fine.?tun|train']
+reference = """I like it: every rating becomes training data. Store each prompt, answer, model version and the 1-5
+rating; good answers become fine-tuning examples, and pairs of a good and a bad answer to the same prompt can train
+a preference step later. The hard part is enough honest ratings. Who would rate: you and friends at first, or
+public users?"""
+
+[[case]]
+id = "B6_general"
+text = "what is the difference between LoRA and QLoRA?"
+expect = "talk"
+max_words = 180
+facts = ['(?i)quantiz|4.?bit']
+reference = """LoRA trains small low-rank adapter matrices on top of a frozen model. QLoRA does the same, but keeps the
+frozen base model quantized to 4 bits, so it fits in much less GPU memory, at a small cost in speed."""
+
+[[case]]
+id = "B7_look_grow"
+text = "how does the snake grow when it eats?"
+expect = "look"
+cite = ["snake/game.py"]
+facts = ['(?i)tail']
+reference = """When the head reaches the food, `step()` keeps the whole body instead of dropping the tail
+(snake/game.py:40), so the snake is one cell longer."""
+
+[[case]]
+id = "B8_look_api"
+text = "what happens if the API gets an unknown direction?"
+expect = "look"
+cite = ["snake/api.py"]
+facts = ['400']
+reference = """`handle()` calls `game.turn()` (snake/api.py:20), which raises ValueError for an unknown direction, and the
+API answers 400 with an error (snake/api.py:22)."""
+
+[[case]]
+id = "B9_change"
+text = "make the snake start 4 cells long instead of 3"
+expect = "change"
+check = "from snake.game import Game; g = Game(); assert len(g.snake) == 4, g.snake; g.step(); assert not g.over"
+solution = { file = "snake/game.py", old = "self.snake = [(cx, cy), (cx - 1, cy), (cx - 2, cy)]", new = "self.snake = [(cx, cy), (cx - 1, cy), (cx - 2, cy), (cx - 3, cy)]" }
+reference = "Done: the snake now starts 4 cells long (snake/game.py:13)."
+
+[[case]]
+id = "B10_remembers"
+text = "lets continue the web app idea from yesterday"
+expect = "talk"
+max_words = 200
+facts = ['(?i)rat(e|ing)', '(?i)fine.?tun|train']
+must_not = ['(?i)\bsnake\b']
+threads = [{ slug = "feedback-web-app", title = "Web app that collects ratings to fine-tune a model", project = "-", said = "A web app where people chat (mostly in Roman Telugu), rate each answer 1-5, and the ratings become fine-tuning data for the user's own 1B model; hosted on a Hugging Face Space.", decided = "FastAPI + SQLite to start; store prompt, answer, model version and rating.", open = "Who rates at first, and how to turn ratings into training pairs." }]
+reference = """Sure. Where we left it: a FastAPI + SQLite app where people chat in Roman Telugu, rate each answer 1-5, and
+the ratings become fine-tuning data for your 1B model. Still open: who rates at first, and how ratings turn into
+training pairs. Want to start with the ratings table?"""

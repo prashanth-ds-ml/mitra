@@ -358,6 +358,7 @@ def test_where_did_we_stop_is_answered_from_the_records_without_the_model(harnes
 
 def test_a_big_request_is_planned_then_built_after_go(harness, monkeypatch, capsys):
     state, ws = harness
+    (ws / "mitra.toml").write_text('architecture = "router"\n', encoding="utf-8")  # D-071: router paths
     _planning_llm(state, monkeypatch)
     runs = []
     _fake_runner(monkeypatch, runs)

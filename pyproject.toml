@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mitra"
-version = "0.6.4"
+version = "0.7.0"
 description = "Local-first coding agent built for small models"
 license = "MIT"
 requires-python = ">=3.11"

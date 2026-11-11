@@ -40,6 +40,117 @@ levels, so do not copy them unless the user asks for a level.
 When the work is done, or you need the user, reply in a few short lines: what you did, what is left. Do not describe
 changes you did not make."""
 
+# D-071 one Mitra: one conversational loop; the model decides whether to talk, look or change (all tools offered)
+ONE_PROMPT = """You are Mitra, the user's thinking partner and coder, running on their own machine, in their project
+folder (its files are listed below).
+
+Talk like a person, not a report. Most messages are conversation: greetings, thinking out loud, ideas, choices,
+opinions, questions. Answer those directly in a few sentences of plain words and react to what the user actually
+said. In conversation never use headings or bold section titles, even when you explain a concept: write short
+paragraphs, and at most one short list when steps or options really need it. When the user is deciding or an idea
+is still open, end with one short question that helps them decide. In small talk, do not bring up the project.
+
+A message that names something in this project (a file, a folder, or a part such as the game, the API, the tests)
+is about this project, even if the words could mean something else in general: look at the code before you answer.
+Use tools only when the answer needs them:
+- About this project's code, files, tests or status: look first (search, list_files, read_file; read only the part
+  you need), then answer with path:line references. Never state a number you did not check; run_tests when the
+  question is whether tests pass.
+- A change: read the file, make small changes (edit_file, write_file), run the tests, fix what fails, stop when it
+  works, then say in a few lines what you changed. Run the tests right after you write code. Create folders with
+  make_dir. Never describe changes you did not make.
+- A bigger feature (several files): propose a short plan in a few lines and ask before building it; a plan.md with
+  `### T1:` tasks is built with run_plan.
+- A fact you do not know: web_search / fetch_url.
+If it is unclear what to look at or change, ask one short question instead of searching.
+
+A mail or message the user wants drafted: you write it FOR the user, as the user, never as Mitra. A mail has a
+'Subject:' line, then the body, then the user's mail signature copied exactly from their notes, word for word,
+with no other closing (no signature in the notes: end with [your name]). Use only facts the user gave or that are
+in this conversation; write [placeholder] for anything missing. Output only the text itself."""
+OUTLINE_MAX_FILES = 60
+_OUTLINE_SKIP = {".git", ".mitra", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "dist", "build",
+                 ".idea", ".vscode"}
+
+
+def project_outline(root: Path, max_files: int = OUTLINE_MAX_FILES) -> str:
+    """'## This project folder: snake' and its files (two levels), so one Mitra knows what 'the snake' or 'the API'
+    refers to (A/B 2026-11-11: asked how the snake grows, it explained real snakes)."""
+    import os
+
+    root = Path(root)
+    files: list[str] = []
+    for d, dirs, names in os.walk(root):
+        dirs[:] = sorted(x for x in dirs if x not in _OUTLINE_SKIP and not x.startswith("."))
+        rel = Path(d).relative_to(root)
+        if len(rel.parts) > 2:
+            dirs[:] = []
+            continue
+        files += [(rel / n).as_posix() for n in sorted(names) if not n.startswith(".")]
+        if len(files) > max_files:
+            break
+    if not files:
+        return ""
+    more = f" (+ more)" if len(files) > max_files else ""
+    return f"## This project folder: {root.name}\nFiles: " + ", ".join(files[:max_files]) + more
+
+
+# D-071 phased (decide, then act): the first call has no real tools, only these three phase switches; the model
+# answers in text (talk) or picks a phase, and only then gets that phase's tools (A/B 2026-11-11: with every tool
+# from the first step, a 9B built a whole app from "either the snake game or a web app").
+PHASED_PROMPT = """You are Mitra, the user's thinking partner and coder, running on their own machine, in their project
+folder (its files are listed below).
+
+Talk like a person, not a report. Most messages are conversation: greetings, thinking out loud, ideas, choices,
+opinions, general questions. Answer those yourself, directly, in a few sentences of plain words, and react to what
+the user actually said. Never use headings or bold section titles; at most one short list when steps or options
+really need it. When the user is deciding or an idea is still open, end with one short question that helps them
+decide. In small talk, do not bring up the project.
+
+You have no file tools until you choose a phase. Choose one only when the message needs it:
+- look_at_code: the message asks about this project's code, files, tests or status (it names something in the
+  project: a file, a folder, a part such as the game, the API, the tests). Never answer those from memory.
+- make_change: the user asked you to change, fix, add or build something small and clear in this project.
+- propose_plan: the user asked to build something bigger (several files) or said "build it" after a discussion.
+Deciding between options, brainstorming, opinions and ideas are conversation: answer them yourself.
+
+A mail or message the user wants drafted: you write it FOR the user, as the user, never as Mitra. A mail has a
+'Subject:' line, then the body, then the user's mail signature copied exactly from their notes, word for word,
+with no other closing (no signature in the notes: end with [your name]). Use only facts the user gave or that are
+in this conversation; write [placeholder] for anything missing. Output only the text itself, with no preamble."""
+
+PHASE_SPECS = [
+    {"name": "look_at_code", "description": "Start looking at this project's files to answer a question about them.",
+     "parameters": {"type": "object", "properties": {"what": {"type": "string", "description": "what to find out"}},
+                    "required": ["what"]}},
+    {"name": "make_change", "description": "Start changing this project's files: a change the user asked for.",
+     "parameters": {"type": "object", "properties": {"what": {"type": "string", "description": "the change"}},
+                    "required": ["what"]}},
+    {"name": "propose_plan", "description": "Write a short plan for a bigger build and ask the user before building.",
+     "parameters": {"type": "object", "properties": {"goal": {"type": "string"}}, "required": ["goal"]}},
+]
+PHASES = {
+    "look_at_code": dict(tools=("list_files", "read_file", "search", "run_tests"), budget="explain_max_steps",
+                         note="[Mitra: look phase. Find what answers the question: search for a name or list_files, "
+                              "read only the part you need, run_tests if the question is whether tests pass. Then "
+                              "answer in a few plain sentences, citing each point as path:line with the file path "
+                              "(for example snake/game.py:40). Never state a number you did not check. Change "
+                              "nothing.]"),
+    "make_change": dict(tools=None, budget="chat_max_steps",
+                        note="[Mitra: change phase. Read the file before you edit it, make small changes, run the "
+                             "tests right after, fix what fails, stop when it works. Then tell the user in two or "
+                             "three lines what you changed (path:line) and the test result.]"),
+    "propose_plan": dict(tools=(), budget=None,
+                         note="[Mitra: plan phase. Write a short plan: the goal in one line, then 3-6 steps, each with "
+                              "the files it touches and how it is checked. End by asking the user whether to build "
+                              "it. Do not build anything yet.]"),
+}
+EMPTY_ANSWER_NOTE = ("[Mitra: you have not said anything to the user. Tell them now, in a few plain sentences, what "
+                     "you found or changed. Do not call tools.]")
+
+ONE_LAST_STEP_NOTE = ("[Mitra: this is your last step. Answer the user now from what you have; say what you could not "
+                      "finish or check. Do not call tools.]")
+
 # D-068 step 1: the one-call reply path (small talk, writing, general questions): no tools, thinking off
 REPLY_NOTES = {
     "chat": "This is small talk. Reply in one or two friendly sentences. If it is the start of the conversation and "
@@ -105,6 +216,35 @@ def cited_files(text: str, root: Path) -> list[str]:
 
 
 READ_ONLY_TOOLS = {"list_files", "read_file", "search", "web_search", "fetch_url", "mcp_find"}  # plan mode
+
+# E-100 (A/B 2026-11-11): with thinking off, mimo sometimes "thinks" anyway, invisibly, until the output cap (8,192
+# tokens, ~6 minutes on the laptop) and answers nothing. A reply that shows nothing for this many chunks is stopped,
+# the model is told to answer now, and it gets one more try.
+RUNAWAY_HIDDEN_CHUNKS = 1500
+RUNAWAY_NOTE = ("[Mitra: your last reply produced nothing visible for a long time and was stopped. Answer the user "
+                "now, directly and briefly, or call one tool. No long reasoning.]")
+
+
+class Runaway(Exception):
+    """A model call that kept generating without any visible answer or tool call."""
+
+
+def guard_runaway(chunks, limit: int = RUNAWAY_HIDDEN_CHUNKS):
+    """Pass chunks through; raise Runaway (closing the stream, so Ollama stops) after `limit` chunks in a row that
+    carry no visible text and no tool call. Only used when thinking is off: with thinking on, long reasoning is
+    expected and shown."""
+    hidden = 0
+    try:
+        for c in chunks:
+            visible = str(getattr(c, "content", "") or "").strip() or getattr(c, "tool_call_chunks", None)
+            hidden = 0 if visible else hidden + 1
+            if hidden >= limit:
+                raise Runaway(f"{limit} chunks with nothing visible")
+            yield c
+    finally:
+        close = getattr(chunks, "close", None)
+        if callable(close):
+            close()
 
 # Ollama parses Qwen3.5's tool calls (XML); a very long call that ends before it closes fails inside Ollama and comes
 # back as an exception, not a reply (E-044). The model is told and tries again in smaller parts.
@@ -328,6 +468,9 @@ class ChatSession:
         self.thinking: bool | None = None  # the model's thinking setting for this role (None = model default)
         self._prev_user_full = ""   # the last request in full, to notice when you ask the same thing again
         self.answer_on_last_step = False  # D-068 step 2: the last step gets no tools, so a turn always ends answered
+        self.last_step_note = LAST_STEP_NOTE  # what the model is told on that last step
+        self.deciding = False       # D-071 phased: the first call offers only the phase switches (PHASE_SPECS)
+        self.phase_request: dict | None = None  # {"name", "args"} when the model chose a phase
         self.end_info: dict = {}    # extra fields for this turn's turn_end row (the explainer's budget, files cited)
         self.last_speed: float | None = None  # tokens/s of the last answer (Ollama's eval_count / eval_duration)
         self.best_speed: dict[str, float] = {}  # per machine this session: a much slower answer = spilled to CPU
@@ -573,6 +716,59 @@ class ChatSession:
             messages.append(call[-1])  # the history keeps your message and the answer, not the instruction
         return res
 
+    def phased(self, messages: list, notes: str = "") -> TurnResult:
+        """D-071 phased: decide first (talk in text, or pick look / change / plan with no real tools), then act in that
+        phase with only its tools, its note and its budget, all inside one turn. Recorded as path "phased"."""
+        saved = (self.path, self.answer_on_last_step, self.last_step_note, self.allowed_tools)
+        note = SystemMessage(content=notes) if notes else None
+        if note is not None:
+            messages.insert(len(messages) - 1, note)
+        self.path, self.phase_request = "phased", None
+        try:
+            return self.turn(messages, body=self._phased_body)
+        finally:
+            self.path, self.answer_on_last_step, self.last_step_note, self.allowed_tools = saved
+            self.deciding, self.phase_request = False, None
+            messages[:] = [m for m in messages if m is not note and not (isinstance(m, HumanMessage) and m.content in (
+                ONE_LAST_STEP_NOTE, LAST_STEP_NOTE, EMPTY_ANSWER_NOTE))]
+
+    def _phased_body(self, messages: list, res: TurnResult, max_steps: int) -> TurnResult:
+        self.deciding = True
+        try:
+            res = self._turn(messages, res, 1)
+        finally:
+            self.deciding = False
+        if not self.phase_request:
+            return res  # talked: one call
+        name = self.phase_request["name"]
+        if name not in PHASES:  # it called a real tool by name: the phase that has it
+            name = "make_change" if name in ("edit_file", "write_file", "append_file", "make_dir", "run_command",
+                                             "run_plan") else "look_at_code"
+        phase = PHASES[name]
+        messages.append(HumanMessage(content=phase["note"]))
+        self.allowed_tools = phase["tools"]
+        self.answer_on_last_step, self.last_step_note = True, ONE_LAST_STEP_NOTE
+        budget = self.harness.limit(phase["budget"]) if phase["budget"] else 1
+        acted = self._turn(messages, TurnResult(journal=res.journal), budget)
+        acted.steps += res.steps  # the decide call counts
+        return acted
+
+    def converse(self, messages: list, notes: str = "") -> TurnResult:
+        """One Mitra (D-071): the model decides whether to talk, look or change; every tool the role allows is
+        offered; the step budget ends with an answer (the last step has no tools). Recorded as path "one". `notes`:
+        your notes again, only when they changed since the start (they are in the system prompt)."""
+        saved = (self.path, self.answer_on_last_step, self.last_step_note)
+        note = SystemMessage(content=notes) if notes else None
+        if note is not None:
+            messages.insert(len(messages) - 1, note)
+        self.path, self.answer_on_last_step, self.last_step_note = "one", True, ONE_LAST_STEP_NOTE
+        try:
+            return self.turn(messages)
+        finally:
+            self.path, self.answer_on_last_step, self.last_step_note = saved
+            messages[:] = [m for m in messages if m is not note and not (
+                isinstance(m, HumanMessage) and m.content == ONE_LAST_STEP_NOTE)]
+
     def explain(self, messages: list, notes: str = "") -> TurnResult:
         """A question about the project's code (D-068 step 2): read-only tools, a budget of `explain_max_steps`
         (6), and the last step has no tools, so it always ends with an answer. The history keeps what was read, so
@@ -606,7 +802,7 @@ class ChatSession:
                 "files_cited": cited_files(res.text, self.ws.root)[:20],
                 "line_refs": bool(_LINE_REF.search(res.text or "")), "asked": res.text.rstrip().endswith("?")}
 
-    def turn(self, messages: list, *, max_steps: int | None = None) -> TurnResult:
+    def turn(self, messages: list, *, max_steps: int | None = None, body=None) -> TurnResult:
         """Run the loop on `messages` (the user's message is already the last one). Appends to `messages`."""
         res = TurnResult()
         max_steps = max_steps or self.harness.limit("chat_max_steps")
@@ -618,7 +814,7 @@ class ChatSession:
         self._check_corrections(of_turn=self.turn_no - 1)  # attributed to the turn they correct
         self.rec.write("turn_start", **self._start_row(str(user)))
         try:
-            res = self._turn(messages, res, max_steps)
+            res = (body or self._turn)(messages, res, max_steps)
         except RemoteGone as exc:  # D-062 B3: not the model's failure; the chat switches to the laptop and reports
             res.stopped, res.remote_gone = True, True
             res.stop_reason = f"the remote GPU stopped answering ({exc})"
@@ -658,11 +854,15 @@ class ChatSession:
         specs = H.apply_tools(tool_specs(self.mode), self.harness)
         if self.allowed_tools is not None:  # the role's tool set (routing)
             specs = [s for s in specs if s["name"] in self.allowed_tools]
+        if self.deciding:  # D-071 phased: talk, or pick a phase; no real tools yet
+            specs = list(PHASE_SPECS)
         bound = self.llm.bind_tools(specs) if specs else self.llm  # the reply path: no tools at all (D-068)
         guard = RepeatGuard(max_repeats=self.harness.limit("max_repeats"),
                             max_failures=self.harness.limit("max_failures"))
         bad_calls = 0
         conn_retried = False
+        runaway_retried = False
+        empty_nudged = False
         for step in range(1, max_steps + 1):
             if self.cancelled:
                 res.stopped, res.stop_reason = True, "cancelled (timed out)"
@@ -670,9 +870,20 @@ class ChatSession:
             res.steps = step
             last = self.answer_on_last_step and step == max_steps and step > 1
             if last:  # D-068 step 2: no tools on the last step, so the turn ends with an answer
-                messages.append(HumanMessage(content=LAST_STEP_NOTE))
+                messages.append(HumanMessage(content=self.last_step_note))
             try:
-                streamed = self._stream((self.llm if last else bound).stream(messages), step)
+                chunks = (self.llm if last else bound).stream(messages)
+                streamed = self._stream(chunks if self.thinking else guard_runaway(chunks), step)
+            except Runaway as exc:  # E-100: invisible thinking until the cap; stop, nudge, one more try
+                self.rec.write("runaway", turn=self.turn_no, step=step, error=str(exc), retry=not runaway_retried)
+                if runaway_retried:
+                    res.stopped, res.stop_reason = True, "the model kept generating without answering"
+                    return res
+                runaway_retried = True
+                self.hooks.show("retry", {}, "the model was generating without answering; asking it to answer now",
+                                False)
+                messages.append(HumanMessage(content=RUNAWAY_NOTE))
+                continue
             except Exception as exc:  # Ollama could not read the model's tool call (E-044)
                 if self.backend_kind == "remote" and is_remote_down(exc):  # D-062 B3: a tunnel blip, or gone
                     self.rec.write("model_error", turn=self.turn_no, step=step, error=str(exc)[:500],
@@ -736,9 +947,22 @@ class ChatSession:
                 if not (reply.content or streamed.text):
                     return self._wrap_up(messages, res, f"step limit ({max_steps} steps)")
                 reply = AIMessage(content=reply.content or streamed.text or "")
+            if not reply.tool_calls and not (streamed.text or "").strip() and not empty_nudged \
+                    and step < max_steps and not last:
+                empty_nudged = True  # an empty answer is never accepted (non-negotiable): ask once for one
+                self.rec.write("empty_answer", turn=self.turn_no, step=step)
+                messages.append(HumanMessage(content=EMPTY_ANSWER_NOTE))
+                continue
             messages.append(reply)
             if not reply.tool_calls:
                 res.text = streamed.text
+                return res
+            if self.deciding:  # the model chose a phase: record it, answer the switch, and hand back
+                tc = reply.tool_calls[0]
+                self.phase_request = {"name": tc["name"], "args": tc.get("args") or {}}
+                self.rec.write("phase", turn=self.turn_no, step=step, name=tc["name"], args=tc.get("args") or {})
+                for t in reply.tool_calls:
+                    messages.append(ToolMessage(content=f"ok: {t['name'].replace('_', ' ')}", tool_call_id=t["id"]))
                 return res
             stop = ""
             for tc in reply.tool_calls:

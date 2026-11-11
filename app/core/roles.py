@@ -1,6 +1,7 @@
 """Which model does which job (phases and roles, D-049..D-051; PHASES_AND_ROLES.md).
 
-Defaults follow D-051 (deepseek-r1:8b thinks, mimo-v2.6:9b does); the live chat keeps the model you picked last.
+Defaults follow D-051 and D-072 (deepseek-r1:8b thinks, qwen3.5:latest does; mimo-v2.6:9b replaced on
+2026-11-11, it turned conversation into builds); the live chat keeps the model you picked last.
 Your choices (`/model role <role> <model>`) are kept in ~/.mitra/roles.json and win over the defaults; mitra.toml
 `[roles]` wins over both. A role whose model is not installed falls back to the chat model, so nothing breaks
 before a download. Every switch is recorded, so the dashboard can compare models per role.
@@ -19,10 +20,10 @@ DEFAULTS: dict[str, str | None] = {
     "chat": None,            # = the model you picked last (/model use)
     "planner": "deepseek-r1:8b",
     "reviewer": "deepseek-r1:8b",
-    "tester": "mimo-v2.6:9b",
-    "builder": "mimo-v2.6:9b",
-    "debugger": "mimo-v2.6:9b",
-    "deployer": "mimo-v2.6:9b",
+    "tester": "qwen3.5:latest",
+    "builder": "qwen3.5:latest",
+    "debugger": "qwen3.5:latest",
+    "deployer": "qwen3.5:latest",
     "reporter": None,        # = whichever model is loaded (no swap)
 }
 WHY = {
