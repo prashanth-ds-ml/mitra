@@ -111,7 +111,13 @@ def conversation_signals(files: list[Path], limit: int = MAX_SIGNALS) -> list[di
                           "next": said.get(turn + 1, "")[:300] if isinstance(turn, int) and name == "rephrase"
                           else ""})
     found.sort(key=lambda x: -x["t"])
-    return found[:limit]
+    unique, seen = [], set()
+    for s in found:  # one conversation can be in its project and in the store: count it once
+        key = (round(s["t"], 3), s["signal"], s["you"])
+        if key not in seen:
+            seen.add(key)
+            unique.append(s)
+    return unique[:limit]
 
 
 def evidence_text(failures: list[dict], signals: list[dict]) -> str:
@@ -205,6 +211,129 @@ def _broken(row: dict) -> str:
     return ""
 
 
+# ── the queue: rules suggested by the coach (layer 2), tested here one per round (D-075) ──────────────────────────
+
+def queue_path() -> Path:
+    return H.home() / "harness" / "queue.jsonl"
+
+
+def queued_rules() -> list[dict]:
+    try:
+        lines = queue_path().read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    out = []
+    for x in lines:
+        try:
+            out.append(json.loads(x))
+        except json.JSONDecodeError:
+            continue
+    return out
+
+
+def _write_queue(rows: list[dict]) -> None:
+    queue_path().parent.mkdir(parents=True, exist_ok=True)
+    queue_path().write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+
+
+def queue_rules(rules: list[dict], source: str = "coach") -> int:
+    """Add rules to the queue (not already queued, learned or tried, and general). Returns how many were added."""
+    h, have = H.load(), queued_rules()
+    seen = {r["text"].lower() for r in have} | {r.lower() for r in h.rules} | {r.lower() for r in tried_rules()}
+    banned, added = banned_words(), 0
+    for r in rules:
+        text = " ".join(str(r.get("text", "")).split())
+        if not text or text.lower() in seen or check_rule(text, banned) or len(text) > H.MAX_RULE_CHARS:
+            continue
+        have.append({"text": text, "why": str(r.get("why", ""))[:200], "source": source, "date": time.strftime(
+            "%Y-%m-%d %H:%M")})
+        seen.add(text.lower())
+        added += 1
+    _write_queue(have)
+    return added
+
+
+def next_queued(h: H.Harness) -> dict | None:
+    for r in queued_rules():
+        if r["text"].lower() not in {x.lower() for x in h.rules}:
+            return r
+    return None
+
+
+def drop_queued(text: str) -> None:
+    _write_queue([r for r in queued_rules() if r["text"] != text])
+
+
+# ── layer 1 by itself: a round in the background when you leave the chat (D-075) ───────────────────────────────
+
+AUTO_MIN_SIGNALS = 3
+
+
+def last_round_t() -> float:
+    """When the last chat round ran (attempts.jsonl; older entries only have "date")."""
+    best = 0.0
+    for a in I.attempts():
+        if a.get("kind") != "chat":
+            continue
+        t = a.get("t")
+        if not t:
+            try:
+                t = time.mktime(time.strptime(a.get("date", ""), "%Y-%m-%d %H:%M"))
+            except ValueError:
+                t = 0
+        best = max(best, float(t))
+    return best
+
+
+def auto_due(files: list[Path]) -> tuple[bool, str]:
+    """(run a round now?, why): 3+ new signals since the last round, or a queued rule; never two at once."""
+    if auto_running():
+        return False, "a round is already running"
+    if queued_rules():
+        return True, f"{len(queued_rules())} queued rule(s) from the coach"
+    since = last_round_t()
+    new = [s for s in conversation_signals(files, limit=1000) if s["t"] > since]
+    if len(new) >= AUTO_MIN_SIGNALS:
+        return True, f"{len(new)} new signals since the last round"
+    return False, f"{len(new)} new signal(s), a round starts at {AUTO_MIN_SIGNALS}"
+
+
+def _lock() -> Path:
+    return H.home() / "harness" / "auto.lock"
+
+
+def auto_running() -> bool:
+    try:
+        pid = int(_lock().read_text(encoding="utf-8").split()[0])
+    except (OSError, ValueError, IndexError):
+        return False
+    try:
+        import psutil
+        return psutil.pid_exists(pid)
+    except ImportError:
+        return False
+
+
+def start_auto(workspace: Path, *, remote: bool = False, popen=None) -> Path:
+    """Start `mitra improve --chat` in the background (it outlives the chat); returns its log file."""
+    import subprocess
+    import sys
+
+    log = H.home() / "harness" / "auto" / (time.strftime("%Y%m%d-%H%M%S") + ".log")
+    log.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [sys.executable, "-m", "app.main", "improve", "--chat", "--rounds", "1"] + (["--remote"] if remote else [])
+    flags = 0
+    if sys.platform == "win32":
+        flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+    with log.open("w", encoding="utf-8") as out:
+        p = (popen or subprocess.Popen)(cmd, cwd=str(workspace), stdout=out, stderr=subprocess.STDOUT,
+                                        stdin=subprocess.DEVNULL, creationflags=flags,
+                                        env={**__import__("os").environ, "PYTHONIOENCODING": "utf-8"})
+    _lock().parent.mkdir(parents=True, exist_ok=True)
+    _lock().write_text(f"{p.pid} {time.time():.0f}", encoding="utf-8")
+    return log
+
+
 def improve_chat(*, proposer, make_runner: Callable[[H.Harness, Path], S.Runner], model: str, arch: str,
                  score_row: dict | None, files: list[Path], instructions: Callable[[H.Harness], str],
                  min_gain: int = MIN_GAIN, dry_run: bool = False, cwd: Path | None = None, run_score=S.run,
@@ -213,19 +342,27 @@ def improve_chat(*, proposer, make_runner: Callable[[H.Harness, Path], S.Runner]
     evidence for a next round)."""
     current = H.load()
     failures, signals = score_failures(score_row), conversation_signals(files)
-    entry = {"date": time.strftime("%Y-%m-%d %H:%M"), "kind": "chat", "harness_version": current.version,
-             "builder": model, "proposer": getattr(proposer, "model", "") or model, "arch": arch,
+    entry = {"t": time.time(), "date": time.strftime("%Y-%m-%d %H:%M"), "kind": "chat",
+             "harness_version": current.version, "builder": model,
+             "proposer": getattr(proposer, "model", "") or model, "arch": arch, "source": "mitra",
              "evidence": {"score": (score_row or {}).get("date", ""), "failed_cases": len(failures),
                           "signals": len(signals)}}
-    if not failures and not signals:
+    queued = next_queued(current)
+    if queued:  # D-075: a rule the coach suggested is tested first, exactly like Mitra's own
+        change, why = I.Change("rule", queued.get("why", ""), text=queued["text"]), ""
+        entry.update(source=queued.get("source", "coach"), proposer=queued.get("source", "coach"))
+        drop_queued(queued["text"])
+        say(f"Testing a queued rule from the {entry['source']}: {queued['text']}")
+    elif not failures and not signals:
         entry.update(result="skipped", reason="no failed cases and no signals: nothing to learn from")
         say("Nothing to learn from: no failed score cases and no /bad or rephrase signals. Run `mitra score --quick` "
             "first, or mark wrong answers with /bad <why> in the chat.")
         return entry
-    say(f"Evidence: {len(failures)} failed case(s) from the score of {entry['evidence']['score'] or '-'}, "
-        f"{len(signals)} signal(s) from your conversations. Asking {entry['proposer']} for a rule ...")
-    change, why = propose_rule(evidence_text(failures, signals), current, proposer, instructions(current),
-                               tried=tried_rules())
+    else:
+        say(f"Evidence: {len(failures)} failed case(s) from the score of {entry['evidence']['score'] or '-'}, "
+            f"{len(signals)} signal(s) from your conversations. Asking {entry['proposer']} for a rule ...")
+        change, why = propose_rule(evidence_text(failures, signals), current, proposer, instructions(current),
+                                   tried=tried_rules())
     if not change:
         entry.update(result="no_proposal", reason=why)
         I.log_attempt(entry)

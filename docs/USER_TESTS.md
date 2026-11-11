@@ -12,6 +12,12 @@ machine or your judgment. Updated every release.
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
 
+## 2026-11-11 · Two self-improvement layers (D-075)
+
+- [ ] `mitra coach`: the report lands in ~/.mitra/coach/ with findings from your sessions; rules it suggests show as queued
+- [ ] Use Mitra, mark 3 wrong answers with `/bad <why>`, exit: "learning in the background" appears
+- [ ] ~20 min later, start Mitra: "learned since last time: …" (or nothing if the rule was dropped); `mitra harness`
+
 ## 2026-11-11 · Behaviour fixes + `mitra improve --chat` (E-101, D-073)
 
 - [ ] Restart Mitra. "good what about you" after "hi": no project talk; "i am thinking mitra": ends with a question

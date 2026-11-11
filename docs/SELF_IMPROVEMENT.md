@@ -214,3 +214,15 @@ failed cases and your signals, one rule per round, kept only with +2 cases and n
 schedule) is open: it needs your choice of when, since a round holds the GPU for ~20 minutes. The real chat records
 are thin so far (25 run files, 3 `/bad`, no rephrase signals): until they grow, the score's failures carry most of
 the evidence. `/bad <why>` after a wrong answer is the most useful signal you can give.
+
+## 13. The two layers (D-075, 2026-11-11)
+
+| | Layer 1: Mitra by itself | Layer 2: the coach (Claude) |
+|---|---|---|
+| Runs | at exit, in the background, when 3+ new signals or a queued rule wait | `mitra coach`, when the header reminds you (7 days / 40 turns) |
+| Sees | your signals + the score's failed cases | every recorded turn, flagged ones first |
+| Changes | one rule per round, kept only if the score rises (+2, no category lower) | writes a report; its rules go to layer 1's queue; code fixes go to a Claude Code session |
+| Where | ~/.mitra/harness (attempts, queue, auto logs) | ~/.mitra/coach (reports, digests) |
+
+You no longer copy conversations into Claude Code: the records hold them. Still paste what the screen looked like
+(layout problems are not in the records).

@@ -2161,6 +2161,63 @@ def _header_extras(cfg: dict, harness) -> tuple[str, str, str]:
     return roles_line, learning, dash
 
 
+def _learning_notices(harness) -> None:
+    """D-075, at start: what Mitra learned since you last saw it (with the undo), a round still running in the
+    background, and the coach reminder. Quiet when there is nothing to say."""
+    from app.core import coach as coach_mod
+    from app.core import harness as H
+    from app.core import improve_chat as IC
+    from app.core import store as st
+    seen_file = H.home() / "harness" / "seen.json"
+    try:
+        seen = int(json.loads(seen_file.read_text(encoding="utf-8")).get("version", 0))
+    except (OSError, ValueError):
+        seen = None
+    try:
+        if seen is not None and harness.version > seen:
+            console.print(Text(f"  ✻ learned since last time: {harness.note or 'harness v' + str(harness.version)}"
+                               f" · `mitra harness` shows it · `mitra harness revert {seen}` undoes it",
+                               style="m.tool"))
+        seen_file.parent.mkdir(parents=True, exist_ok=True)
+        seen_file.write_text(json.dumps({"version": harness.version}), encoding="utf-8")
+        if IC.auto_running():
+            console.print(Text("  ✻ a learning round is still running in the background (the GPU is busy)",
+                               style="m.faint"))
+        line = coach_mod.reminder(st.stored_files())
+        if line:
+            console.print(Text("  ✻ " + line, style="m.faint"))
+    except Exception:  # noqa: BLE001 - notices must never block the start
+        pass
+
+
+def cmd_coach(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Only write the digest (no Claude call)."),
+) -> None:
+    """Layer 2 (D-075): Claude reviews Mitra's recorded conversations since the last review and writes a coach
+    report; its rules are queued for `mitra improve --chat`, where the score decides each one."""
+    from app.core import coach as coach_mod
+    from app.core import dashboard as D
+    from app.core import improve_chat as IC
+    from app.core import score as S
+
+    files = D.run_files()
+    if dry_run:
+        turns = coach_mod.turns_since(files, coach_mod.last_review_t())
+        text = coach_mod.digest(turns)
+        out = coach_mod.home() / "digest-dry-run.md"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        console.print(Text(f"{len(turns)} turns ({sum(1 for t in turns if t['flags'])} flagged), "
+                           f"{len(text):,} characters · {out}", style="m.tool"))
+        return
+    row = IC.last_score_row(S.history(last=200), model=config.load_last_model() or "", arch="phased")
+    res = coach_mod.coach(files, score_row=row, say=lambda t: console.print(Text(t, style="m.text")))
+    raise typer.Exit(0 if res["result"] in ("done", "skipped") else 1)
+
+
+cli.command("coach")(cmd_coach)
+
+
 def _follow_night() -> None:
     """Live view of the latest night run in the chat; ctrl+c stops watching only."""
     from app.core import night as night_mod
@@ -3186,6 +3243,7 @@ def _chat():
         _kaggle_report("the Kaggle GPU ended while Mitra was closed", turns=_kaggle_died_turns, summarize=False,
                        startup=True)
     _kaggle_at_start()
+    _learning_notices(harness)
 
     while True:
         _set_current_task("Ready")
@@ -3220,6 +3278,18 @@ def _chat():
                     pass
                 except Exception as _exc:  # noqa: BLE001 - memory must never block leaving
                     console.print(Text(f"  could not save the threads: {str(_exc)[:120]}", style="m.faint"))
+            if architecture == "phased" and cfg.get("auto_improve", True):  # D-075 layer 1 by itself
+                try:
+                    from app.core import improve_chat as _IC
+                    from app.core import store as _st
+                    _files = sorted(set(_st.stored_files()) | {chat.rec.path})
+                    _due, _why = _IC.auto_due(_files)
+                    if _due:
+                        _log = _IC.start_auto(pathlib.Path(cfg["workspace"]), remote=bool(remote_mod.active()))
+                        console.print(Text(f"  ✻ learning in the background ({_why}): one `mitra improve --chat` "
+                                           f"round, ~20 min on the GPU · log: {_log}", style="m.tool"))
+                except Exception as _exc:  # noqa: BLE001 - learning must never block leaving
+                    console.print(Text(f"  could not start learning: {str(_exc)[:120]}", style="m.faint"))
             console.print(Text("  Bye.", style="m.dim"))
             break
 
