@@ -69,7 +69,12 @@ stack in `~/.mitra/me.md` (created on the first start) and project facts in `.mi
 turn. `/copy` puts the last answer on the clipboard.
 
 **Questions about your code** (*"explain the game logic"*, *"where is the API defined?"*) are answered read-only
-in at most 6 steps, with file:line references; nothing is changed.
+in at most 6 steps, with file:line references; nothing is changed. So are brainstorms and reviews
+(*"brainstorm ideas to make the game harder"*); *"go with option 2"* then builds the one you pick.
+
+**How good is it today?** `mitra score` runs a fixed measuring set (sorting, writing, explain, ideas, small and
+medium coding tasks with hidden tests) and keeps every result in `results/scores.jsonl`; `--quick` takes a few
+minutes. Every change to Mitra is kept only if this score holds.
 
 Just type what you want, e.g. *"what does this project do?"*, *"add a --verbose flag to cli.py and a test for it"*,
 *"the tests in tests/test_api.py fail, fix them"*. Mitra asks before every file change and command (shift+tab

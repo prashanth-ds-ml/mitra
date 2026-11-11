@@ -1,0 +1,10 @@
+id = "D1"
+title = "Clean the sign-up dataset"
+prompt = """
+`clean_rows()` in clean.py only strips spaces. Make it clean the sign-up rows properly:
+- strip spaces around every value
+- lowercase the email; drop rows whose email is empty or has no "@"
+- drop duplicate emails, keeping the first row
+- `age` becomes an int; if it is not a whole number, age is None
+Keep the rows in their original order.
+"""

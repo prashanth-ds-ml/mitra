@@ -1,0 +1,76 @@
+# The measuring set (D-068 step 3): questions, ideas and reviews about a project (the explainer, read only).
+# project: a folder under score/projects, copied fresh for each case. cite: at least one of these files must be
+# named in the answer. facts: regexes that must all match (case-insensitive). must_not: claims that are wrong.
+# options: for ideas, how many numbered options (min, max). reference: an answer that passes (validated).
+project = "snake"
+
+[[case]]
+id = "X1_game_logic"
+category = "explain"
+question = "explain the game logic"
+cite = ["snake/game.py"]
+facts = ['opposite|revers', 'tail|grow', 'wall|out of bounds|bounds|edge|board', 'score']
+must_not = ['(?i)wraps? around|teleport']
+reference = """The rules are in `snake/game.py`:
+- `turn()` (snake/game.py:24) ignores a turn to the opposite direction, so the snake cannot reverse into itself.
+- `step()` (snake/game.py:30) moves the head; leaving the board (snake/game.py:36) or hitting the body ends the game.
+- Eating keeps the tail, so the snake grows by one, and the score goes up (snake/game.py:45)."""
+
+[[case]]
+id = "X2_grow"
+category = "explain"
+question = "how does the snake grow when it eats?"
+cite = ["snake/game.py"]
+facts = ['tail', 'score']
+must_not = []
+reference = """When the head reaches the food, `step()` keeps the whole body instead of dropping the tail
+(snake/game.py:40), so the snake is one cell longer; the score goes up and new food is placed (snake/game.py:45-47)."""
+
+[[case]]
+id = "X3_bad_direction"
+category = "explain"
+question = "what happens if the API gets an unknown direction?"
+cite = ["snake/api.py"]
+facts = ['400', 'ValueError|error']
+must_not = ['(?i)\b(500|ignored silently)\b']
+reference = """`handle()` calls `game.turn(direction)` (snake/api.py:20); `turn()` raises ValueError for a direction not
+in MOVES (snake/game.py:26), and the API answers 400 with {"error": ...} (snake/api.py:22)."""
+
+[[case]]
+id = "X4_wall"
+category = "explain"
+question = "what happens when the snake hits the wall?"
+cite = ["snake/game.py"]
+facts = ['over|ends|game over']
+must_not = ['(?i)wraps? around|bounces?|teleport']
+reference = """The game ends: `step()` checks the new head against the board (snake/game.py:36) and sets
+`over = True` (snake/game.py:37); after that `step()` does nothing."""
+
+[[case]]
+id = "I1_harder"
+category = "ideas"
+question = "brainstorm ideas to make the snake game harder"
+cite = ["snake/game.py", "web/index.html", "snake/api.py"]
+facts = []
+options = [3, 5]
+# the game already ends at the wall: "add walls / wall collision" misreads the code
+must_not = ['(?i)\b(add|introduce)\w*\s+(\w+\s+)?wall collision']
+reference = """1. **Speed up as the score grows**: the step interval is fixed in web/index.html:42; shorten it per point.
+2. **Obstacles**: blocked cells in `Game` (snake/game.py:8) that end the game like the body does.
+3. **Food that moves or expires**: `place_food()` (snake/game.py:20) again after N steps.
+My pick: 1, the smallest change with the biggest effect."""
+
+[[case]]
+id = "R1_review"
+category = "ideas"
+question = "review the code in snake/game.py"
+cite = ["snake/game.py"]
+facts = []
+points = 2
+# on an open board every free cell can be reached: a known wrong claim
+must_not = ['(?i)unreachable|can ?not reach|can never reach|never be reached']
+reference = """Good: small and clear; the rules live in `step()` (snake/game.py:30) and the state is plain data.
+Risky:
+1. `place_food()` builds every free cell each time (snake/game.py:21): fine on 20x20, slow on big boards.
+2. `api.py` keeps one global game, so two players share it.
+I would change 1 first."""

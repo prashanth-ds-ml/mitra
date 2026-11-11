@@ -13,6 +13,7 @@ Rules, not a model: cheap, instant, predictable. `/plan <task>` and `/do <task>`
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from app.core.resume import is_resume_question
 
@@ -46,6 +47,17 @@ REFINE = re.compile(r"^(make it|now make it|can you make it|a bit|slightly|more|
 DAILY = re.compile(r"^(plan my|help me plan|make (a|my) (to-?do|todo|schedule|checklist)|prioriti[sz]e (my|these))\b")
 # ideas: general when they name nothing in the project; "brainstorm ways to make the game harder" is about it
 IDEAS = re.compile(r"^(give me (ideas|names|a list|suggestions)|brainstorm|suggest|any ideas|ideas (for|to|on))\b")
+# talking an idea through, not building it yet (live 2026-11-11: "build a web app ... can we brainstrom on this" and
+# "i feel ... once we get a base model i want to setup a web app ..." were planned as features)
+DISCUSS = re.compile(r"\b(brainst(or|ro)m(ing)?|discuss|discussion|think (deep|deeply|through|about|it through|this through)|"
+                     r"what do you think|your thoughts|thoughts on|pros and cons|trade-?offs?)\b")
+MUSING = re.compile(r"^(so )?(i feel|i think|i guess|i might|i was thinking|i want to|i'?d like to|maybe|what if|"
+                    r"once we|we can|we could|imagine|suppose|ok lets say|lets say|let'?s say)\b")
+BUILD_NOW = re.compile(r"\b(build it|build this|start building|go ahead|implement it|implement this|let'?s build|"
+                       r"lets build|create it|do it|start coding|write the code)\b")
+# folder names that are also everyday words: "a web app" in a discussion does not mean the web/ folder
+GENERIC_NAMES = frozenset({"web", "app", "api", "data", "model", "models", "src", "docs", "static", "templates",
+                           "scripts", "config", "server", "client", "main", "utils", "frontend", "backend", "database"})
 # picking one of the options Mitra just gave ("go with option 2", "the first idea", "let's do 3")
 PICK = re.compile(r"\b(option|idea|approach|choice|number|no\.?) ?#?\d\b|\b(first|second|third|fourth|fifth|last) "
                   r"(one|idea|option|approach)\b|^(go with|let'?s do|lets do|do|pick|take|choose|use) \S+$|"
@@ -82,8 +94,31 @@ def _writing(words: list[str], low: str, raw: str) -> bool:
     if ws & WRITING_NOUNS and (ws & {"write", "draft", "compose", "send", "reply", "respond", "prepare", "make",
                                      "create", "give", "need", "help", "turn", "convert", "rewrite"}
                               or low.startswith(("a ", "an ", "mail ", "email ", "reply "))):
-        return not (ws & {"function", "endpoint", "class", "test", "tests", "api", "script", "module", "file"})
+        if re.search(r"\b(mail|email|message|reply|response|note|summary)s? (function|endpoint|class|test|tests|api|"
+                     r"script|module|file|handler|parser|template|model|field|table)\b", low):
+            return False  # "add a reply endpoint": code
+        # "a mail to my manager ... for a family function" is a mail; "send an email when the test fails" is code
+        to_person = re.search(r"\bto (my|the|our|a|an) (manager|team|boss|client|customer|hr|friend|colleagues?|"
+                              r"lead|teacher|landlord|professor|recruiter|vendor)\b", low)
+        return bool(to_person) or not (ws & {"function", "endpoint", "class", "test", "tests", "api", "script",
+                                             "module", "file"})
     return False
+
+
+def project_words(root: Path) -> frozenset:
+    """Names in the workspace (files, folders, stems; two levels): a question naming one is about the project."""
+    out: set[str] = set()
+    try:
+        for p in list(Path(root).iterdir())[:200]:
+            if p.name.startswith(".") or p.name in ("node_modules", "__pycache__", "venv"):
+                continue
+            out.update({p.name.lower(), p.stem.lower()})
+            if p.is_dir():
+                for q in list(p.iterdir())[:100]:
+                    out.update({q.name.lower(), q.stem.lower()})
+    except OSError:
+        pass
+    return frozenset(w for w in out if len(w) > 2)
 
 
 def classify(text: str, previous: str = "", project_words: frozenset | set = frozenset()) -> str:
@@ -111,6 +146,16 @@ def classify(text: str, previous: str = "", project_words: frozenset | set = fro
                  or set(words) & PROJECT_WORDS or named)
     if IDEAS.match(low):
         return "question" if about else "general"  # ideas about the project: look at it first (explainer)
+    if previous == "general" and BUILD_NOW.search(low) and len(short) <= 12:
+        return "big"  # "ok lets build it" after talking an idea through: plan it first (with the discussion)
+    starts_with_change = bool(words) and words[0] in CHANGE_VERBS
+    if not BUILD_NOW.search(low) and not starts_with_change and (
+            DISCUSS.search(low) or (previous in ("general", "question") and MUSING.match(low))):
+        # a new idea is talked through in one answer; only one that names the code reads it first (explainer)
+        code = bool(any(c in raw for c in "/\\`") or named - GENERIC_NAMES
+                    or set(words) & {"code", "codebase", "repo", "repository", "project", "file", "files",
+                                     "function", "module", "class", "tests", "test"})
+        return "question" if code else "general"  # "build it" then plans it
     if previous == "writing" and REFINE.match(low):
         return "writing"
     if _writing(words, low, raw):

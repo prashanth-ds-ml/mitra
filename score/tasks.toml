@@ -1,0 +1,15 @@
+# The measuring set (D-068 step 3): coding tasks, graded by hidden tests Mitra never sees.
+# bench = a task in bench/tasks (the payments app); dir = a task folder here (start/, solution/, visible/, hidden/).
+# size: small (one clear change) or medium (a feature, several files or functions).
+tasks = [
+  { id = "T01", bench = "T01", size = "small" },   # order totals off by a paisa
+  { id = "T02", bench = "T02", size = "small" },   # charge list stops at 100
+  { id = "T03", bench = "T03", size = "small" },   # over-refund crashes with 500
+  { id = "T07", bench = "T07", size = "small" },   # mixed-currency order crashes
+  { id = "T08", bench = "T08", size = "small" },   # paying a paid order returns 200
+  { id = "T09", bench = "T09", size = "small" },   # reject orders over 1 lakh
+  { id = "D1", dir = "tasks/D1_clean_dataset", size = "small" },
+  { id = "T06", bench = "T06", size = "medium" },  # an endpoint listing an order's refunds
+  { id = "T10", bench = "T10", size = "medium" },  # refund the rest of an order
+  { id = "E1", dir = "tasks/E1_eval_script", size = "medium" },
+]

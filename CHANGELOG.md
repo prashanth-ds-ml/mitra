@@ -4,6 +4,16 @@ All notable changes, newest first. Versions follow the milestones in [docs/PLAN.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-11 · `mitra score`: the measuring set (D-068 step 3) + fixes from a live session
+- `mitra score` runs the measuring set and keeps one row per run in results/scores.jsonl: sorting (no model),
+  writing, explain, ideas/review, small and medium coding tasks (hidden tests). `--quick` skips the coding
+  tasks, `--remote` runs on Kaggle, `--validate` checks the set, `--history` shows past scores. First: sorting 46/46 · writing 0/3 · explain 4/4 · ideas 1/2 (15 min, 2026-11-11 01:03).
+- Talking an idea through ("can we brainstorm on this", "i feel ...") is answered, not planned; "ok lets build
+  it" then plans it with the discussion.
+- The planner streams, so the Kaggle tunnel no longer cuts it after 120 s (Cloudflare 524).
+- The Kaggle-ended report no longer names an old night run.
+- A mail to your manager "for a family function" is writing, not code.
+
 ## [0.5.1] - 2026-11-10 · brainstorming and reviews about your code (D-068 step 2b)
 - "brainstorm ideas to make the game harder", "review game.py", "pros and cons of …" read the code first
   (explainer); ideas come as 3-5 options with trade-offs, and "go with option 2" builds the one you pick.

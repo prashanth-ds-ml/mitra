@@ -1,0 +1,56 @@
+# The measuring set (D-068 step 3): writing. Fixed notes (not your me.md), so scores compare across days.
+# must: facts that must be in the text (case-insensitive). must_not: regexes that must not match.
+# signature: the last lines, exactly (spaces between lines ignored). reference: an answer that passes (validated).
+notes = """## About the user (me.md)
+Name: Prashanth
+Role: AI engineer
+Mail signature:
+    Regards,
+    Prashanth
+Tone: concise, friendly, plain English; no filler"""
+
+[[case]]
+id = "W1_team_mail"
+request = "draft a mail to the team saying Mitra can now run on a free Kaggle GPU; setup is `mitra kaggle setup` then `mitra kaggle start`"
+must = ["Subject:", "kaggle setup", "kaggle start"]
+must_not = ['(?im)^\s*(thanks|regards|best|cheers),?\s*\n\s*mitra\s*$', '\[your name\]', '(?i)paid (plan|option|tier)']
+signature = ["Regards,", "Prashanth"]
+max_words = 160
+reference = """Subject: Mitra now runs on a free Kaggle GPU
+
+Hi team,
+
+Mitra can now run on a free Kaggle GPU. To set it up, run `mitra kaggle setup` once, then `mitra kaggle start`.
+
+Regards,
+Prashanth"""
+
+[[case]]
+id = "W2_leave_mail"
+request = "write an email to my manager asking for leave on Friday 14 November for a family function"
+must = ["Subject:", "14", "Friday", "leave"]
+must_not = ['(?im)^\s*(thanks|regards|best|cheers),?\s*\n\s*mitra\s*$', '\[your name\]']
+signature = ["Regards,", "Prashanth"]
+max_words = 130
+reference = """Subject: Leave request for Friday, 14 November
+
+Hi [Manager's name],
+
+I'd like to take leave on Friday, 14 November, for a family function. I'll make sure my work is covered before then.
+
+Regards,
+Prashanth"""
+
+[[case]]
+id = "W3_summary"
+request = """summarise this:
+Team sync, 10 Nov. The budget for the Q1 pilot was approved at 4 lakh. We will hire two ML engineers in December.
+The launch moves from 15 January to 1 February because the data vendor is late. Ravi owns the vendor follow-up.
+Next sync on 17 Nov."""
+must = ["4 lakh", "two", "1 Feb", "Ravi"]   # "1 Feb" also matches "1 February"
+must_not = ['(?i)subject:', '(?i)^(here is|here.s|sure)']
+max_words = 90
+reference = """- Q1 pilot budget approved: 4 lakh.
+- Hiring two ML engineers in December.
+- Launch moved from 15 January to 1 February (the data vendor is late); Ravi follows up with the vendor.
+- Next sync: 17 Nov."""

@@ -506,6 +506,95 @@ def cmd_report(
 cli.command("report")(cmd_report)
 
 
+def cmd_score(
+    quick: bool = typer.Option(False, "--quick", help="Only sorting, writing, explain and ideas (a few minutes)."),
+    only: str = typer.Option("", "--only", help="Categories (sorting,writing,explain,ideas,small,medium) and/or "
+                             "case ids (W1_team_mail,T01,...), comma-separated."),
+    model: str = typer.Option("", "--model", help="Model (default: your chat model)."),
+    remote: bool = typer.Option(False, "--remote", help="Run on the remote GPU in use (Kaggle) instead of the laptop."),
+    check: bool = typer.Option(False, "--validate", help="Only check the set: every reference passes, every start "
+                               "state fails. No model."),
+    show: bool = typer.Option(False, "--history", help="Show the last scores."),
+    as_json: bool = typer.Option(False, "--json", help="Print the score row as JSON."),
+) -> None:
+    """The measuring set (D-068 step 3): run it and get one score; every run is kept in results/scores.jsonl."""
+    from app.core import score as S
+
+    if show:
+        for row in S.history():
+            console.print(Text(f"{row['date']}  v{row['mitra_version']} · harness {row['harness_version']} · "
+                               f"{row['model'] or '-'} · {row['backend'] or '-'}   {S.summary(row['score'])}",
+                               style="m.text"))
+        return
+    if check:
+        problems = S.validate()
+        for p in problems:
+            console.print(Text("  ✗ " + p, style="m.err"))
+        console.print(Text("the set is sound: every reference passes, every start state fails" if not problems
+                           else f"{len(problems)} problem(s)", style="m.tool" if not problems else "m.err"))
+        raise typer.Exit(1 if problems else 0)
+    parts = [x.strip() for x in only.split(",") if x.strip()]
+    cats = tuple(c for c in S.CATEGORIES if c in parts) or (S.QUICK if quick else S.CATEGORIES)
+    ids = {x for x in parts if x not in S.CATEGORIES} or None
+    if ids and not [c for c in parts if c in S.CATEGORIES]:
+        cats = S.CATEGORIES  # only case ids: look for them everywhere
+    runner, model_name = None, ""
+    if [c for c in cats if c != "sorting"]:
+        from app.core import harness as harness_mod
+        from app.core import roles as roles_mod
+        from app.core import store as store_mod
+        from app.llm import model_supports_thinking
+
+        cfg = config.load()
+        model_name = model or roles_mod.chat_model(cfg)
+        # config.load points everything at an active Kaggle remote; the score runs on this machine unless --remote
+        # (E-082: the first "laptop" scores ran on the user's Kaggle session, at 256K)
+        local = cfg.get("_local") or {}
+        local_cfg = {**cfg, "num_ctx": local.get("num_ctx")} if "_local" in cfg else cfg
+        base_url = (local.get("ollama_local_base_url") if "_local" in cfg else cfg.get("ollama_local_base_url")) \
+            or "http://127.0.0.1:11434"
+        num_ctx, backend = roles_mod.context_for(model_name, local_cfg), "laptop"
+        if remote:
+            from app import remote as remote_mod
+            info = remote_mod.active()
+            if not info:
+                console.print(Text("no remote GPU in use: start one with `mitra kaggle start`", style="m.err"))
+                raise typer.Exit(1)
+            base_url, num_ctx, backend = info["url"], int(info.get("num_ctx") or num_ctx), "remote"
+        think = False if model_supports_thinking(model_name) else None
+        llm = get_local_llm(model_name, base_url=base_url, num_ctx=num_ctx, reasoning=think)
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        runner = S.Runner(llm=llm, harness=harness_mod.load(), num_ctx=num_ctx, backend=backend,
+                          records=store_mod.root() / "score-runs" / stamp)
+        console.print(Text(f"  scoring {', '.join(cats)} · {model_name} · {backend} · {num_ctx // 1024}K", style="m.tool"))
+
+    def line(c) -> None:
+        if as_json:
+            return
+        mark = "✓" if c.passed else "✗"
+        detail = f"{c.seconds:.0f}s · {c.steps} steps" if c.category != "sorting" else ""
+        if c.category == "sorting" and c.passed:
+            return  # 40 green lines say nothing
+        console.print(Text(f"  {mark} {c.category:8} {c.id:16} {detail}  {c.why}",
+                           style="m.tool" if c.passed else "m.err"))
+
+    before = [r for r in S.history(last=50) if r.get("categories") == list(cats) and r.get("model") == model_name
+              and not r.get("only")]
+    row = S.run(cats, runner=runner, model=model_name, cwd=pathlib.Path.cwd(), only=ids, on_case=line)
+    if as_json:
+        print(json.dumps(row, indent=2, ensure_ascii=False))
+        return
+    console.print(Text(f"\n  score: {S.summary(row['score'])}  ({row['seconds'] / 60:.1f} min)", style="m.accent.b"))
+    if before and not ids:
+        console.print(Text(f"  before ({before[-1]['date']}, v{before[-1]['mitra_version']}): "
+                           f"{S.summary(before[-1]['score'])}", style="m.faint"))
+    console.print(Text(f"  kept in {S.RESULTS}" + (f" · records: {row['records']}" if row["records"] else ""),
+                       style="m.faint"))
+
+
+cli.command("score")(cmd_score)
+
+
 def cmd_dashboard(
     port: int = typer.Option(8765, "--port", help="Port on 127.0.0.1."),
     no_open: bool = typer.Option(False, "--no-open", help="Do not open the browser."),
@@ -2647,10 +2736,7 @@ def _chat():
         night = None
         try:
             from app.core import night as _night
-            ns = _night.status(n=5)
-            if ns:
-                night = {"state": "running" if ns["running"] else "finished", "plan": pathlib.Path(ns["plan"]).name,
-                         "detail": f"{ns['elapsed_min']} min of up to {ns['hours']} h"}
+            night = handoff.night_for_report(_night.status(n=5), st.get("started"))
         except Exception:
             pass
         summary = ""
@@ -2820,22 +2906,7 @@ def _chat():
         return get_local_llm(model, temperature, base_url=cfg.get("ollama_local_base_url"), num_ctx=num_ctx,
                              num_gpu=num_gpu, reasoning=False if _think_cache[model] else None)
 
-    def _project_words() -> frozenset:
-        """Names in the workspace (files, folders, stems; two levels): a question naming one is about the project."""
-        root, out = pathlib.Path(cfg["workspace"]), set()
-        try:
-            for p in list(root.iterdir())[:200]:
-                if p.name.startswith(".") or p.name in ("node_modules", "__pycache__", "venv"):
-                    continue
-                out.update({p.name.lower(), p.stem.lower()})
-                if p.is_dir():
-                    for q in list(p.iterdir())[:100]:
-                        out.update({q.name.lower(), q.stem.lower()})
-        except OSError:
-            pass
-        return frozenset(w for w in out if len(w) > 2)
-
-    project_words = _project_words()
+    project_words = intent_mod.project_words(pathlib.Path(cfg["workspace"]))
 
     def _plan_first(task: str) -> dict:
         """P4: a short runnable plan from a small context pack; Go / Change / Save / Cancel (auto mode: Go).
@@ -3454,6 +3525,7 @@ def _chat():
 
         # ── What kind of request (D-065 P3) ───────────────────────────────────
         request_kind = force_kind or intent_mod.classify(user_input, previous=last_kind, project_words=project_words)
+        talked_first = last_kind in ("general", "question")  # "ok lets build it" after a discussion
         last_kind = request_kind
         if request_kind == "resume":  # from Mitra's records: instant, no model call, no searching
             _brief = resume_mod.brief(pathlib.Path(cfg["workspace"]))
@@ -3484,7 +3556,8 @@ def _chat():
 
         if request_kind == "big":  # D-065 P4/P5: plan first, then small checked steps
             _t_plan = time.monotonic()
-            _plan_info = _plan_first(user_input) or {}
+            _plan_info = _plan_first(planner_mod.with_discussion(user_input, messages) if talked_first
+                                     else user_input) or {}
             chat.note_request(user_input, "big", "plan_first", _plan_info.pop("outcome", "plan_cancelled"),
                               seconds=time.monotonic() - _t_plan, **_plan_info)
             continue

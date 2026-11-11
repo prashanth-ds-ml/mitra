@@ -94,7 +94,7 @@ def test_switching_between_kaggle_and_the_laptop(harness, capsys):
         state["up"] = False
         return "change the code"
 
-    Inputs.script = ["/mode plan", "explain the code", "/mode auto", "write the feature", kaggle_dies, "exit"]
+    Inputs.script = ["/mode plan", "explain the code", "/mode auto", "/do write the feature", kaggle_dies, "exit"]
     main._chat()
     out = " ".join(capsys.readouterr().out.split())  # the terminal wraps long lines
     # read work went to the laptop, write work back to Kaggle
@@ -316,6 +316,15 @@ def _planning_llm(state, monkeypatch):
         m = Model(*[AIMessage(content=f"answer {i}") for i in range(20)])
         m.base_url, m.model = base_url, model
         m.invoke = lambda messages: AIMessage(content=PLAN)
+        chat_stream = m.stream
+
+        def stream(messages):  # the planner streams (F-078); the chat gets its scripted answers
+            from app.core.planner import PLANNER_PROMPT
+            if messages and str(messages[0].content).startswith(PLANNER_PROMPT[:60]):
+                return iter([AIMessage(content=PLAN)])
+            return chat_stream(messages)
+
+        m.stream = stream
         return m
 
     monkeypatch.setattr(main, "get_local_llm", fake_llm)

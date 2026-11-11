@@ -1,0 +1,10 @@
+id = "E1"
+title = "An evaluation script for a classifier"
+prompt = """
+Write evaluate.py for our classifier's predictions. preds.jsonl has one row per example: {"label": ..., "pred": ...}.
+- `evaluate(path)` returns a dict: "n" (rows), "accuracy", "per_label" ({label: {"precision", "recall", "f1",
+  "support"}} for every label that appears as a label or a pred) and "macro_f1" (mean f1 over those labels).
+- A row whose pred is missing or null counts as wrong.
+- A precision or recall with nothing to divide by is 0.0. Round every float to 4 decimals.
+- `python evaluate.py preds.jsonl` prints the dict as JSON.
+"""

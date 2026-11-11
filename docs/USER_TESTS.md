@@ -12,6 +12,12 @@ machine or your judgment. Updated every release.
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
 
+## 2026-11-11 · `mitra score` and talking ideas through (D-068 step 3, v0.6.0)
+
+- [ ] Restart Mitra; "can we brainstorm on <an idea>" answers (no plan); then "ok lets build it" plans it with what you discussed
+- [ ] Plan-first on Kaggle no longer fails with error 524
+- [ ] `mitra score --quick` on the laptop; once on Kaggle: `mitra kaggle start`, then `mitra score --remote`
+
 ## 2026-11-10 · Questions about code (D-068 step 2, v0.5.0)
 
 - [ ] In one of your projects ask "explain how X works": an answer in under a minute with file:line, no edits

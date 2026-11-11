@@ -57,6 +57,7 @@ Template per step: **What we build · What Mitra does after it · Why · Done wh
 - **Records:** steps used, budget hit or not, files cited.
 
 ### Step 3. The measuring set and the starting score
+**✓ Built 2026-11-11** (D-069: `score/`, `app/core/score.py`, `mitra score`; `tests/test_step3_score.py`). `mitra score --validate`: every reference passes, every start state fails. Starting score on mimo-v2.6:9b (laptop): quick sorting 46/46 · writing 0/3 · explain 4/4 · ideas 1/2 (15 min, 2026-11-11 01:03); full not run yet. Kaggle: `mitra score --remote` (not run yet).
 - **Build:** 10 tasks in mitra-playground with hidden checks and a reference solution (written by Claude): 5 drills on
   your own code, 2 brick-breaker features, the endpoint fix, the dataset clean-up, the evaluation script; plus 3
   writing checks (key facts present, signature, length). `mitra score` runs them and appends to

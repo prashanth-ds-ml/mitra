@@ -1,0 +1,5 @@
+{"label": "spam", "pred": "spam"}
+{"label": "spam", "pred": "ham"}
+{"label": "ham", "pred": "ham"}
+{"label": "ham", "pred": "ham"}
+{"label": "ham", "pred": null}

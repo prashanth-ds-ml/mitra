@@ -36,6 +36,14 @@ Method and every result, whatever it shows. Raw results live in `results/` and a
 - **Metrics:** pass rate, fixed prompt tokens, broken tool calls, turns, wall time; from M3: frontier tokens, ₹, GPU Wh
 - **Rules:** same tasks, same model, same context and timeout for every agent; runs repeated N times; failures kept
 
+## The measuring set (D-068 step 3, D-069): `mitra score`
+
+Every run appends a row to `results/scores.jsonl` (versions, model, machine, every case).
+
+| Date | Mitra | Model | Machine | Score | Failed |
+|---|---|---|---|---|---|
+| 2026-11-11 01:03 | 0.5.1 | mimo-v2.6:9b | laptop | sorting 46/46 · writing 0/3 · explain 4/4 · ideas 1/2 | W1_team_mail: signature not exactly: Regards, / Prashanth; W2_leave_mail: signature not exactly: Regards, / Prashanth; W3_summary: missing: 1 February; I1_harder: 10 options (want 3-5) |
+
 ## Results
 
 ### 2026-11-06 · M1 · First `mitra improve` runs (self-improvement step 3, smoke test)

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Snake</title>
+<style>
+  body { background: #050a06; color: #b8f0c0; font-family: monospace; display: flex; flex-direction: column; align-items: center; }
+  canvas { border: 1px solid #1a3320; margin-top: 12px; }
+</style>
+</head>
+<body>
+<h1>Snake</h1>
+<div id="score">score 0</div>
+<canvas id="board" width="400" height="400"></canvas>
+<p>Arrow keys to turn · R to restart</p>
+<script>
+const board = document.getElementById("board");
+const ctx = board.getContext("2d");
+const KEYS = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
+
+async function api(method, path, body) {
+  const res = await fetch(path, { method, headers: { "Content-Type": "application/json" },
+                                   body: body ? JSON.stringify(body) : undefined });
+  return res.json();
+}
+
+function draw(s) {
+  const cell = board.width / s.width;
+  ctx.fillStyle = "#08110a"; ctx.fillRect(0, 0, board.width, board.height);
+  ctx.fillStyle = "#ff6b5c";
+  if (s.food) ctx.fillRect(s.food[0] * cell, s.food[1] * cell, cell, cell);
+  ctx.fillStyle = "#5cff7a";
+  for (const [x, y] of s.snake) ctx.fillRect(x * cell + 1, y * cell + 1, cell - 2, cell - 2);
+  document.getElementById("score").textContent = "score " + s.score + (s.over ? " · game over (R)" : "");
+}
+
+document.addEventListener("keydown", async (e) => {
+  if (KEYS[e.key]) draw(await api("POST", "/api/turn", { direction: KEYS[e.key] }));
+  if (e.key === "r" || e.key === "R") draw(await api("POST", "/api/reset", {}));
+});
+
+setInterval(async () => draw(await api("POST", "/api/step", {})), 150);
+api("GET", "/api/state").then(draw);
+</script>
+</body>
+</html>

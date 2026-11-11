@@ -44,14 +44,39 @@ T101, T102, ...; '- Needs: -'), using what the failure says. No text outside the
 
 
 def _invoke(llm, messages, timeout_s: float = PLAN_TIMEOUT_S) -> str:
+    def call() -> str:
+        # streamed, not one invoke: over the Kaggle tunnel a reply that sends nothing for 120 s is cut by
+        # Cloudflare (error 524, live 2026-11-11); a stream keeps bytes flowing while the plan is written
+        if hasattr(llm, "stream"):
+            return "".join(str(getattr(c, "content", "") or "") for c in llm.stream(messages))
+        return str(getattr(llm.invoke(messages), "content", "") or "")
+
     pool = ThreadPoolExecutor(max_workers=1)
     try:
-        reply = pool.submit(llm.invoke, messages).result(timeout=timeout_s)
-        return str(getattr(reply, "content", "") or "")
+        return pool.submit(call).result(timeout=timeout_s)
     except FutureTimeout as exc:
         raise TimeoutError(f"the planner did not answer within {timeout_s:.0f} s") from exc
     finally:
         pool.shutdown(wait=False)
+
+
+DISCUSSION_MAX_CHARS = 4000
+
+
+def with_discussion(request: str, messages: list, max_chars: int = DISCUSSION_MAX_CHARS) -> str:
+    """"ok lets build it" after talking an idea through: the task is the discussion, not those four words.
+    The last few user messages and Mitra's last answer, newest kept first when it is too long (live 2026-11-11)."""
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    talk = [m for m in messages if isinstance(m, (HumanMessage, AIMessage)) and str(m.content or "").strip()
+            and not getattr(m, "tool_calls", None)]
+    users = [str(m.content).strip() for m in talk if isinstance(m, HumanMessage)][-4:]
+    answer = next((str(m.content).strip() for m in reversed(talk) if isinstance(m, AIMessage)), "")
+    parts = [f"- {u[:1200]}" for u in users]
+    text = "\n".join(parts) + (f"\n\nMitra's last answer:\n{answer[:2000]}" if answer else "")
+    if len(text) > max_chars:
+        text = text[-max_chars:]
+    return f"{request}\n\nBuild what we discussed just before. What you said, in order:\n{text}" if text else request
 
 
 def _words(text: str) -> set[str]:

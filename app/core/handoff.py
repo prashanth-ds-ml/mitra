@@ -90,6 +90,17 @@ def summarize(llm, messages: list, timeout_s: float = 180) -> str:
         pool.shutdown(wait=False)
 
 
+def night_for_report(ns: dict | None, kaggle_started: float | None) -> dict | None:
+    """The night run worth naming in a Kaggle-ended report: one still running, or one started in this Kaggle
+    session. An old finished night's "elapsed" is the time since it started (live 2026-11-11: "4176 min of up to
+    4.0 h"), so a finished night shows no minutes."""
+    if not ns or not (ns.get("running") or (kaggle_started and ns.get("started", 0) >= kaggle_started)):
+        return None
+    return {"state": "running" if ns["running"] else "finished", "plan": Path(str(ns.get("plan", ""))).name,
+            "detail": (f"{ns.get('elapsed_min')} min so far, up to {ns.get('hours')} h" if ns["running"]
+                       else f"up to {ns.get('hours')} h")}
+
+
 def build(*, reason: str, workspace: Path, turns: list[dict], laptop: str, summary: str = "",
           last_tests: str = "", night: dict | None = None, kaggle: dict | None = None, now: float | None = None) -> str:
     now = now or time.time()

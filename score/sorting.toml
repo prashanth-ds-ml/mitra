@@ -1,0 +1,60 @@
+# The measuring set (D-068 step 3): how a request is sorted, no model. `previous` = the kind of the request before.
+# project_words: names in the project the request is typed in (files, folders).
+project_words = ["game", "paddle", "ball", "snake", "api", "serve", "web"]
+
+cases = [
+  # small talk and answers to Mitra
+  { text = "hi", want = "chat" },
+  { text = "thanks a lot", want = "chat" },
+  { text = "good morning mitra", want = "chat" },
+  { text = "ok", previous = "small", want = "small" },
+  { text = "yes go ahead", previous = "question", want = "small" },
+  # writing
+  { text = "draft a mail to the team about the kaggle setup", want = "writing" },
+  { text = "write an email to my manager asking for leave on friday", want = "writing" },
+  { text = "write a reply to this message: can we meet at 5?", want = "writing" },
+  { text = "summarise this:\nThe meeting covered the budget and the hiring plan.", want = "writing" },
+  { text = "translate this to hindi: thank you for coming", want = "writing" },
+  { text = "make it shorter", previous = "writing", want = "writing" },
+  { text = "more formal please", previous = "writing", want = "writing" },
+  { text = "write an email to my manager asking for leave on Friday for a family function", want = "writing" },
+  { text = "make the script send an email when the tests fail", want = "small" },
+  # general (names nothing in the project)
+  { text = "what is the difference between LoRA and QLoRA?", want = "general" },
+  { text = "plan my day: gym, kaggle run, review PRs", want = "general" },
+  { text = "how do I run a docker container?", want = "general" },
+  { text = "brainstorm names for my startup", want = "general" },
+  { text = "give me ideas for a weekend trip", want = "general" },
+  # questions, reviews, ideas about the project (explainer)
+  { text = "explain the game logic", want = "question" },
+  { text = "how does main.py start?", want = "question" },
+  { text = "summarize the game module", want = "question" },
+  { text = "why does the ball go through the paddle?", want = "question" },
+  { text = "what does paddle do?", want = "question" },
+  { text = "review the code in game.py", want = "question" },
+  { text = "is this a good way to structure the game loop?", want = "question" },
+  { text = "pros and cons of moving to fastapi for this project", want = "question" },
+  { text = "brainstorm ideas to make the game harder", want = "question" },
+  { text = "suggest some improvements for the api", want = "question" },
+  { text = "any ideas to speed up our tests?", want = "question" },
+  { text = "what could we add to the snake game next?", want = "question" },
+  { text = "what is option 2 exactly?", previous = "question", want = "question" },
+  # talking an idea through (live 2026-11-11), then building it
+  { text = "i want you to build a web app that writes small stories with an llm from openrouter, can we brainstorm on this", want = "general" },
+  { text = "i feel we should add a database and ask users to rate the answers", previous = "general", want = "general" },
+  { text = "ok lets build it", previous = "general", want = "big" },
+  { text = "build the web app we discussed", previous = "general", want = "big" },
+  # one change
+  { text = "write a function to parse the log", want = "small" },
+  { text = "fix the failing test in test_game.py", want = "small" },
+  { text = "make it shorter", want = "small" },
+  { text = "update the plan with a level system", want = "small" },
+  { text = "add a task to plan.md for sound", want = "small" },
+  { text = "go with option 2", previous = "question", want = "small" },
+  { text = "yes, the first idea", previous = "question", want = "small" },
+  # several changes or a whole feature: plan first
+  { text = "add a reply endpoint to the api", want = "big" },
+  { text = "update the plan and implement the level system", want = "big" },
+  # from Mitra's records
+  { text = "where did we stop", want = "resume" },
+]
