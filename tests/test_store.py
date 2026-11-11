@@ -85,3 +85,17 @@ def test_size_text_names_the_folder():
     assert "empty" in S.size_text()
     L.Recorder(S.H.home().parent / "p" / ".mitra" / "runs" / "r.jsonl").write("start")
     assert "1 record files" in S.size_text()
+
+
+def test_a_short_temp_name_still_counts_as_the_test_home(tmp_path, monkeypatch):
+    """E-108: on the Windows CI runner gettempdir() is the 8.3 name (C:/Users/RUNNER~1/...) while the home is
+    resolved to the long one: every test record looked like a dev run and was skipped (CI red since v0.7.0)."""
+    import tempfile
+
+    from app.core import store
+
+    (tmp_path / "x").mkdir()
+    # the same folder, spelled so that only resolving makes it match (as RUNNER~1 vs runneradmin does on CI)
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path / "x" / ".."))
+    rec = tmp_path / "proj" / ".mitra" / "runs" / "chat-1.jsonl"
+    assert store.mirror_path(rec) is not None

@@ -60,7 +60,8 @@ def mirror_path(record: Path) -> Path | None:
     home, store = H.home().resolve(), runs_root().resolve()
     if _within(record, root().resolve()):
         return None
-    if _within(record, Path(tempfile.gettempdir()).resolve()) and not _within(home, Path(tempfile.gettempdir())):
+    tmp = Path(tempfile.gettempdir()).resolve()  # E-108: resolved for both (CI's temp is C:\Users\RUNNER~1\...)
+    if _within(record, tmp) and not _within(home, tmp):
         # a workspace in the temp folder is a test, a score case or a dev check, never one of your projects: it
         # would show up as a project and feed the coach (deep dive 2026-11-11: 8 such folders were found)
         return None
