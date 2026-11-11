@@ -506,6 +506,36 @@ def cmd_report(
 cli.command("report")(cmd_report)
 
 
+def _score_model(model: str, remote: bool, ctx: int, arch: str):
+    """The model a score run uses -> (llm, model name, num_ctx, backend). Shared by `mitra score` and
+    `mitra improve --chat`, so the judge runs exactly as a score does."""
+    from app.core import roles as roles_mod
+    from app.core import score as S
+    from app.llm import model_supports_thinking
+
+    if arch not in S.ARCHITECTURES:
+        console.print(Text(f"--arch is one of: {', '.join(S.ARCHITECTURES)}", style="m.err"))
+        raise typer.Exit(2)
+    cfg = config.load()
+    model_name = model or roles_mod.chat_model(cfg)
+    # config.load points everything at an active Kaggle remote; the score runs on this machine unless --remote
+    # (E-082: the first "laptop" scores ran on the user's Kaggle session, at 256K)
+    local = cfg.get("_local") or {}
+    local_cfg = {**cfg, "num_ctx": local.get("num_ctx")} if "_local" in cfg else cfg
+    base_url = (local.get("ollama_local_base_url") if "_local" in cfg else cfg.get("ollama_local_base_url")) \
+        or "http://127.0.0.1:11434"
+    num_ctx, backend = (ctx or roles_mod.context_for(model_name, local_cfg)), "laptop"
+    if remote:
+        from app import remote as remote_mod
+        info = remote_mod.active()
+        if not info:
+            console.print(Text("no remote GPU in use: start one with `mitra kaggle start`", style="m.err"))
+            raise typer.Exit(1)
+        base_url, num_ctx, backend = info["url"], int(info.get("num_ctx") or num_ctx), "remote"
+    think = False if model_supports_thinking(model_name) else None
+    return get_local_llm(model_name, base_url=base_url, num_ctx=num_ctx, reasoning=think), model_name, num_ctx, backend
+
+
 def cmd_score(
     quick: bool = typer.Option(False, "--quick", help="Only sorting, writing, explain and ideas (a few minutes)."),
     only: str = typer.Option("", "--only", help="Categories (sorting,writing,explain,ideas,small,medium) and/or "
@@ -545,32 +575,10 @@ def cmd_score(
     runner, model_name = None, ""
     if [c for c in cats if c != "sorting"]:
         from app.core import harness as harness_mod
-        from app.core import roles as roles_mod
         from app.core import store as store_mod
-        from app.llm import model_supports_thinking
 
-        cfg = config.load()
-        model_name = model or roles_mod.chat_model(cfg)
-        # config.load points everything at an active Kaggle remote; the score runs on this machine unless --remote
-        # (E-082: the first "laptop" scores ran on the user's Kaggle session, at 256K)
-        local = cfg.get("_local") or {}
-        local_cfg = {**cfg, "num_ctx": local.get("num_ctx")} if "_local" in cfg else cfg
-        base_url = (local.get("ollama_local_base_url") if "_local" in cfg else cfg.get("ollama_local_base_url")) \
-            or "http://127.0.0.1:11434"
-        num_ctx, backend = (ctx or roles_mod.context_for(model_name, local_cfg)), "laptop"
-        if remote:
-            from app import remote as remote_mod
-            info = remote_mod.active()
-            if not info:
-                console.print(Text("no remote GPU in use: start one with `mitra kaggle start`", style="m.err"))
-                raise typer.Exit(1)
-            base_url, num_ctx, backend = info["url"], int(info.get("num_ctx") or num_ctx), "remote"
-        think = False if model_supports_thinking(model_name) else None
-        llm = get_local_llm(model_name, base_url=base_url, num_ctx=num_ctx, reasoning=think)
+        llm, model_name, num_ctx, backend = _score_model(model, remote, ctx, arch)
         stamp = time.strftime("%Y%m%d-%H%M%S")
-        if arch not in S.ARCHITECTURES:
-            console.print(Text(f"--arch is one of: {', '.join(S.ARCHITECTURES)}", style="m.err"))
-            raise typer.Exit(2)
         runner = S.Runner(llm=llm, harness=harness_mod.load(), num_ctx=num_ctx, backend=backend,
                           records=store_mod.root() / "score-runs" / stamp, arch=arch)
         console.print(Text(f"  scoring {', '.join(cats)} · {model_name} · {backend} · {num_ctx // 1024}K · {arch}",
@@ -647,8 +655,18 @@ def cmd_improve(
     tasks: str = typer.Option("", "--tasks", help="Comma-separated tune task ids (default: the whole tune half)."),
     max_steps: int = typer.Option(30, "--max-steps", help="Model calls per benchmark task."),
     force: bool = typer.Option(False, "--force", help="Run even if the free-RAM check fails."),
+    chat: bool = typer.Option(False, "--chat", help="Learn a conversation rule from failed score cases and your "
+                              "/bad and rephrase signals; `mitra score` (behaviour, writing, explain, ideas) decides."),
+    rounds: int = typer.Option(1, "--rounds", help="With --chat: rounds in a row (~20 min each on the laptop)."),
+    min_gain: int = typer.Option(0, "--min-gain", help="With --chat: cases the rule must add (0 = the default, 2)."),
+    arch: str = typer.Option("phased", "--arch", help="With --chat: the architecture scored (as `mitra score`)."),
+    remote: bool = typer.Option(False, "--remote", help="With --chat: run on the remote GPU in use (Kaggle)."),
+    ctx: int = typer.Option(0, "--ctx", help="With --chat: context size (0 = your setting)."),
 ) -> None:
-    """Self-improve: a local model proposes one settings change for the top problem; the benchmark decides."""
+    """Self-improve: a local model proposes one settings change; the benchmark (or with --chat, the score) decides."""
+    if chat:
+        _improve_chat(model, arch, remote, ctx, rounds, min_gain, dry_run)
+        return
     import json as _json
     import urllib.request
 
@@ -699,6 +717,46 @@ def cmd_improve(
                       proposer_name=proposer_name, dry_run=dry_run, tasks=chosen, bench=bench, num_ctx=num_ctx,
                       max_steps=max_steps, say=lambda t: console.print(Text(t, style="m.text")))
     raise typer.Exit(0 if entry.get("result") in ("kept", "dropped", "dry_run", "skipped") else 1)
+
+
+def _improve_chat(model: str, arch: str, remote: bool, ctx: int, rounds: int, min_gain: int, dry_run: bool) -> None:
+    """`mitra improve --chat`: rounds of propose a rule -> score both -> keep or drop (improve_chat.py)."""
+    from app.core import dashboard as D
+    from app.core import harness as H
+    from app.core import improve_chat as IC
+    from app.core import score as S
+    from app.core.chat import CHAT_PROMPT, ONE_PROMPT, PHASED_PROMPT
+
+    llm, model_name, num_ctx, backend = _score_model(model, remote, ctx, arch)
+    console.print(Text(f"  improve --chat · {model_name} · {backend} · {num_ctx // 1024}K · {arch} · "
+                       f"{rounds} round(s)", style="m.tool"))
+
+    def make_runner(h, records):
+        return S.Runner(llm=llm, harness=h, num_ctx=num_ctx, backend=backend, records=records, arch=arch)
+
+    def instructions(h):
+        return H.apply_prompt({"one": ONE_PROMPT, "phased": PHASED_PROMPT}.get(arch, CHAT_PROMPT), h)
+
+    row = IC.last_score_row(S.history(last=200), model=model_name, arch=arch)
+    if row and row.get("harness_version") != H.load().version:
+        row = None  # failures under other rules say little about these
+    files = D.run_files()
+    say = lambda t: console.print(Text(t, style="m.text"))  # noqa: E731
+    results = []
+    for n in range(1, max(1, rounds) + 1):
+        if rounds > 1:
+            console.print(Text(f"\n── round {n} of {rounds}", style="m.accent.b"))
+        entry = IC.improve_chat(proposer=llm, make_runner=make_runner, model=model_name, arch=arch, score_row=row,
+                                files=files, instructions=instructions, min_gain=min_gain or IC.MIN_GAIN,
+                                dry_run=dry_run, cwd=pathlib.Path.cwd(), say=say)
+        results.append(entry.get("result"))
+        if entry.get("result") not in ("kept", "dropped"):
+            break
+        row = entry.get("next_row")
+    kept = results.count("kept")
+    console.print(Text(f"\n  {kept} rule(s) kept of {len(results)} round(s) · `mitra harness` shows the rules",
+                       style="m.accent.b"))
+    raise typer.Exit(0 if all(r in ("kept", "dropped", "dry_run", "skipped") for r in results) else 1)
 
 
 cli.command("improve")(cmd_improve)

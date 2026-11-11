@@ -12,6 +12,14 @@ machine or your judgment. Updated every release.
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
 
+## 2026-11-11 · Behaviour fixes + `mitra improve --chat` (E-101, D-073)
+
+- [ ] Restart Mitra. "good what about you" after "hi": no project talk; "i am thinking mitra": ends with a question
+- [ ] "brainstorm ideas to make <your game> harder": it reads the code first, 3-5 ideas with file:line
+- [ ] A wrong answer: `/bad <why>` (this is evidence for `mitra improve --chat`)
+- [ ] With Mitra closed: `mitra improve --chat --dry-run` shows the evidence count and one proposed rule
+- [ ] When the GPU is free (~20 min): `mitra improve --chat`, then `mitra harness` shows any kept rule
+
 ## 2026-11-11 · One Mitra + qwen3.5 (v0.7.0)
 
 - [ ] Restart Mitra: the header shows qwen3.5:latest; "hi", "i am thinking…", "either X or Y" get short replies, no file reading

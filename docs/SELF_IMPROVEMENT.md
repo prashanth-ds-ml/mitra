@@ -207,3 +207,10 @@ What is missing for "it improves as we use it" (Phase B in BUILD_ORDER):
 
 Next choice for the user: fix the 4 rule-type misses directly (fast, proven by the score), or first wire
 `mitra improve` to `mitra score` + conversation signals so such misses get proposed and tested automatically.
+
+**User chose both (2026-11-11).** The 4 misses were fixed by hand (E-101). Points 1 and 2 above are built as
+`mitra improve --chat` (D-073): the judge is the quick score's model categories, the proposer reads the score's
+failed cases and your signals, one rule per round, kept only with +2 cases and no category lower. Point 3 (a
+schedule) is open: it needs your choice of when, since a round holds the GPU for ~20 minutes. The real chat records
+are thin so far (25 run files, 3 `/bad`, no rephrase signals): until they grow, the score's failures carry most of
+the evidence. `/bad <why>` after a wrong answer is the most useful signal you can give.

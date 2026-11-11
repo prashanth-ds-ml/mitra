@@ -3,6 +3,12 @@
 All notable changes, newest first. Versions follow the milestones in [docs/PLAN.md](docs/PLAN.md).
 
 ## [Unreleased]
+- **Four conversation misses fixed (E-101):** small talk no longer brings up the project; "I am thinking" gets a
+  question back; ideas about the project's code read the code first (3-5 options tied to file:line); continuing an
+  earlier conversation stays on that topic; summaries keep names, numbers and dates as written.
+- **`mitra improve --chat` (D-073):** Mitra learns one conversation rule from the failed `mitra score` cases and
+  your `/bad` / rephrase / interrupt / undo signals, scores the quick set with and without it, and keeps it only if
+  it passes at least 2 more cases with no category lower. `--rounds N`, `--dry-run`; undo with `mitra harness revert`.
 
 ## [0.7.0] - 2026-11-11 · One Mitra (D-071) + qwen3.5 as the model (D-072)
 - **qwen3.5:latest is Mitra's model** (chat, all roles, Kaggle at 256K); mimo turned conversation into builds.
