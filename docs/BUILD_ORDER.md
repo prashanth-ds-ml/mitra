@@ -128,6 +128,33 @@ Template per step: **What we build · What Mitra does after it · Why · Done wh
 | B6 | Direct MCP tools per role (git, context7), then the Serena trial | measured on the score |
 | B7 | Reviewer with semgrep, deployer, Modal, other profiles | |
 
+## Agreed order (D-077, 2026-11-12)
+
+Local first: everything works on the laptop with no internet; Kaggle when online and a job needs it. The numbers in
+brackets are the must-haves in D-077 each item serves. Steps 4-5 above are items 2-4 here.
+
+| # | Item | Serves | Status |
+|---|---|---|---|
+| 1 | No claim without a source: the decide step's query runs (E-109), "confirmed"/"tests pass" checked against the turn's tool results (E-110), honest "offline" | 3, 6 | done 2026-11-12 |
+| 1b | Partner basics (D-078, must-have 13): no opening praise, agree only with a reason; "deep dive" = at least 3 queries and 4-5 pages with a bigger budget | 13 | |
+| 1c | Honest self-description: ABOUT_MITRA also says what Mitra cannot do yet, kept in step with this table | 7 | |
+| 2 | Tests after every change, retry with the failing output | 5 | |
+| 3 | No "done" without a passing test in the same turn | 6 | |
+| 4 | Read before edit; no accidental whole-file overwrite | 4 | |
+| 5 | Coding practice set: Python, SQL, MongoDB; public sets with hidden tests + our own; split learn / held out | 10 | |
+| 6 | Your real failures (/bad) become score cases | 10 | |
+| 7 | Honest keep/drop gate: re-run the cases that changed, no new failures, held-out set | 11 | |
+| 8 | Threads add, never overwrite | 12 | |
+| 9 | Better signals: the 4B reads your next message against a checklist; optional per-session rating at exit | 9 | |
+| 10 | General web search: SearXNG on Kaggle (one-cell engine test first) | 7 | |
+| 11 | Knows its tools and limits; installed package docs first | 7 | |
+| 12 | Read files outside the project, read-only, asks first | 4 | |
+| 13 | Kaggle crash-safety, stream timeout (E-081), fast offline detection | 2, 3 | |
+
+Later: night runs on the practice set with a morning report; friends' feedback (scrubbed export/import file); Kiwix
+offline docs (refreshed monthly); lessons from verified work; test anchors; tests first; loop detection; veto a rule
+before use; project map; 4B + 9B together; docs MCP; diff view; the coach on a schedule; fine-tuning last (D-021).
+
 ## Frozen until Phase A is done
 New subsystems, new MCP servers, new backends, profile packs, dashboard work, UI polish beyond what a step needs.
 

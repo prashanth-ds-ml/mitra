@@ -3,6 +3,10 @@
 All notable changes, newest first. Versions follow the milestones in [docs/PLAN.md](docs/PLAN.md).
 
 ## [Unreleased]
+- **No claim without proof (D-077 #1, E-109, E-110):** a search Mitra asks for while deciding now really runs (it
+  was dropped, and the model was told "ok"); an answer that says "confirmed", "verified", "I found" or "tests pass"
+  without a tool result in the same turn to back it gets a ⚠ Unverified line, a record row, and a flag in the coach's
+  digest. Offline, web search and fetch say "Offline: nothing was searched" at once instead of timing out.
 - **Four conversation misses fixed (E-101):** small talk no longer brings up the project; "I am thinking" gets a
   question back; ideas about the project's code read the code first (3-5 options tied to file:line); continuing an
   earlier conversation stays on that topic; summaries keep names, numbers and dates as written.

@@ -3868,6 +3868,9 @@ def _chat():
                 console.print(ui.tool_line("Stopped", ok=False, detail=turn.stop_reason))
             elif not ai_reply:
                 console.print(ui.tool_line("Empty reply", ok=False, detail="the model wrote no answer. Try again."))
+            if getattr(turn, "unverified", None):  # E-110: a claim no tool result of this turn backs
+                from app.core import grounding as grounding_mod
+                console.print(ui.tool_line("Unverified", ok=False, detail=grounding_mod.warning(turn.unverified)))
 
             # ── Token bar ─────────────────────────────────────────────────────
             sess_in += turn_in; sess_out += turn_out

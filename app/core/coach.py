@@ -103,7 +103,7 @@ def turns_since(files: list[Path], since_t: float) -> list[dict]:
         rows = _rows(f)
         by_turn: dict = {}
         for r in rows:
-            n = r.get("turn") if r.get("kind") in ("turn_start", "turn_end", "phase", "talk_route") else (
+            n = r.get("turn") if r.get("kind") in ("turn_start", "turn_end", "phase", "talk_route", "grounding") else (
                 r.get("of_turn") if r.get("kind") in ("signal", "feedback") else None)
             if r.get("kind") == "tool":
                 n = r.get("turn")
@@ -128,6 +128,8 @@ def turns_since(files: list[Path], since_t: float) -> list[dict]:
                     flags.append("you marked it /bad" + (f": {r.get('note')}" if r.get("note") else ""))
                 elif r.get("kind") == "signal" and r.get("signal") in ("rephrase", "interrupt", "undo"):
                     flags.append(f"signal: {r.get('signal')}")
+                elif r.get("kind") == "grounding":  # E-110: claimed a check no tool result backed
+                    flags.append("unverified claim: " + "; ".join(str(c)[:120] for c in (r.get("claims") or [])[:2]))
             text = str(end.get("text", "") or "")
             seconds = float(end.get("seconds") or 0)
             if not text.strip():

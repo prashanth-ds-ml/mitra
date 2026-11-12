@@ -18,6 +18,7 @@ from typing import Callable
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from app.agents.limits import RepeatGuard
+from app.core import grounding
 from app.core import harness as H
 from app.core import loop as core_loop
 from app.core import signals as SIG
@@ -469,6 +470,7 @@ class TurnResult:
     last_test_summary: str = ""
     remote_gone: bool = False  # the remote GPU stopped mid-turn (D-062 B3)
     first_s: float | None = None  # time to the first answer word or tool call of the turn (D-068)
+    unverified: list = field(default_factory=list)  # E-110: claims no tool result of the turn backs
 
 
 class ChatSession:
@@ -502,7 +504,8 @@ class ChatSession:
         self.answer_on_last_step = False  # D-068 step 2: the last step gets no tools, so a turn always ends answered
         self.last_step_note = LAST_STEP_NOTE  # what the model is told on that last step
         self.deciding = False       # D-071 phased: the first call offers only the phase switches (PHASE_SPECS)
-        self.phase_request: dict | None = None  # {"name", "args"} when the model chose a phase
+        self.phase_request: dict | None = None  # {"name", "args", "id"} when the model chose a phase
+        self.turn_tools: list[tuple[str, bool, str]] = []  # E-110: (name, ok, output) of this turn's tools
         self.last_phase: str | None = None       # phased: the phase the last turn worked in (None = talk only)
         self.end_info: dict = {}    # extra fields for this turn's turn_end row (the explainer's budget, files cited)
         self.last_speed: float | None = None  # tokens/s of the last answer (Ollama's eval_count / eval_duration)
@@ -789,20 +792,38 @@ class ChatSession:
             messages[:] = [m for m in messages if m is not reminder]
         if not self.phase_request:
             return res  # talked: one call
-        name = self.phase_request["name"]
+        asked = name = self.phase_request["name"]
         if name not in PHASES:  # it called a real tool by name: the phase that has it
             name = ("make_change" if name in ("edit_file", "write_file", "append_file", "make_dir", "run_command",
                                               "run_plan")
                     else "look_up" if name in ("web_search", "fetch_url") else "look_at_code")
         phase = PHASES[name]
         self.last_phase = name
-        messages.append(HumanMessage(content=phase["note"]))
         self.allowed_tools = phase["tools"]
+        if asked not in PHASES and asked in READ_ONLY_TOOLS and asked in (phase["tools"] or ()):
+            self._run_decided(messages, asked)  # E-109: the query it asked for runs, it is not dropped
+        messages.append(HumanMessage(content=phase["note"]))
         self.answer_on_last_step, self.last_step_note = True, ONE_LAST_STEP_NOTE
         budget = self.harness.limit(phase["budget"]) if phase["budget"] else 1
         acted = self._turn(messages, TurnResult(journal=res.journal), budget)
         acted.steps += res.steps  # the decide call counts
         return acted
+
+    def _run_decided(self, messages: list, name: str) -> None:
+        """E-109 (live 2026-11-11): the decide step called web_search with "DPDP Act India SME compliance deadline";
+        the switch answered "ok" without running it, the look-up phase never searched it, and the answer said
+        "Confirmed". A read-only tool named in the decide step now runs first, and its result replaces the
+        placeholder the switch wrote."""
+        args, call_id = self.phase_request.get("args") or {}, self.phase_request.get("id")
+        out, ok = self._run(name, args, self._run_plan)
+        self.hooks.show(name, args, out, ok)
+        self.turn_tools.append((name, ok, out))
+        self.rec.write("tool", turn=self.turn_no, step=1, name=name, args=args, ok=ok, output=out[:3000],
+                       from_decide=True)
+        for i, m in enumerate(messages):
+            if isinstance(m, ToolMessage) and m.tool_call_id == call_id:
+                messages[i] = ToolMessage(content=out, tool_call_id=call_id)
+                break
 
     def converse(self, messages: list, notes: str = "") -> TurnResult:
         """One Mitra (D-071): the model decides whether to talk, look or change; every tool the role allows is
@@ -862,6 +883,7 @@ class ChatSession:
         t0 = time.monotonic()
         user = next((m.content for m in reversed(messages) if isinstance(m, HumanMessage)), "")
         self._new_turn(str(user))
+        self.turn_tools = []
         self._check_corrections(of_turn=self.turn_no - 1)  # attributed to the turn they correct
         self.rec.write("turn_start", **self._start_row(str(user)))
         try:
@@ -888,6 +910,11 @@ class ChatSession:
                 self.signal("interrupt", steps=res.steps)
             self._remember_left(res.journal)
             raise
+        claims = grounding.unbacked(res.text, self.turn_tools) if res.text else []
+        if claims:  # E-110: a "confirmed" / "tests pass" no tool result of this turn backs
+            res.unverified = claims
+            self.rec.write("grounding", turn=self.turn_no, claims=[c[:300] for c in claims],
+                           tools=[n for n, _, _ in self.turn_tools])
         self.rec.write("turn_end", turn=self.turn_no, steps=res.steps, stopped=res.stopped, reason=res.stop_reason,
                        text=res.text[:2000], tokens_in=res.tokens_in, tokens_out=res.tokens_out,
                        ctx_used=res.ctx_used, seconds=round(time.monotonic() - t0, 1), outcome=turn_outcome(res),
@@ -1010,10 +1037,13 @@ class ChatSession:
                 return res
             if self.deciding:  # the model chose a phase: record it, answer the switch, and hand back
                 tc = reply.tool_calls[0]
-                self.phase_request = {"name": tc["name"], "args": tc.get("args") or {}}
+                self.phase_request = {"name": tc["name"], "args": tc.get("args") or {}, "id": tc["id"]}
                 self.rec.write("phase", turn=self.turn_no, step=step, name=tc["name"], args=tc.get("args") or {})
                 for t in reply.tool_calls:
-                    messages.append(ToolMessage(content=f"ok: {t['name'].replace('_', ' ')}", tool_call_id=t["id"]))
+                    # E-109: a real tool named here is not run by the switch; "ok" made the model think it was
+                    said = (f"ok: {t['name'].replace('_', ' ')}" if t["name"] in PHASES
+                            else f"Not run yet: {t['name']} has not been run. Call it in the next step.")
+                    messages.append(ToolMessage(content=said, tool_call_id=t["id"]))
                 return res
             stop = ""
             for tc in reply.tool_calls:
@@ -1035,6 +1065,7 @@ class ChatSession:
                     res.last_test_ok = ok
                     res.last_test_summary = (out.strip().splitlines() or [""])[0][:200]
                 self.hooks.show(name, args, out, ok)
+                self.turn_tools.append((name, ok, out))
                 self.rec.write("tool", turn=self.turn_no, step=step, name=name, args=args, ok=ok, output=out[:3000])
                 messages.append(ToolMessage(content=out, tool_call_id=tc["id"]))
                 stop = guard.after(name, out, ok) or ""
