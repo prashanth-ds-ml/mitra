@@ -275,6 +275,9 @@ def cited_files(text: str, root: Path) -> list[str]:
 
 READ_ONLY_TOOLS = {"list_files", "read_file", "search", "web_search", "fetch_url", "mcp_find"}  # plan mode
 CHANGE_TOOLS = ("edit_file", "write_file", "append_file")  # D-078 #2: after these, the tests run
+# E-114: a phase may hand over to the next one in the same turn (looked first, then changes or plans)
+PHASE_NEXT = {"look_at_code": ("make_change", "propose_plan"), "look_up": ("look_at_code", "make_change")}
+MAX_PHASE_SWITCHES = 2
 NO_TEST_EXT = (".md", ".txt", ".rst")                      # notes and docs: no test run after them
 
 # E-100 (A/B 2026-11-11): with thinking off, mimo sometimes "thinks" anyway, invisibly, until the output cap (8,192
@@ -498,6 +501,19 @@ class TurnResult:
     remote_gone: bool = False  # the remote GPU stopped mid-turn (D-062 B3)
     first_s: float | None = None  # time to the first answer word or tool call of the turn (D-068)
     unverified: list = field(default_factory=list)  # E-110: claims no tool result of the turn backs
+    switch_to: str = ""  # E-114: the phase a phase handed over to (look -> change / plan)
+
+
+def _merged(first: TurnResult, then: TurnResult) -> TurnResult:
+    """E-114: one turn that worked in two phases: counts add up, the answer and test state are the last phase's."""
+    then.steps += first.steps
+    then.tokens_in += first.tokens_in
+    then.tokens_out += first.tokens_out
+    then.tests_run += first.tests_run
+    if then.last_test_ok is None:
+        then.last_test_ok, then.last_test_summary = first.last_test_ok, first.last_test_summary
+    then.first_s = first.first_s if first.first_s is not None else then.first_s
+    return then
 
 
 class ChatSession:
@@ -844,6 +860,17 @@ class ChatSession:
         self.look_budget = budget
         acted = self._turn(messages, TurnResult(journal=res.journal), budget)
         acted.steps += res.steps  # the decide call counts
+        hops = 0
+        while acted.switch_to and hops < MAX_PHASE_SWITCHES:  # E-114: looked first, now changes (or plans)
+            hops += 1
+            name, acted.switch_to = acted.switch_to, ""
+            phase = PHASES[name]
+            self.last_phase, self.allowed_tools = name, phase["tools"]
+            self.rec.write("phase", turn=self.turn_no, step=acted.steps, name=name, args={}, switched=True)
+            messages.append(HumanMessage(content=phase["note"]))
+            budget = self.harness.limit(phase["budget"]) if phase["budget"] else 1
+            more = self._turn(messages, TurnResult(journal=acted.journal), budget)
+            acted = _merged(acted, more)
         return acted
 
     def _run_decided(self, messages: list, name: str) -> None:
@@ -1135,7 +1162,7 @@ class ChatSession:
                             else f"Not run yet: {t['name']} has not been run. Call it in the next step.")
                     messages.append(ToolMessage(content=said, tool_call_id=t["id"]))
                 return res
-            stop, changed_now = "", False
+            stop, changed_now, switch_to = "", False, ""
             for tc in reply.tool_calls:
                 if stop:  # every tool call gets a result, even when the turn is stopping
                     messages.append(ToolMessage(content="✗ Not run: the turn was stopped.", tool_call_id=tc["id"]))
@@ -1146,7 +1173,12 @@ class ChatSession:
                     stop = "cancelled (timed out)"
                     continue
                 refused = guard.before(name, args)
-                if refused:
+                if name in PHASE_NEXT.get(self.last_phase or "", ()) and self.path == "phased" and not refused:
+                    # E-114 (Phase 1 score, B9): asked to change something, the 9B looked first, found the line,
+                    # called make_change inside the look phase and was told it is "not available"
+                    switch_to = name
+                    out, ok = f"ok: switching to the {name.replace('_', ' ')} phase; its tools come next.", True
+                elif refused:
                     out, ok = refused, False
                 elif name == "run_tests" and not args and self._last_auto is not None:
                     # D-078 #2: nothing changed since the tests ran after the last change: the same result, at once
@@ -1169,6 +1201,9 @@ class ChatSession:
                 stop = guard.after(name, out, ok) or ""
             if stop:
                 return self._wrap_up(messages, res, stop)
+            if switch_to:  # E-114: the next phase runs with its own tools, note and budget (_phased_body)
+                res.switch_to = switch_to
+                return res
             if changed_now:  # D-078 #2: the tests run after every change, and the model sees the result
                 changed_now = False
                 note = self._test_after_change(res, step)

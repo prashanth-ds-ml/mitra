@@ -138,3 +138,34 @@ def test_write_file_refuses_to_shrink_a_big_file_to_a_fragment(tmp_path):
     (tmp_path / "small.py").write_text("x = 1\ny = 2\n", encoding="utf-8")
     T.read_file(ws, "small.py")
     T.write_file(ws, "small.py", "x = 3\n")                                    # small files: fine
+
+
+# ── E-114: a look phase hands over to the change phase ─────────────────────────────────────────────────────────
+
+def test_looking_first_then_changing_works_in_one_turn(tmp_path):
+    """Phase 1 score, B9: "make the snake start 4 cells long" -> look_at_code, found line 13, called make_change
+    inside the look phase, was told it is not available, and answered "I can't directly edit files"."""
+    _project(tmp_path)
+    m = Spy(AIMessage(content="", tool_calls=[tc("look_at_code", 1, what="where add is")]),
+            AIMessage(content="", tool_calls=[tc("read_file", 2, path="calc.py")]),
+            AIMessage(content="", tool_calls=[tc("make_change", 3, what="add, not subtract")]),
+            AIMessage(content="", tool_calls=[tc("edit_file", 4, path="calc.py", old="a - b", new="a + b")]),
+            AIMessage(content="Changed calc.py:2 to add; the test passes."))
+    s = _session(tmp_path, m)
+    res = s.phased(_msgs("make add in calc.py add instead of subtract"))
+    assert (tmp_path / "calc.py").read_text(encoding="utf-8").endswith("return a + b\n")
+    assert res.tests_run == 1 and res.last_test_ok is True and res.unverified == []
+    assert res.text.startswith("Changed calc.py:2") and s.last_phase == "make_change"
+    rows = [json.loads(x) for x in s.rec.path.read_text(encoding="utf-8").splitlines() if x.strip()]
+    assert [r["name"] for r in rows if r["kind"] == "phase"] == ["look_at_code", "make_change"]
+    assert res.steps == 5
+
+
+def test_a_phase_cannot_switch_to_one_that_is_not_next(tmp_path):
+    _project(tmp_path)
+    m = Spy(AIMessage(content="", tool_calls=[tc("look_up", 1, what="x")]),
+            AIMessage(content="", tool_calls=[tc("propose_plan", 2, goal="x")]),
+            AIMessage(content="Here is what I found."))
+    s = _session(tmp_path, m)
+    s.phased(_msgs("look up x"))
+    assert s.last_phase == "look_up"                       # look_up -> propose_plan is not a hand-over

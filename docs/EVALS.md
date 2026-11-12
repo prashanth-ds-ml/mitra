@@ -79,6 +79,13 @@ times in a row, 2026-11-12. Quick set: behaviour 14 · writing 3 · explain 4 ·
   total falls below 17.
 - **Against before #1** (2026-11-11 16:28, behaviour on the old 10-case set 7/10): no case that worked broke.
 
+**Phase 1 check** (commit 1aeb15c: tests after every change, no "done" without a pass, write guard, partner basics,
+honest self-description), 2026-11-12 16:59: sorting 54/54 · behaviour 10/14 · writing 2/3 · explain 4/4 · ideas 1/2
+= **17/23**, inside the baseline's 17-19; **no regression** (no case that passed in all three baseline runs fails).
+Failed: B6_general (185 words, too long), B9_change (changed nothing), B12_knows_itself (no "Kaggle"), W3_summary
+(opened with "Here is"), I1_harder (no file cited). B9 had failed in all three baseline runs: its record showed the
+model looked first, then could not switch to the change phase (E-114, fixed in F-106 after this run).
+
 ## Results
 
 ### 2026-11-06 · M1 · First `mitra improve` runs (self-improvement step 3, smoke test)
