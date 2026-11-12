@@ -103,9 +103,27 @@ SQL from Spider; hidden checks decide.
 | Date | Code | Passed | Python | SQL | Held out | Misread | Time | Failures |
 |---|---|---|---|---|---|---|---|---|
 | 2026-11-12 22:06 | d2d139d | **13/20** | 8/12 | 5/8 | 5/9 | 1 | 41 min | 2× "couldn't create the files" (E-124), 1× answered in chat with no query.sql (E-124), 1× extra column (Spider column strictness), 1× wrong rows, 1× misread (mbpp/432, an edge case its own test missed), 1× 600 s with no answer from the model (E-081) |
+| 2026-11-13 00:06 | 1208270 (E-124 in) | **18/20** | 12/12 | 6/8 | 7/9 | 0 | 45 min | 2× SQL wrong rows (network_1/899 a real mistake; world_1/742 an extra column, Spider strictness). All three E-124 tasks now pass (humaneval/87, mbpp/606, world_1/723); mbpp/432 (misread) and mbpp/749 (time-out) passed too |
 
 Run by the user on an evening machine (not a fresh baseline). 10 tasks had no own tests (all 8 SQL, 2 Python that never
 wrote a file).
+
+Single runs, so the practice noise is not known yet; but the three tasks E-124 targeted all flipped to pass, and
+no task that passed before failed. Free RAM 6 GB at the start; 4.8 of 7.7 GB of the model on the GPU.
+
+### Phase 3 baseline (2026-11-12 23:43-00:06, commit 1208270, not after a restart)
+
+| Run | Free RAM | Model on GPU | Model cases | Failed |
+|---|---|---|---|---|
+| 1 (23:43) | 8.4 GB | 4.8 of 7.7 GB | **17/23** | B7 (no file cited), B12, B13, W3, X2 (no file cited), I1 |
+| 2 (23:51) | 3.9 GB | 4.8 of 7.7 GB | **19/23** | B12, W3, X2 ("changed files"), I1 |
+| 3 (23:59) | 6.3 GB | 4.8 of 7.7 GB | **18/23** | B7 ("changed files"), B12, W3, X2 (no file cited), I1 |
+
+- **Noise:** 17-19 again, as on 2026-11-12. Always failing: B12_knows_itself (no "Kaggle"), W3_summary ("Here is"),
+  X2_grow, I1_harder. A Phase 3 change counts as a regression only if a case passing in all three runs fails, or the
+  total falls below 17.
+- **"changed files" on a question** (B7 run 3, X2 run 2): both ran run_tests, which leaves .pytest_cache; the score
+  counts it as a change (known, Phase 3 step 2).
 
 ## Results
 
