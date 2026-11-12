@@ -8,6 +8,8 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-113 | 2026-11-12 | E-123 | `practice` is in `intent.CLI_COMMANDS` (the chat answers with the terminal hint) and `mitra practice` exists (D-078 step 5b) | `app/core/intent.py`, `app/main.py` | `tests/test_practice_run.py::test_mitra_practice_typed_in_the_chat_gets_the_terminal_hint` (fails without the fix) | works |
+| F-112 | 2026-11-12 | E-122 | PHASED_PROMPT: the phases are Mitra's own switches, never named to the user ("I'll look at the code", not "look_at_code") | `app/core/chat.py` | `tests/test_practice_run.py::test_the_phase_names_are_never_named_to_the_user` | works |
 | F-111 | 2026-11-12 | E-121 | `score.claims`: a must_not match counts only when its sentence does not negate it before the match (doesn't, not, never, no, instead of, ...) | `app/core/score.py` | `tests/test_live_20261112_p1.py::test_a_denied_wrong_claim_is_not_a_wrong_claim` (fails without the fix) | works |
 | F-110 | 2026-11-12 | E-120 | Both read each file session by session (`cases._sessions`: split at `session` rows); `conversation_signals` also leaves out turns kept as held-out real cases | `app/core/improve_chat.py`, `app/core/coach.py`, `app/core/cases.py` | `tests/test_cases_d078.py::test_a_bad_is_matched_to_its_own_session` (fails without the fix) | works |
 | F-109 | 2026-11-12 | E-118 | When the message asks for a deep dive or a web search, the decide-step reminder adds "do it now (look_up, or look_at_code if it is about this project's files); do not ask whether to search" | `app/core/chat.py` | `tests/test_live_20261112_p1.py::test_a_deep_dive_or_search_request_is_told_to_search_now` (fails without the fix) | works |

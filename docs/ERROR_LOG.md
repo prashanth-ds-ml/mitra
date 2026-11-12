@@ -8,6 +8,8 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-123 | 2026-11-12 | D-078 step 5 | Low | user's live session (typed "mitra practice" in the chat) | "mitra practice" in the chat went to the model, which made up a "practice loop": `practice` was not in the terminal-command list (the command did not exist yet either) | closed | F-113 |
+| E-122 | 2026-11-12 | D-071 phased | Low | same live session | The answer named Mitra's internal phase switches to the user: "ask what you want to do (e.g., look_at_code, look_up, make_change, or just chat)" | closed | F-112 |
 | E-121 | 2026-11-12 | D-068 score | Medium | quick score 2026-11-12 20:08 (X4_wall) | The explain/ideas "wrong claim" check matched denials: "The game doesn't wrap around or bounce, it simply stops" (correct) failed as the wrong claim "wraps around" | closed | F-111 |
 | E-120 | 2026-11-12 | D-073, D-075 | High | review while building D-078 step 6 | `improve_chat.conversation_signals` and `coach.turns_since` matched a /bad (or signal) to its turn by turn number over the whole day's file, but turn numbers restart in every session: a /bad on turn 3 of the second session got the text of turn 3 of the first. `mitra improve` and the coach digest have been reading mismatched evidence whenever a day had more than one session | closed | F-110 |
 | E-119 | 2026-11-12 | D-071 phased | Low | user's live session on the Phase 1 code | A WhatsApp message draft got a "Subject:" line and **bold** (WhatsApp shows the stars): every message was drafted like a mail | closed | F-108 |

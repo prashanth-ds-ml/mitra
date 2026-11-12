@@ -3,6 +3,11 @@
 All notable changes, newest first. Versions follow the milestones in [docs/PLAN.md](docs/PLAN.md).
 
 ## [Unreleased]
+- **`mitra practice` (D-078 step 5):** `mitra practice --download` builds 100 Python (MBPP+, HumanEval+) and 50
+  SQL (Spider) tasks in ~/.mitra/practice once (works offline after that); `mitra practice --n 20 [--kind sql]
+  [--split held_out] [--remote]` lets Mitra solve each in a fresh folder with its own tests, and a hidden check
+  decides. The report counts "misread" tasks (its own tests passed, the hidden check failed). Results in
+  results/practice.jsonl (task ids and outcomes only).
 - **Your /bad becomes a test case (D-078 step 6):** `mitra cases` drafts a score case from each new /bad (the coach
   writes it when Claude Code is there, otherwise a template from your note); `mitra cases review` keeps, edits or
   drops each one. Kept cases form the private "real" category of `mitra score` (~/.mitra/score/real.toml, never in

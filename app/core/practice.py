@@ -345,3 +345,140 @@ def load(dest: Path | None = None, kind: str = "", split: str = "") -> list[Task
     except OSError:
         return []
     return [t for t in tasks if (not kind or t.kind == kind) and (not split or t.split == split)]
+
+
+# ── running (step 5b): Mitra solves each task in a fresh folder, then the hidden check decides ────────────────────
+
+TASK_TIMEOUT_S = 600
+
+
+@dataclass
+class Result:
+    id: str
+    kind: str
+    split: str
+    passed: bool
+    detail: str = ""        # the hidden check's reason (never shown to Mitra)
+    own_tests: bool = False  # Mitra wrote its own test file
+    own_ok: bool | None = None  # its last test run in the turn passed (None: never ran)
+    seconds: float = 0.0
+    steps: int = 0
+
+    @property
+    def misread(self) -> bool:
+        """Its own tests passed, the hidden ones did not: it misunderstood the task (the most useful lesson)."""
+        return bool(self.own_ok) and not self.passed
+
+
+def order(tasks: list[Task]) -> list[Task]:
+    """A fixed order spread over sources and kinds (by hash), so `--n 20` is the same 20 every time."""
+    return sorted(tasks, key=lambda t: hashlib.sha1(("run:" + t.id).encode()).hexdigest())
+
+
+def prepare(task: Task, ws: Path) -> None:
+    ws.mkdir(parents=True, exist_ok=True)
+    if task.kind == "sql":
+        (ws / "database.sqlite").write_bytes(Path(task.db).read_bytes())
+
+
+def grade(task: Task, ws: Path) -> Check:
+    """The hidden check on what Mitra left in the folder. SQL runs on the original database (Mitra's copy may have
+    been changed)."""
+    if task.kind == "python":
+        f = ws / "solution.py"
+        if not f.is_file():
+            return Check(False, "no solution.py")
+        return check_python(f.read_text(encoding="utf-8", errors="replace"), task.test, task.call)
+    f = ws / "query.sql"
+    if not f.is_file():
+        return Check(False, "no query.sql")
+    return check_sql(task.db, f.read_text(encoding="utf-8", errors="replace"), task.gold)
+
+
+def solve(task: Task, runner, timeout_s: float = TASK_TIMEOUT_S) -> Result:
+    """One task: a fresh folder, Mitra's own chat loop (the score's runner: edits allowed, no web), the hidden check."""
+    from langchain_core.messages import HumanMessage
+
+    from app.core import score as S
+
+    t0 = time.monotonic()
+    with tempfile.TemporaryDirectory(prefix="mitra-practice-", ignore_cleanup_errors=True) as tmp:
+        ws = Path(tmp) / "task"
+        prepare(task, ws)
+        s = runner.session(ws, task.id.replace("/", "_"))
+        messages = [runner.system(ws=ws), HumanMessage(content=task.prompt)]
+        steps, own_ok = 0, None
+        try:
+            res, _path = S._timed(lambda: runner.respond(s, messages, ws), timeout_s, s)
+            steps, own_ok = res.steps, res.last_test_ok
+            check = grade(task, ws)
+        except Exception as exc:  # noqa: BLE001 - a crash or a time-out is a failed task, never a pass
+            check = Check(False, f"{type(exc).__name__}: {str(exc)[:150]}")
+        own_tests = any(p.name.startswith("test_") for p in ws.glob("*.py"))
+    return Result(task.id, task.kind, task.split, check.passed, check.detail, own_tests, own_ok,
+                  round(time.monotonic() - t0, 1), steps)
+
+
+def results_path() -> Path:
+    from app.core import score as S
+    return S.RESULTS.parent / "practice.jsonl"
+
+
+def run(tasks: list[Task], runner, *, model: str = "", on_task=lambda r: None, results: Path | None = None,
+        timeout_s: float = TASK_TIMEOUT_S) -> dict:
+    """Solve every task, append one row to results/practice.jsonl (the task ids and outcomes only: no task text),
+    return it."""
+    import json
+    from dataclasses import asdict
+
+    from app.core import score as S
+
+    t0, out = time.monotonic(), []
+    for task in tasks:
+        r = solve(task, runner, timeout_s)
+        on_task(r)
+        out.append(r)
+    row = {"t": time.time(), "date": time.strftime("%Y-%m-%d %H:%M"), "mitra_version": S.mitra_version(),
+           "harness_version": runner.harness.version, "model": model, "arch": runner.arch,
+           "backend": runner.backend, "num_ctx": runner.num_ctx, "seconds": round(time.monotonic() - t0, 1),
+           "records": str(runner.records), "summary": summary(out),
+           "results": [{**asdict(r), "misread": r.misread} for r in out]}
+    path = results or results_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    return row
+
+
+def summary(results: list[Result]) -> dict:
+    def frac(rs):
+        return [sum(r.passed for r in rs), len(rs)]
+    return {"all": frac(results),
+            "python": frac([r for r in results if r.kind == "python"]),
+            "sql": frac([r for r in results if r.kind == "sql"]),
+            "held_out": frac([r for r in results if r.split == "held_out"]),
+            "misread": sum(r.misread for r in results),
+            "no_own_tests": sum(not r.own_tests for r in results)}
+
+
+def report(row: dict) -> str:
+    """A few lines for the screen and EVALS."""
+    s = row["summary"]
+    parts = [f"{k} {s[k][0]}/{s[k][1]}" for k in ("python", "sql", "held_out") if s[k][1]]
+    lines = [f"practice: {s['all'][0]}/{s['all'][1]} passed · " + " · ".join(parts)
+             + f" · {row['seconds'] / 60:.0f} min",
+             f"misread (its own tests passed, the hidden ones failed): {s['misread']} · "
+             f"wrote no tests of its own: {s['no_own_tests']}"]
+    reasons = Counter(_reason(r["detail"]) for r in row["results"] if not r["passed"])
+    if reasons:
+        lines.append("most common failures: " + "; ".join(f"{why} ×{n}" for why, n in reasons.most_common(3)))
+    return "\n".join(lines)
+
+
+def _reason(detail: str) -> str:
+    d = (detail or "").strip()
+    for key in ("no solution.py", "no query.sql", "timed out", "query error", "TimeoutError", "SyntaxError",
+                "NameError", "TypeError", "AssertionError", "rows, want"):
+        if key in d:
+            return {"rows, want": "wrong rows", "AssertionError": "wrong output"}.get(key, key)
+    return d.splitlines()[-1][:60] if d else "unknown"

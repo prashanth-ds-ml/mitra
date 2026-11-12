@@ -139,7 +139,7 @@ def project_words(root: Path) -> frozenset:
     return frozenset(w for w in out if len(w) > 2)
 
 
-CLI_COMMANDS = ("score", "kaggle", "report", "dashboard", "solve", "night", "harness", "improve", "coach", "cases", "init",
+CLI_COMMANDS = ("score", "kaggle", "report", "dashboard", "solve", "night", "harness", "improve", "coach", "cases", "practice", "init",
                 "status", "config", "models", "test", "mcp", "logs", "remote")
 
 

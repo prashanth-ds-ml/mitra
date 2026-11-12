@@ -2269,6 +2269,61 @@ def cmd_cases(
 cli.command("cases")(cmd_cases)
 
 
+def cmd_practice(
+    download: bool = typer.Option(False, "--download", help="Download the sets once (MBPP+, HumanEval+, Spider, about "
+                                  "200 MB) and build the tasks in ~/.mitra/practice."),
+    n: int = typer.Option(20, "--n", help="How many tasks (the same ones every time, spread over the set)."),
+    kind: str = typer.Option("", "--kind", help="python or sql (default: both)."),
+    split: str = typer.Option("", "--split", help="learn or held_out (default: both)."),
+    model: str = typer.Option("", "--model", help="Model (default: your chat model)."),
+    remote: bool = typer.Option(False, "--remote", help="Run on the remote GPU in use (Kaggle) instead of the laptop."),
+    ctx: int = typer.Option(0, "--ctx", help="Context size for this run (0 = your setting)."),
+    arch: str = typer.Option("phased", "--arch", help="How Mitra handles a message (as `mitra score`)."),
+) -> None:
+    """Coding practice (D-078 step 5): Mitra solves small Python and SQL tasks in a fresh folder, writes its own
+    tests, and a hidden check decides; results in results/practice.jsonl."""
+    from app.core import harness as harness_mod
+    from app.core import practice as P
+    from app.core import score as S
+    from app.core import store as store_mod
+
+    say = lambda t, style="m.text": console.print(Text(t, style=style))  # noqa: E731
+    if download:
+        try:
+            P.build(say=say)
+        except Exception as exc:  # noqa: BLE001 - offline, a bad download: said plainly
+            say(f"could not build the practice set: {exc}", "m.err")
+            raise typer.Exit(1)
+        return
+    if kind not in ("", "python", "sql") or split not in ("", "learn", "held_out"):
+        raise typer.BadParameter("--kind python|sql, --split learn|held_out")
+    tasks = P.order(P.load(kind=kind, split=split))[:max(1, n)]
+    if not tasks:
+        say("No practice tasks yet: run `mitra practice --download` once (needs the internet).", "m.err")
+        raise typer.Exit(1)
+    llm, model_name, num_ctx, backend = _score_model(model, remote, ctx, arch)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    runner = S.Runner(llm=llm, harness=harness_mod.load(), num_ctx=num_ctx, backend=backend,
+                      records=store_mod.root() / "practice-runs" / stamp, arch=arch)
+    say(f"  practice: {len(tasks)} task(s) · {model_name} · {backend} · {num_ctx // 1024}K · {arch}", "m.tool")
+
+    def line(r) -> None:
+        mark = "✓" if r.passed else "✗"
+        why = "" if r.passed else ("  misread: its own tests passed · " if r.misread else "  ") + r.detail.splitlines()[-1][:90] \
+            if r.detail else ""
+        say(f"  {mark} {r.kind:6} {r.split:8} {r.id:28} {r.seconds:.0f}s · {r.steps} steps{why}",
+            "m.tool" if r.passed else "m.err")
+
+    row = P.run(tasks, runner, model=model_name, on_task=line)
+    console.print()
+    for ln in P.report(row).splitlines():
+        say("  " + ln, "m.tool")
+    say(f"  kept in {P.results_path()} · records: {runner.records}", "m.faint")
+
+
+cli.command("practice")(cmd_practice)
+
+
 def _follow_night() -> None:
     """Live view of the latest night run in the chat; ctrl+c stops watching only."""
     from app.core import night as night_mod
