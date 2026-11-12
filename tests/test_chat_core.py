@@ -90,8 +90,10 @@ def test_it_keeps_working_until_it_answers(tmp_path):
     session = C.ChatSession(workspace=tmp_path, llm=model, hooks=hooks, mode="auto")
     res = session.turn(msgs("make the tests pass"))
     assert res.text == "Added calc.add; the test passes." and res.steps == 7
-    tests = [ok for name, ok, _ in shown if name == "run_tests"]
-    assert tests == [False, True]                       # failed, fixed, passed
+    tests = [(ok, "nothing changed since" in out) for name, ok, out in shown if name == "run_tests"]
+    # D-078 #2: the tests run by themselves after each change; the model's own run_tests right after returns that
+    # same result at once (no second pytest): failed after the write, passed after the fix
+    assert tests == [(False, False), (False, True), (True, False), (True, True)]
     assert (tmp_path / "calc.py").read_text() == "def add(a, b):\n    return a + b\n"
     assert [e["path"].endswith("calc.py") for e in res.journal] == [True, True]   # /undo entries
 

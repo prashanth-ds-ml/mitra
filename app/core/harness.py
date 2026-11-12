@@ -22,6 +22,10 @@ DEFAULT_LIMITS = {
     "chat_max_steps": 40,
     "solve_max_steps": 40,
     "explain_max_steps": 6,   # D-068 step 2: a question about the code: read only, then answer
+    "deep_max_steps": 14,     # D-078 1b: a "deep dive" look-up: several searches and pages before the answer
+    "deep_min_searches": 3,   # searches a deep dive is nudged to make (1 = off)
+    "deep_min_pages": 4,      # pages a deep dive is nudged to open (1 = off)
+    "auto_test_rounds": 3,    # D-078 #2: tests run after each change; failing rounds before "stop and say" (1 = off)
     "max_repeats": 2,        # identical calls allowed before they are refused
     "max_failures": 4,       # failures of one tool in a row before the turn stops
     "fresh_round_after": 3,  # failing test runs in a row before solve starts a fresh round

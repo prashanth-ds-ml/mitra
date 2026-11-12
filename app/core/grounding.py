@@ -16,9 +16,12 @@ _CHECKED = re.compile(
 # says the tests pass
 _TESTS = re.compile(r"\b(all (the )?tests? (now )?(pass|passed|passing)|tests? (now |all )?(pass|passed|are passing)|"
                     r"tests? (are )?green)\b", re.IGNORECASE)
+# D-078 #3: says a change is finished (only checked when the turn changed files)
+_DONE = re.compile(r"\b(done|fixed|works( now)?|is working|now working|implemented|completed|solved|resolved)\b",
+                   re.IGNORECASE)
 # honest "nothing found" / negations are not claims
-_HONEST = re.compile(r"\b(not|n't|no|nothing|could not|couldn't|unable|without|fail(ed|s)?|unverified|did not)\b",
-                     re.IGNORECASE)
+_HONEST = re.compile(r"\b(not|n't|no|nothing|could not|couldn't|unable|without|fail(ed|s)?|unverified|untested|"
+                     r"did not)\b", re.IGNORECASE)
 _NUMBER = re.compile(r"\d[\d,.]*\d|\d")
 _NAME = re.compile(r"(?<![.!?]\s)(?<!^)\b[A-Z][A-Za-z0-9]{2,}\b")
 _COMMON = {"The", "This", "That", "These", "Those", "Mitra", "Here", "There", "Yes", "Also", "And", "But", "For",
@@ -63,17 +66,19 @@ def _backed(sentence: str, evidence: str) -> bool:
     return True
 
 
-def unbacked(text: str, tools: list[tuple[str, bool, str]]) -> list[str]:
+def unbacked(text: str, tools: list[tuple[str, bool, str]], changed: bool = False) -> list[str]:
     """The sentences of `text` that claim a check no tool result of this turn backs. `tools`: (name, ok, output)
-    of every tool run in the turn, in order."""
+    of every tool run in the turn, in order. `changed`: the turn changed files, so "done" / "fixed" needs the last
+    test run of the turn to have passed (D-078 #3)."""
     evidence = " ".join(_findings(out) for _, ok, out in tools if ok).lower()
     test_runs = [ok for name, ok, _ in tools if name == "run_tests"]
+    tested_ok = bool(test_runs and test_runs[-1])
     out = []
     for s in _sentences(text or ""):
         if _HONEST.search(s):
             continue
-        if _TESTS.search(s):
-            if not (test_runs and test_runs[-1]):
+        if _TESTS.search(s) or (changed and _DONE.search(s)):
+            if not tested_ok:
                 out.append(s)
             continue
         if _CHECKED.search(s) and not _backed(s, evidence):

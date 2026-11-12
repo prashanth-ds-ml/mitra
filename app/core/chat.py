@@ -46,16 +46,26 @@ changes you did not make."""
 ABOUT_MITRA = """## About you (Mitra)
 You are Mitra, the user's own coding assistant: they build you (github.com/prashanth-ds-ml/mitra) to work with
 small local models, on this laptop (Ollama, qwen3.5, 64K context) or on a free Kaggle T4 GPU (256K; `mitra kaggle
-start`). What you can already do: talk things through; read and explain code; make changes and run the tests; plan
-bigger work (plan.md) and build it task by task with tests (run_plan, `mitra night` overnight); search the web and
-read pages; MCP servers (git, github, context7, semgrep); skills from skills/ folders (/skills); draft mails and
-summaries in the user's voice from their notes (me.md); remember earlier conversations as threads. Every turn is
-recorded; /good and /bad mark answers; `mitra score` measures you; `mitra improve` learns rules you keep only if
-the score improves (`mitra harness` shows them). Not built yet: tests written before code, checks that passing
-tests stay passing, charts and diagrams. When the user plans your features, say which ones you already have."""
+start`). What you can already do: talk things through; read and explain code; make changes and run the tests (after each
+change the project's tests run by themselves and you see the result; a "done" without a passing run is flagged); plan bigger work (plan.md) and build it task by task with tests (run_plan, `mitra night`
+overnight); search the web and read pages; MCP servers (git, github, context7, semgrep); skills from skills/ folders
+(/skills); draft mails and summaries in the user's voice from their notes (me.md); keep short summaries of earlier
+conversations as threads. Every turn is recorded; /good and /bad mark answers; `mitra score` measures you;
+`mitra improve` learns rules you keep only if the score improves (`mitra harness` shows them).
+Not built yet (D-078, being built): web search reaches only
+Wikipedia, GitHub, arXiv, Hugging Face and the Ollama library (no news, blogs or company sites); you cannot read
+files outside this project folder; thread summaries can lose details such as links; a /good or /bad changes you
+only after `mitra improve` tests a rule, not straight away; no tests written before code, no charts.
+When asked what you can do, never claim a "not built yet" item.
+When the user plans your features, say which ones you already have."""
+
+# D-078 1b (live 2026-11-12): "You're absolutely right!" opened 5 of 10 answers
+PARTNER = ("Be honest with the user: agree only when they are right, and say why; never open with \"You're absolutely "
+           "right\" or other praise. Never open with praise of any kind. Give your own view, even when it differs "
+           "from theirs.")
 
 # D-071 one Mitra: one conversational loop; the model decides whether to talk, look or change (all tools offered)
-ONE_PROMPT = """You are Mitra, the user's thinking partner and coder, running on their own machine, in their project
+ONE_PROMPT ="""You are Mitra, the user's thinking partner and coder, running on their own machine, in their project
 folder (its files are listed below).
 
 Talk like a person and react to what the user actually said. Most messages are conversation: greetings,
@@ -63,7 +73,7 @@ thinking out loud, ideas, choices, opinions, questions: answer those directly. F
 names, files and commands, numbered steps, bullet lists, a table for a comparison, and short ## headings
 when an answer has several parts. When the user is
 deciding or an idea is still open, end with one short question that helps them decide. In small talk, do not bring
-up the project.
+up the project. """ + PARTNER + """
 
 A message that names something in this project (a file, a folder, or a part such as the game, the API, the tests)
 is about this project, even if the words could mean something else in general: look at the code before you answer.
@@ -122,7 +132,7 @@ thinking out loud, ideas, choices, opinions, general questions: answer those you
 names, files and commands, numbered steps, bullet lists, a table for a comparison, and short ## headings
 when an answer has several parts.
 When the user is deciding or an idea is still open, end with one short question that helps them decide. In small
-talk, do not bring up the project.
+talk, do not bring up the project. """ + PARTNER + """
 
 You have no file tools until you choose a phase. Choose one only when the message needs it:
 - look_at_code: the message asks about this project's code, files, tests or status (it names something in the
@@ -178,6 +188,21 @@ PHASES = {
                               "the files it touches and how it is checked. End by asking the user whether to build "
                               "it. Do not build anything yet.]"),
 }
+# D-078 1b (live 2026-11-12): "do a deep dive into web" got 1 search and 2 pages ("you are still missing some")
+_DEEP = re.compile(r"\b(deep[ -]?dive|dig (deep|deeper)|go deeper|in[ -]depth|thorough(ly)?|comprehensive|"
+                   r"proper research|research (it |this )?properly|all the sources|every source|everything you can)\b",
+                   re.IGNORECASE)
+DEEP_NOTE = ("[Mitra: deep look-up. The user asked you to dig deep. Search at least {searches} times with different "
+             "words (search each name or project on its own, then the topic with other words), open the {pages}-5 "
+             "best results (fetch_url), then answer clearly (Markdown) with what you found and where (link for each "
+             "point), and say what you could not find. Say plainly when a search found nothing useful.]")
+
+
+def is_deep(message: str) -> bool:
+    """The user asked for a deep dive (more searches and pages, a bigger budget)."""
+    return bool(_DEEP.search(message or ""))
+
+
 EMPTY_ANSWER_NOTE = ("[Mitra: you have not said anything to the user. Tell them now, in a few plain sentences, what "
                      "you found or changed. Do not call tools.]")
 
@@ -249,6 +274,8 @@ def cited_files(text: str, root: Path) -> list[str]:
 
 
 READ_ONLY_TOOLS = {"list_files", "read_file", "search", "web_search", "fetch_url", "mcp_find"}  # plan mode
+CHANGE_TOOLS = ("edit_file", "write_file", "append_file")  # D-078 #2: after these, the tests run
+NO_TEST_EXT = (".md", ".txt", ".rst")                      # notes and docs: no test run after them
 
 # E-100 (A/B 2026-11-11): with thinking off, mimo sometimes "thinks" anyway, invisibly, until the output cap (8,192
 # tokens, ~6 minutes on the laptop) and answers nothing. A reply that shows nothing for this many chunks is stopped,
@@ -506,6 +533,10 @@ class ChatSession:
         self.deciding = False       # D-071 phased: the first call offers only the phase switches (PHASE_SPECS)
         self.phase_request: dict | None = None  # {"name", "args", "id"} when the model chose a phase
         self.turn_tools: list[tuple[str, bool, str]] = []  # E-110: (name, ok, output) of this turn's tools
+        self.deep: dict | None = None        # D-078 1b: a deep dive's progress (searches, pages) in this turn
+        self.look_budget: int | None = None  # the step budget of the last phase
+        self._test_fails, self._no_tests_said = 0, False  # D-078 #2: failing test runs after changes this turn
+        self._last_auto: tuple[str, bool] | None = None    # the run after the last change, while nothing changed
         self.last_phase: str | None = None       # phased: the phase the last turn worked in (None = talk only)
         self.end_info: dict = {}    # extra fields for this turn's turn_end row (the explainer's budget, files cited)
         self.last_speed: float | None = None  # tokens/s of the last answer (Ollama's eval_count / eval_duration)
@@ -800,11 +831,17 @@ class ChatSession:
         phase = PHASES[name]
         self.last_phase = name
         self.allowed_tools = phase["tools"]
+        note, budget_name = phase["note"], phase["budget"]
+        if name == "look_up" and is_deep(self._prev_user_full):  # D-078 1b: a deep dive digs
+            searches, pages = self.harness.limit("deep_min_searches"), self.harness.limit("deep_min_pages")
+            self.deep = {"searches": 0, "pages": 0, "min_searches": searches, "min_pages": pages}
+            note, budget_name = DEEP_NOTE.format(searches=max(searches, 2), pages=max(pages, 2)), "deep_max_steps"
         if asked not in PHASES and asked in READ_ONLY_TOOLS and asked in (phase["tools"] or ()):
             self._run_decided(messages, asked)  # E-109: the query it asked for runs, it is not dropped
-        messages.append(HumanMessage(content=phase["note"]))
+        messages.append(HumanMessage(content=note))
         self.answer_on_last_step, self.last_step_note = True, ONE_LAST_STEP_NOTE
-        budget = self.harness.limit(phase["budget"]) if phase["budget"] else 1
+        budget = self.harness.limit(budget_name) if budget_name else 1
+        self.look_budget = budget
         acted = self._turn(messages, TurnResult(journal=res.journal), budget)
         acted.steps += res.steps  # the decide call counts
         return acted
@@ -822,8 +859,60 @@ class ChatSession:
                        from_decide=True)
         for i, m in enumerate(messages):
             if isinstance(m, ToolMessage) and m.tool_call_id == call_id:
-                messages[i] = ToolMessage(content=out, tool_call_id=call_id)
+                messages[i] = ToolMessage(content=out + self._deep_progress(name, ok), tool_call_id=call_id)
                 break
+
+    def _test_after_change(self, res: TurnResult, step: int) -> str:
+        """D-078 #2 (must-have 5): after a step that changed code, run the project's tests and hand the model the
+        result: passed (say so), failed (the failures, fix the cause, round N of M), or failed M times (stop and tell
+        the user honestly). A project without tests gets "not checked: say so". Returns the note for the model."""
+        rounds = self.harness.limit("auto_test_rounds")
+        if rounds <= 1:
+            return ""
+        if not T.has_tests(self.ws.root):
+            if self._no_tests_said:
+                return ""
+            self._no_tests_said = True
+            return ("[Mitra: this project has no tests, so your change was not checked by running tests. Tell the "
+                    "user plainly that it is untested.]")
+        out, ok = self._run("run_tests", {}, self._run_plan)
+        if out.startswith("✗") and "not available" in out:
+            return ""  # this role cannot run tests
+        summary = (T.test_summary(out) or out.strip().splitlines()[0] if out.strip() else "no output")[:200]
+        res.tests_run += 1
+        res.last_test_ok, res.last_test_summary = ok, summary
+        self.hooks.show("run_tests", {"after_change": True}, out, ok)
+        self.turn_tools.append(("run_tests", ok, out))
+        self.rec.write("tool", turn=self.turn_no, step=step, name="run_tests", args={}, ok=ok, output=out[:3000],
+                       after_change=True)
+        self._last_auto = (out, ok)
+        if ok:
+            self._test_fails = 0
+            return (f"[Mitra: the tests ran after your change and passed ({summary}). When you are done, tell the "
+                    "user what you changed and this result.]")
+        self._test_fails += 1
+        if self._test_fails >= rounds:
+            return (f"[Mitra: the tests still fail after {self._test_fails} rounds of fixes ({summary}). Stop "
+                    "changing code. Tell the user honestly what still fails, why you think it fails, and what you "
+                    "would try next.]")
+        return (f"[Mitra: the tests ran after your change and failed ({summary}). Round {self._test_fails} of "
+                f"{rounds}. The failures:\n{out.strip()[:1500]}\nRead the failing line, fix the cause, and the tests "
+                "run again after your next change.]")
+
+    def _deep_progress(self, name: str, ok: bool) -> str:
+        """D-078 1b: in a deep dive, each search or page result tells the model how far it is, until it has searched
+        and read enough. A nudge on the result, not after an answer (the answer is already on screen by then)."""
+        deep = getattr(self, "deep", None)
+        if not deep or not ok or name not in ("web_search", "fetch_url"):
+            return ""
+        deep["searches" if name == "web_search" else "pages"] += 1
+        if deep["min_searches"] > 1 and deep["searches"] < deep["min_searches"]:
+            return (f"\n\n[Mitra: deep dive: {deep['searches']} of {deep['min_searches']} searches done. Search again "
+                    "with different words (try each name on its own) before you answer.]")
+        if deep["min_pages"] > 1 and deep["pages"] < deep["min_pages"]:
+            return (f"\n\n[Mitra: deep dive: {deep['pages']} of {deep['min_pages']} pages read. Open the best results "
+                    "with fetch_url before you answer.]")
+        return ""
 
     def converse(self, messages: list, notes: str = "") -> TurnResult:
         """One Mitra (D-071): the model decides whether to talk, look or change; every tool the role allows is
@@ -883,7 +972,8 @@ class ChatSession:
         t0 = time.monotonic()
         user = next((m.content for m in reversed(messages) if isinstance(m, HumanMessage)), "")
         self._new_turn(str(user))
-        self.turn_tools = []
+        self.turn_tools, self.deep = [], None
+        self._test_fails, self._no_tests_said, self._last_auto = 0, False, None
         self._check_corrections(of_turn=self.turn_no - 1)  # attributed to the turn they correct
         self.rec.write("turn_start", **self._start_row(str(user)))
         try:
@@ -910,7 +1000,7 @@ class ChatSession:
                 self.signal("interrupt", steps=res.steps)
             self._remember_left(res.journal)
             raise
-        claims = grounding.unbacked(res.text, self.turn_tools) if res.text else []
+        claims = grounding.unbacked(res.text, self.turn_tools, changed=bool(res.journal)) if res.text else []
         if claims:  # E-110: a "confirmed" / "tests pass" no tool result of this turn backs
             res.unverified = claims
             self.rec.write("grounding", turn=self.turn_no, claims=[c[:300] for c in claims],
@@ -1045,7 +1135,7 @@ class ChatSession:
                             else f"Not run yet: {t['name']} has not been run. Call it in the next step.")
                     messages.append(ToolMessage(content=said, tool_call_id=t["id"]))
                 return res
-            stop = ""
+            stop, changed_now = "", False
             for tc in reply.tool_calls:
                 if stop:  # every tool call gets a result, even when the turn is stopping
                     messages.append(ToolMessage(content="✗ Not run: the turn was stopped.", tool_call_id=tc["id"]))
@@ -1058,6 +1148,10 @@ class ChatSession:
                 refused = guard.before(name, args)
                 if refused:
                     out, ok = refused, False
+                elif name == "run_tests" and not args and self._last_auto is not None:
+                    # D-078 #2: nothing changed since the tests ran after the last change: the same result, at once
+                    out, ok = self._last_auto[0] + "\n(The same run as after your last change: nothing changed since.)", \
+                        self._last_auto[1]
                 else:
                     out, ok = self._run(name, args, self._run_plan)
                 if name == "run_tests":
@@ -1067,10 +1161,19 @@ class ChatSession:
                 self.hooks.show(name, args, out, ok)
                 self.turn_tools.append((name, ok, out))
                 self.rec.write("tool", turn=self.turn_no, step=step, name=name, args=args, ok=ok, output=out[:3000])
-                messages.append(ToolMessage(content=out, tool_call_id=tc["id"]))
+                messages.append(ToolMessage(content=out + self._deep_progress(name, ok), tool_call_id=tc["id"]))
+                if ok and name in CHANGE_TOOLS:
+                    self._last_auto = None  # something changed: the next run_tests really runs
+                    if not str(args.get("path", "")).lower().endswith(NO_TEST_EXT):
+                        changed_now = True
                 stop = guard.after(name, out, ok) or ""
             if stop:
                 return self._wrap_up(messages, res, stop)
+            if changed_now:  # D-078 #2: the tests run after every change, and the model sees the result
+                changed_now = False
+                note = self._test_after_change(res, step)
+                if note:
+                    messages.append(HumanMessage(content=note))
         return self._wrap_up(messages, res, f"step limit ({max_steps} model calls)")
 
     SLOW_FRACTION = 0.5  # slower than half this machine's best answer this session: shown in orange

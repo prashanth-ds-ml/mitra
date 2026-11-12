@@ -3,6 +3,12 @@
 All notable changes, newest first. Versions follow the milestones in [docs/PLAN.md](docs/PLAN.md).
 
 ## [Unreleased]
+- **Phase 1 of D-078 (trust):** after every code change the project's tests run by themselves; on a failure Mitra
+  gets the failing output and up to 3 rounds to fix it, then stops and says honestly what still fails (a project
+  without tests is called untested). A "done" / "fixed" after a change without a passing run gets the ⚠ Unverified
+  line. `write_file` refuses to shrink a file of 20+ lines to under half (use `edit_file`). A "deep dive" now
+  searches at least 3 times and opens 4-5 pages; Mitra no longer opens with "You're absolutely right" and says what
+  it cannot do yet. Switches in `harness.toml`: `auto_test_rounds`, `deep_min_searches`, `deep_min_pages` (1 = off).
 - **No claim without proof (D-077 #1, E-109, E-110):** a search Mitra asks for while deciding now really runs (it
   was dropped, and the model was told "ok"); an answer that says "confirmed", "verified", "I found" or "tests pass"
   without a tool result in the same turn to back it gets a ⚠ Unverified line, a record row, and a flag in the coach's

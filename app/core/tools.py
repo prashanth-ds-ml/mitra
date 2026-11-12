@@ -368,6 +368,12 @@ def write_file(ws: Workspace, path: str, content: str) -> str:
     if isinstance(content, (dict, list)):
         import json
         content = json.dumps(content, indent=2) + "\n"
+    if full.is_file():  # D-078 #4: a small model rewriting a whole file often drops most of it
+        old_lines = len(full.read_text(encoding="utf-8", errors="replace").splitlines())
+        new_lines = len(str(content).splitlines())
+        if old_lines >= SHRINK_MIN_LINES and new_lines < old_lines * SHRINK_RATIO:
+            raise ToolError(f"write_file would replace '{rel}' ({old_lines} lines) with {new_lines} lines and drop "
+                            f"most of it. Use edit_file to change part of it; write_file replaces the whole file.")
     _commit(ws, full, str(content))
     return f"Wrote {rel} ({len(str(content).splitlines())} lines)." + syntax_note(rel, str(content))
 
@@ -430,6 +436,24 @@ def rollback(entries: list[dict]) -> int:
 
 
 _PYTEST_CHECK: dict[str, bool] = {}
+
+
+SHRINK_MIN_LINES = 20   # D-078 #4: write_file refuses to shrink a file this long ...
+SHRINK_RATIO = 0.5      # ... to under half its lines (an accidental whole-file overwrite)
+_TEST_SKIP = {".git", ".mitra", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "dist", "build"}
+
+
+def has_tests(root: Path, max_depth: int = 4) -> bool:
+    """D-078 #2: the project has pytest-style tests (test_*.py or *_test.py, at most 4 folders deep)."""
+    root = Path(root)
+    for d, dirs, names in os.walk(root):
+        rel = Path(d).relative_to(root)
+        if len(rel.parts) >= max_depth:
+            dirs[:] = []
+        dirs[:] = [x for x in dirs if x not in _TEST_SKIP and not x.startswith(".")]
+        if any(n.endswith(".py") and (n.startswith("test_") or n.endswith("_test.py")) for n in names):
+            return True
+    return False
 
 
 def _has_pytest(python: str) -> bool:

@@ -59,6 +59,26 @@ Laptop (RTX 5050 8 GB). Same quick set: behaviour 10 · writing 3 · explain 4 �
 | 2026-11-11 16:37 | one | qwen3.5:latest | 64K | sorting 54/54 · behaviour 7/10 · writing 2/3 · explain 1/4 · ideas 1/2 | **11/19** | 9 min | B7_look_grow: did not cite snake/game.py; B8_look_api: did not cite snake/api.py (cited snake/game.py); B10_remembers: used tools to talk: read_file, read_file, read_file; W3_summary: missing: two; X2_grow: missing fact: score; X3_bad_direction: did not cite snake/api.py (cited snake/game.py); X4_wall: wrong claim: (?i)wraps? around|bounces?|teleport; I1_harder: did not cite snake/game.py or web/index.html or snake/api.py |
 | 2026-11-11 16:50 | router | qwen3.5:latest | 64K | sorting 54/54 · behaviour 5/10 · writing 2/3 · explain 4/4 · ideas 1/2 | **12/19** | 13 min | B2_thinking: too long for a conversation: 61 words (max 60); B4_deciding: empty answer; B5_think_with_me: report-style: 4 headings; B6_general: report-style: 3 headings; B10_remembers: should not match: (?i)\bsnake\b; W3_summary: missing: two; I1_harder: did not cite snake/game.py or web/index.html or snake/api.py |
 
+## Phase 1 baseline: the noise of the quick score (D-078)
+
+Laptop (RTX 5050 8 GB), qwen3.5:latest, phased, 64K, commit bdff454 (D-077 #1 in), harness v0, the same code three
+times in a row, 2026-11-12. Quick set: behaviour 14 · writing 3 · explain 4 · ideas 2 = 23 model cases (+ sorting 54).
+
+| Run | Time | Score | Model cases |
+|---|---|---|---|
+| 1 (15:12) | 11.6 min | sorting 54/54 · behaviour 11/14 · writing 2/3 · explain 4/4 · ideas 1/2 | **18/23** |
+| 2 (15:25) | 12.7 min | sorting 54/54 · behaviour 10/14 · writing 2/3 · explain 4/4 · ideas 1/2 | **17/23** |
+| 3 (15:39) | 13.8 min | sorting 54/54 · behaviour 11/14 · writing 3/3 · explain 4/4 · ideas 1/2 | **19/23** |
+
+- **Noise:** the total moved by up to 2 (17-19) on unchanged code, and **6 of 23 cases (26%) changed result** at
+  least once across the three runs: B2_thinking, B6_general, B7_look_grow, B10_remembers, B12_knows_itself,
+  W3_summary. Always failing: I1_harder (does not cite the project files). Always passing: explain 4/4, R1_review.
+- **What it means:** a gain or loss of 2 on one run is inside the noise, so the D-073 gate (keep at +2 on one run) is
+  close to a coin toss, as the research said; Phase 3 step 7 (re-run what changed, held-out set) is needed. For
+  Phase 1, a change counts as a regression only if a case that passed in all three baseline runs now fails, or the
+  total falls below 17.
+- **Against before #1** (2026-11-11 16:28, behaviour on the old 10-case set 7/10): no case that worked broke.
+
 ## Results
 
 ### 2026-11-06 · M1 · First `mitra improve` runs (self-improvement step 3, smoke test)
