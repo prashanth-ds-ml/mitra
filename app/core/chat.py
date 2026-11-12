@@ -148,7 +148,8 @@ You have no file tools until you choose a phase. The phases are your own switche
   project: a file, a folder, a part such as the game, the API, the tests). Never answer those from memory.
 - look_up: the user asks you to find, pull or look up information, or about recent work, papers, tools, versions
   or prices you may not know. Never answer those from memory.
-- make_change: the user asked you to change, fix, add or build something small and clear in this project.
+- make_change: the user asked you to change, fix, add or build something small and clear in this project, or to
+  write, save or create code, a query or a file (also a new file in an empty folder).
 - propose_plan: the user asked to build something bigger (several files) or said "build it" after a discussion.
 Deciding between options, opinions and ideas are conversation: answer them yourself. But ideas or opinions about
 this project's code (make the game harder, improve the API, review it) need look_at_code first.
@@ -944,6 +945,20 @@ class ChatSession:
                 f"{rounds}. The failures:\n{out.strip()[:1500]}\nRead the failing line, fix the cause, and the tests "
                 "run again after your next change.]")
 
+    def _nothing_to_read(self, name: str, out: str) -> str:
+        """E-124 (first practice run: 2 of 20 tasks): asked to write solution.py in an empty folder, the model chose to
+        look, found nothing, read the missing file 4 times and answered "I couldn't create the files due to tool
+        limits". In the look phase, an empty folder or a missing file tells it how to create one."""
+        if self.last_phase != "look_at_code" or self.path != "phased":
+            return ""
+        empty = name == "list_files" and out.strip() in ("(empty)", "")
+        missing = name == "read_file" and "is not a file" in out
+        if not (empty or missing):
+            return ""
+        what = "This folder is empty" if empty else "That file does not exist yet"
+        return (f"\n\n[Mitra: {what}. If the user asked you to write or create it, call make_change now: it gives "
+                "you the tools to create files.]")
+
     def _deep_progress(self, name: str, ok: bool) -> str:
         """D-078 1b: in a deep dive, each search or page result tells the model how far it is, until it has searched
         and read enough. A nudge on the result, not after an answer (the answer is already on screen by then)."""
@@ -1211,7 +1226,8 @@ class ChatSession:
                 self.hooks.show(name, args, out, ok)
                 self.turn_tools.append((name, ok, out))
                 self.rec.write("tool", turn=self.turn_no, step=step, name=name, args=args, ok=ok, output=out[:3000])
-                messages.append(ToolMessage(content=out + self._deep_progress(name, ok), tool_call_id=tc["id"]))
+                messages.append(ToolMessage(content=out + self._deep_progress(name, ok) + self._nothing_to_read(name, out),
+                                            tool_call_id=tc["id"]))
                 if ok and name in CHANGE_TOOLS:
                     self._last_auto = None  # something changed: the next run_tests really runs
                     if not str(args.get("path", "")).lower().endswith(NO_TEST_EXT):

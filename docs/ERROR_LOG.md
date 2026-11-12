@@ -8,6 +8,7 @@ that fails without it. Before fixing anything, search this file and [LESSONS.md]
 
 | ID | Date | Milestone | Severity | Found by | Title | Status | Fix |
 |---|---|---|---|---|---|---|---|
+| E-124 | 2026-11-12 | D-071 phased | High | first `mitra practice` run (3 of 7 failures) | Asked to write solution.py in an empty folder, the model chose look_at_code, listed the empty folder, read the missing solution.py 4 times and answered "I couldn't create the files due to tool limits" with the code in the chat (humaneval/87, mbpp/606); "save the query in query.sql" was answered in the chat with no file (spider/world_1/723). The look phase never said how to create a file, and the make_change rule did not cover writing a new file | closed | F-114 |
 | E-123 | 2026-11-12 | D-078 step 5 | Low | user's live session (typed "mitra practice" in the chat) | "mitra practice" in the chat went to the model, which made up a "practice loop": `practice` was not in the terminal-command list (the command did not exist yet either) | closed | F-113 |
 | E-122 | 2026-11-12 | D-071 phased | Low | same live session | The answer named Mitra's internal phase switches to the user: "ask what you want to do (e.g., look_at_code, look_up, make_change, or just chat)" | closed | F-112 |
 | E-121 | 2026-11-12 | D-068 score | Medium | quick score 2026-11-12 20:08 (X4_wall) | The explain/ideas "wrong claim" check matched denials: "The game doesn't wrap around or bounce, it simply stops" (correct) failed as the wrong claim "wraps around" | closed | F-111 |

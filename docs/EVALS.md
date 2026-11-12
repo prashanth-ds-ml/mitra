@@ -95,6 +95,18 @@ current code with the 1d line 7/12 passed, without it 5/12, and **the Phase 1 co
 this laptop; a regression check compares runs made under the same conditions only. Phase 3 starts with a fresh
 baseline (after a restart), never mixing morning and evening runs.
 
+## Coding practice (D-078 step 5, `mitra practice`)
+
+Laptop (RTX 5050 8 GB), qwen3.5:latest, phased, 128K. 20 tasks (the fixed first 20), Python from MBPP+/HumanEval+,
+SQL from Spider; hidden checks decide.
+
+| Date | Code | Passed | Python | SQL | Held out | Misread | Time | Failures |
+|---|---|---|---|---|---|---|---|---|
+| 2026-11-12 22:06 | d2d139d | **13/20** | 8/12 | 5/8 | 5/9 | 1 | 41 min | 2× "couldn't create the files" (E-124), 1× answered in chat with no query.sql (E-124), 1× extra column (Spider column strictness), 1× wrong rows, 1× misread (mbpp/432, an edge case its own test missed), 1× 600 s with no answer from the model (E-081) |
+
+Run by the user on an evening machine (not a fresh baseline). 10 tasks had no own tests (all 8 SQL, 2 Python that never
+wrote a file).
+
 ## Results
 
 ### 2026-11-06 · M1 · First `mitra improve` runs (self-improvement step 3, smoke test)

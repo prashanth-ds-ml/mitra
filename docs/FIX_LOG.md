@@ -8,6 +8,7 @@ again.
 
 | ID | Date | Fixes | Title | Files | Regression test | Result |
 |---|---|---|---|---|---|---|
+| F-114 | 2026-11-12 | E-124 | In the look phase, an empty folder or a missing file adds "call make_change now: it gives you the tools to create files" to the tool result; the make_change rule covers writing, saving or creating code, a query or a (new) file | `app/core/chat.py` | `tests/test_practice_run.py::test_an_empty_folder_tells_the_look_phase_how_to_create_the_file` (fails without the fix), `::test_writing_or_saving_a_file_is_a_change_in_the_prompt` | works |
 | F-113 | 2026-11-12 | E-123 | `practice` is in `intent.CLI_COMMANDS` (the chat answers with the terminal hint) and `mitra practice` exists (D-078 step 5b) | `app/core/intent.py`, `app/main.py` | `tests/test_practice_run.py::test_mitra_practice_typed_in_the_chat_gets_the_terminal_hint` (fails without the fix) | works |
 | F-112 | 2026-11-12 | E-122 | PHASED_PROMPT: the phases are Mitra's own switches, never named to the user ("I'll look at the code", not "look_at_code") | `app/core/chat.py` | `tests/test_practice_run.py::test_the_phase_names_are_never_named_to_the_user` | works |
 | F-111 | 2026-11-12 | E-121 | `score.claims`: a must_not match counts only when its sentence does not negate it before the match (doesn't, not, never, no, instead of, ...) | `app/core/score.py` | `tests/test_live_20261112_p1.py::test_a_denied_wrong_claim_is_not_a_wrong_claim` (fails without the fix) | works |

@@ -92,3 +92,33 @@ def test_the_phase_names_are_never_named_to_the_user():
 def test_mitra_practice_typed_in_the_chat_gets_the_terminal_hint():
     assert intent.terminal_command("mitra practice")
     assert intent.terminal_command("mitra practice --download")
+
+
+# ── E-124: write a file into an empty folder ───────────────────────────────────────────────────────────────────
+
+def test_an_empty_folder_tells_the_look_phase_how_to_create_the_file(tmp_path):
+    """First practice run (humaneval/87, mbpp/606): look_at_code in an empty folder, read the missing solution.py 4
+    times, then "I couldn't create the files due to tool limits"."""
+    from langchain_core.messages import ToolMessage
+    from tests.test_phased import _msgs
+    ws = tmp_path / "task"
+    ws.mkdir()
+    m = Spy(AIMessage(content="", tool_calls=[tc("look_at_code", 1, what="solution.py")]),
+            AIMessage(content="", tool_calls=[tc("list_files", 2, path="")]),
+            AIMessage(content="", tool_calls=[tc("read_file", 3, path="solution.py")]),
+            AIMessage(content="", tool_calls=[tc("make_change", 4, what="create solution.py")]),
+            AIMessage(content="", tool_calls=[tc("write_file", 5, path="solution.py",
+                                                  content="def add(a, b):\n    return a + b\n")]),
+            AIMessage(content="Created solution.py with add."))
+    from tests.test_chat_core import fake_hooks
+    s = C.ChatSession(workspace=ws, llm=m, hooks=fake_hooks()[0])
+    s.phased(_msgs("Write a Python function `add` in solution.py"))
+    seen = {x.tool_call_id: x.content for x in m.seen[-1] if isinstance(x, ToolMessage)}
+    assert "This folder is empty" in seen["c2"] and "call make_change now" in seen["c2"]
+    assert "does not exist yet" in seen["c3"]
+    assert (ws / "solution.py").read_text(encoding="utf-8").startswith("def add")
+
+
+def test_writing_or_saving_a_file_is_a_change_in_the_prompt():
+    """First practice run (spider/world_1/723): "save only the query in query.sql" was answered in the chat."""
+    assert "write, save or create code, a query or a file" in C.PHASED_PROMPT
