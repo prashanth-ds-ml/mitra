@@ -100,49 +100,50 @@ def turns_since(files: list[Path], since_t: float) -> list[dict]:
     for f in files:
         if not f.name.startswith("chat-"):  # only your conversations: not plan tasks, score or improve runs
             continue
-        rows = _rows(f)
-        by_turn: dict = {}
-        for r in rows:
-            n = r.get("turn") if r.get("kind") in ("turn_start", "turn_end", "phase", "talk_route", "grounding") else (
-                r.get("of_turn") if r.get("kind") in ("signal", "feedback") else None)
-            if r.get("kind") == "tool":
-                n = r.get("turn")
-            if n is None:
-                continue
-            by_turn.setdefault(n, []).append(r)
-        for n, rs in by_turn.items():
-            start = next((r for r in rs if r.get("kind") == "turn_start"), None)
-            if not start or float(start.get("t") or 0) <= since_t:
-                continue
-            you = str(start.get("user", ""))
-            if not you or you.startswith("/"):
-                continue
-            end = next((r for r in rs if r.get("kind") == "turn_end"), {})
-            tools = [str(r.get("name")) for r in rs if r.get("kind") == "tool"]
-            errors = [str(r.get("name")) for r in rs if r.get("kind") == "tool" and r.get("ok") is False]
-            phase = next((str(r.get("name")) for r in rs if r.get("kind") == "phase"), "")
-            talk = next((r for r in rs if r.get("kind") == "talk_route"), None)
-            flags = []
-            for r in rs:
-                if r.get("kind") == "feedback" and r.get("verdict") == "bad":
-                    flags.append("you marked it /bad" + (f": {r.get('note')}" if r.get("note") else ""))
-                elif r.get("kind") == "signal" and r.get("signal") in ("rephrase", "interrupt", "undo"):
-                    flags.append(f"signal: {r.get('signal')}")
-                elif r.get("kind") == "grounding":  # E-110: claimed a check no tool result backed
-                    flags.append("unverified claim: " + "; ".join(str(c)[:120] for c in (r.get("claims") or [])[:2]))
-            text = str(end.get("text", "") or "")
-            seconds = float(end.get("seconds") or 0)
-            if not text.strip():
-                flags.append("empty answer")
-            if seconds >= SLOW_S:
-                flags.append(f"slow: {seconds:.0f} s")
-            if errors:
-                flags.append("tool errors: " + ", ".join(errors[:4]))
-            turns.append({"t": float(start.get("t") or 0), "project": _project(f), "you": you, "mitra": text,
-                          "path": start.get("path", ""),
-                          "phase": phase or ("talk" if start.get("path") == "phased" else ""),
-                          "backend": "laptop" if talk else start.get("backend", ""), "seconds": seconds,
-                          "tools": tools, "flags": flags})
+        from app.core import cases as cases_mod
+        for rows in cases_mod._sessions(_rows(f)):  # E-120: turn numbers restart in every session
+            by_turn: dict = {}
+            for r in rows:
+                n = r.get("turn") if r.get("kind") in ("turn_start", "turn_end", "phase", "talk_route", "grounding") else (
+                    r.get("of_turn") if r.get("kind") in ("signal", "feedback") else None)
+                if r.get("kind") == "tool":
+                    n = r.get("turn")
+                if n is None:
+                    continue
+                by_turn.setdefault(n, []).append(r)
+            for n, rs in by_turn.items():
+                start = next((r for r in rs if r.get("kind") == "turn_start"), None)
+                if not start or float(start.get("t") or 0) <= since_t:
+                    continue
+                you = str(start.get("user", ""))
+                if not you or you.startswith("/"):
+                    continue
+                end = next((r for r in rs if r.get("kind") == "turn_end"), {})
+                tools = [str(r.get("name")) for r in rs if r.get("kind") == "tool"]
+                errors = [str(r.get("name")) for r in rs if r.get("kind") == "tool" and r.get("ok") is False]
+                phase = next((str(r.get("name")) for r in rs if r.get("kind") == "phase"), "")
+                talk = next((r for r in rs if r.get("kind") == "talk_route"), None)
+                flags = []
+                for r in rs:
+                    if r.get("kind") == "feedback" and r.get("verdict") == "bad":
+                        flags.append("you marked it /bad" + (f": {r.get('note')}" if r.get("note") else ""))
+                    elif r.get("kind") == "signal" and r.get("signal") in ("rephrase", "interrupt", "undo"):
+                        flags.append(f"signal: {r.get('signal')}")
+                    elif r.get("kind") == "grounding":  # E-110: claimed a check no tool result backed
+                        flags.append("unverified claim: " + "; ".join(str(c)[:120] for c in (r.get("claims") or [])[:2]))
+                text = str(end.get("text", "") or "")
+                seconds = float(end.get("seconds") or 0)
+                if not text.strip():
+                    flags.append("empty answer")
+                if seconds >= SLOW_S:
+                    flags.append(f"slow: {seconds:.0f} s")
+                if errors:
+                    flags.append("tool errors: " + ", ".join(errors[:4]))
+                turns.append({"t": float(start.get("t") or 0), "project": _project(f), "you": you, "mitra": text,
+                              "path": start.get("path", ""),
+                              "phase": phase or ("talk" if start.get("path") == "phased" else ""),
+                              "backend": "laptop" if talk else start.get("backend", ""), "seconds": seconds,
+                              "tools": tools, "flags": flags})
     turns.sort(key=lambda x: x["t"])
     return turns
 

@@ -2218,6 +2218,57 @@ def cmd_coach(
 cli.command("coach")(cmd_coach)
 
 
+def cmd_cases(
+    action: str = typer.Argument("draft", help="draft (new /bad turns), review (keep / edit / drop) or list."),
+    no_coach: bool = typer.Option(False, "--no-coach", help="Draft from the template only (no Claude call)."),
+) -> None:
+    """Your /bad turns become score cases (D-078 step 6): drafted by the coach (or a template), kept only when you
+    approve, scored in the private, held-out "real" category of `mitra score`."""
+    from app.core import cases as cases_mod
+    from app.core import coach as coach_mod
+    from app.core import dashboard as D
+
+    say = lambda t: console.print(Text(t, style="m.text"))  # noqa: E731
+    if action == "draft":
+        new = cases_mod.new_bad_turns(D.run_files())
+        if not new:
+            say("No new /bad turns to draft. Mark an answer /bad <what was wrong> in the chat first.")
+            return
+        run = None if no_coach or not coach_mod.claude_path() else coach_mod.run_claude
+        say(f"Drafting {len(new)} case(s) from your /bad turns" + (" with the coach…" if run else " (template)…"))
+        paths = cases_mod.write_drafts(D.run_files(), run_claude=run, say=say)
+        say(f"{len(paths)} draft(s) in {cases_mod.home() / 'drafts'} · next: `mitra cases review`")
+    elif action == "review":
+        drafts = cases_mod.drafts()
+        if not drafts:
+            say("No drafts. `mitra cases` drafts your new /bad turns.")
+            return
+        for p in drafts:
+            console.print(Text(f"\n── {p.name}", style="m.tool"))
+            console.print(Text(p.read_text(encoding="utf-8").rstrip(), style="m.dim"))
+            choice = typer.prompt("keep / edit / drop / skip", default="keep").strip().lower()
+            if choice.startswith("e"):
+                typer.edit(filename=str(p))
+                choice = typer.prompt("keep / drop / skip", default="keep").strip().lower()
+            try:
+                if choice.startswith("k"):
+                    c = cases_mod.keep(p)
+                    say(f"  kept {c['id']} (expect {c['expect']}) in {cases_mod.real_path()}")
+                elif choice.startswith("d"):
+                    cases_mod.drop(p)
+                    say("  dropped")
+            except ValueError as exc:
+                say(f"  not kept: {exc}. Edit {p} and review again.")
+    elif action == "list":
+        ids = sorted(cases_mod.kept_ids())
+        say(f"{len(ids)} real case(s) kept: {', '.join(ids) or 'none'} · {len(cases_mod.drafts())} draft(s) waiting")
+    else:
+        raise typer.BadParameter("action: draft, review or list")
+
+
+cli.command("cases")(cmd_cases)
+
+
 def _follow_night() -> None:
     """Live view of the latest night run in the chat; ctrl+c stops watching only."""
     from app.core import night as night_mod

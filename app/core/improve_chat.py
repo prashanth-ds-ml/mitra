@@ -64,12 +64,17 @@ def last_score_row(rows: list[dict], *, model: str, arch: str) -> dict | None:
     return None
 
 
+# sorting needs no model; "real" (your /bad turns, D-078 step 6) is held out: a rule is never fitted to it
+NOT_EVIDENCE = ("sorting", "real")
+
+
 def score_failures(row: dict | None) -> list[dict]:
     if not row:
         return []
     texts = case_texts()
     return [{"id": c["id"], "category": c["category"], "why": c.get("why", ""), "asked": texts.get(c["id"], "")}
-            for c in row.get("cases", []) if not c.get("passed") and c.get("category") != "sorting"][:MAX_FAILURES]
+            for c in row.get("cases", []) if not c.get("passed") and c.get("category") not in NOT_EVIDENCE
+            ][:MAX_FAILURES]
 
 
 def _rows(path: Path) -> list[dict]:
@@ -89,27 +94,29 @@ def _rows(path: Path) -> list[dict]:
 def conversation_signals(files: list[Path], limit: int = MAX_SIGNALS) -> list[dict]:
     """Your /bad marks and quiet signals, newest first, each with the turn it was about: what you said, what Mitra
     answered, your note, and (for a rephrase) what you said next."""
+    from app.core import cases as cases_mod
+    held_out = cases_mod.held_out_texts()  # D-078 step 6: turns kept as "real" cases are never evidence
     found = []
     for f in files:
-        rows = _rows(f)
-        said = {r.get("turn"): str(r.get("user", "")) for r in rows if r.get("kind") == "turn_start"}
-        answered = {r.get("turn"): str(r.get("text", "")) for r in rows if r.get("kind") == "turn_end"}
-        for r in rows:
-            kind = r.get("kind")
-            if kind == "feedback" and r.get("verdict") == "bad":
-                name = "bad"
-            elif kind == "signal" and r.get("signal") in EVIDENCE_SIGNALS:
-                name = r["signal"]
-            else:
-                continue
-            turn = r.get("of_turn")
-            you = said.get(turn, "")
-            if not you or you.startswith("/"):
-                continue
-            found.append({"t": float(r.get("t") or 0), "signal": name, "you": you[:300],
-                          "mitra": answered.get(turn, "")[:300], "note": str(r.get("note", ""))[:300],
-                          "next": said.get(turn + 1, "")[:300] if isinstance(turn, int) and name == "rephrase"
-                          else ""})
+        for rows in cases_mod._sessions(_rows(f)):  # E-120: turn numbers restart in every session of a file
+            said = {r.get("turn"): str(r.get("user", "")) for r in rows if r.get("kind") == "turn_start"}
+            answered = {r.get("turn"): str(r.get("text", "")) for r in rows if r.get("kind") == "turn_end"}
+            for r in rows:
+                kind = r.get("kind")
+                if kind == "feedback" and r.get("verdict") == "bad":
+                    name = "bad"
+                elif kind == "signal" and r.get("signal") in EVIDENCE_SIGNALS:
+                    name = r["signal"]
+                else:
+                    continue
+                turn = r.get("of_turn")
+                you = said.get(turn, "")
+                if not you or you.startswith("/") or " ".join(you.split()) in held_out:
+                    continue
+                found.append({"t": float(r.get("t") or 0), "signal": name, "you": you[:300],
+                              "mitra": answered.get(turn, "")[:300], "note": str(r.get("note", ""))[:300],
+                              "next": said.get(turn + 1, "")[:300] if isinstance(turn, int) and name == "rephrase"
+                              else ""})
     found.sort(key=lambda x: -x["t"])
     unique, seen = [], set()
     for s in found:  # one conversation can be in its project and in the store: count it once

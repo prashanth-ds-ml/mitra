@@ -38,8 +38,9 @@ from app.core.intent import classify, project_words
 ROOT = Path(__file__).resolve().parents[2]
 SET = ROOT / "score"
 RESULTS = ROOT / "results" / "scores.jsonl"
-CATEGORIES = ("sorting", "behaviour", "writing", "explain", "ideas", "small", "medium")
-QUICK = ("sorting", "behaviour", "writing", "explain", "ideas")
+CATEGORIES = ("sorting", "behaviour", "writing", "explain", "ideas", "real", "small", "medium")
+QUICK = ("sorting", "behaviour", "writing", "explain", "ideas", "real")
+HELD_OUT = ("real",)  # D-078 step 6: your real failures, scored but never learned from (`mitra improve`)
 ARCHITECTURES = ("router", "one", "phased")  # D-071: routed paths (D-068), one loop, or decide-then-act      # no coding tasks: a few minutes
 SHELL_TIMEOUT_S = 120
 GRADE_TIMEOUT_S = 120
@@ -387,11 +388,12 @@ def _tools_used(s) -> list[str]:
     return [str(r.get("name")) for r in rows if r.get("kind") == "tool" and r.get("turn") == s.turn_no]
 
 
-def run_behaviour(r: Runner, on_case: Callable[[Case], None] = lambda c: None, only: set | None = None) -> list[Case]:
+def run_behaviour(r: Runner, on_case: Callable[[Case], None] = lambda c: None, only: set | None = None,
+                  data: dict | None = None, category: str = "behaviour") -> list[Case]:
     from langchain_core.messages import AIMessage
 
-    data, out = _toml("behaviour.toml"), []
-    project = SET / "projects" / data["project"]
+    data, out = data or _toml("behaviour.toml"), []
+    project = SET / "projects" / data.get("project", "snake")
     for c in data["case"]:
         if only and c["id"] not in only:
             continue
@@ -418,10 +420,25 @@ def run_behaviour(r: Runner, on_case: Callable[[Case], None] = lambda c: None, o
                 why = check_behaviour(c, res.text, ws, tools=_tools_used(s), changed=changed, check_error=err)
             except Exception as exc:  # noqa: BLE001 - a crash or a hang is a failed case, never a pass
                 steps, why = 0, f"{type(exc).__name__}: {str(exc)[:150]}"
-        case = Case(c["id"], "behaviour", not why, why, round(time.monotonic() - t0, 1), steps)
+        case = Case(c["id"], category, not why, why, round(time.monotonic() - t0, 1), steps)
         on_case(case)
         out.append(case)
     return out
+
+
+def real_cases() -> dict | None:
+    """D-078 step 6: ~/.mitra/score/real.toml, the cases you kept from your /bad turns (private, held out)."""
+    from app.core import cases as cases_mod
+    try:
+        data = tomllib.loads(cases_mod.real_path().read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+    return data if data.get("case") else None
+
+
+def run_real(r: Runner, on_case: Callable[[Case], None] = lambda c: None, only: set | None = None) -> list[Case]:
+    data = real_cases()
+    return run_behaviour(r, on_case, only, data=data, category="real") if data else []
 
 
 def _validate_behaviour() -> list[str]:
@@ -615,6 +632,8 @@ def run(categories=CATEGORIES, *, runner: Runner | None = None, model: str = "",
         cases += run_behaviour(runner, on_case, only)
     if "writing" in categories:
         cases += run_writing(runner, on_case, only)
+    if "real" in categories:
+        cases += run_real(runner, on_case, only)
     if {"explain", "ideas"} & set(categories):
         cases += run_explain(runner, on_case, tuple(c for c in ("explain", "ideas") if c in categories), only)
     sizes = tuple(s for s in ("small", "medium") if s in categories)

@@ -3,6 +3,11 @@
 All notable changes, newest first. Versions follow the milestones in [docs/PLAN.md](docs/PLAN.md).
 
 ## [Unreleased]
+- **Your /bad becomes a test case (D-078 step 6):** `mitra cases` drafts a score case from each new /bad (the coach
+  writes it when Claude Code is there, otherwise a template from your note); `mitra cases review` keeps, edits or
+  drops each one. Kept cases form the private "real" category of `mitra score` (~/.mitra/score/real.toml, never in
+  the repo), held out: `mitra improve` never learns from them. Fixed: improve and the coach matched a /bad to the
+  wrong turn when a day had several sessions (E-120).
 - **Phase 1 of D-078 (trust):** after every code change the project's tests run by themselves; on a failure Mitra
   gets the failing output and up to 3 rounds to fix it, then stops and says honestly what still fails (a project
   without tests is called untested). A "done" / "fixed" after a change without a passing run gets the ⚠ Unverified

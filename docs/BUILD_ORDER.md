@@ -142,7 +142,7 @@ brackets are the must-haves in D-077 each item serves. Steps 4-5 above are items
 | 3 | No "done" without a passing test in the same turn | 6 | done 2026-11-12 |
 | 4 | Read before edit; no accidental whole-file overwrite | 4 | done: read-before-edit existed (tools.py); 2026-11-12 write_file refuses to shrink a 20+ line file to under half |
 | 5 | Coding practice set (`mitra practice`): Python (MBPP+, newer LiveCodeBench) and SQL (Spider subset on SQLite) first, MongoDB later with our own tasks (user 2026-11-12); hidden tests judge, Mitra writes its own tests; split learn / held out | 10 | |
-| 6 | Your real failures (/bad) become score cases | 10 | |
+| 6 | Your real failures (/bad) become score cases | 10 | done 2026-11-12: `mitra cases` + `mitra cases review`, private held-out "real" category |
 | 7 | Honest keep/drop gate: re-run the cases that changed, no new failures, held-out set | 11 | |
 | 8 | Threads add, never overwrite | 12 | |
 | 9 | Better signals: the 4B reads your next message against a checklist; optional per-session rating at exit | 9 | |
