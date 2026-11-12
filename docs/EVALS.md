@@ -86,6 +86,15 @@ Failed: B6_general (185 words, too long), B9_change (changed nothing), B12_knows
 (opened with "Here is"), I1_harder (no file cited). B9 had failed in all three baseline runs: its record showed the
 model looked first, then could not switch to the change phase (E-114, fixed in F-106 after this run).
 
+**1d + step 6 check, and an explain drift** (2026-11-12 evening): quick score 20:08 = 17/23, but X2_grow and X4_wall
+(passing in all four earlier runs) failed. X4 was a scoring bug (E-121: the denial "doesn't wrap around" counted as
+the claim). X2 and later runs: correct answers citing "Line 39" with no file. Explain-only runs that evening:
+current code with the 1d line 7/12 passed, without it 5/12, and **the Phase 1 commit itself (1aeb15c, explain 4/4 at
+16:59) 7/12**: not a code change. Same model digest and Ollama settings; free RAM had fallen from ~10 GB (morning) to
+3-4 GB and only 5.5 of 7.7 GB of the model sat on the GPU. Conclusion: explain drifts with machine conditions on
+this laptop; a regression check compares runs made under the same conditions only. Phase 3 starts with a fresh
+baseline (after a restart), never mixing morning and evening runs.
+
 ## Results
 
 ### 2026-11-06 · M1 · First `mitra improve` runs (self-improvement step 3, smoke test)

@@ -119,6 +119,20 @@ def count_options(text: str) -> int:
     return len({m.group(3) for m in _OPTION.finditer(text or "")})
 
 
+_NEGATED = re.compile(r"\b(doesn'?t|does not|don'?t|do not|isn'?t|is not|won'?t|will not|never|no|not|neither|nor|"
+                      r"instead of|rather than)\b", re.I)
+
+
+def claims(pattern: str, text: str) -> bool:
+    """E-121: the answer makes the claim `pattern`, not its denial: "The game doesn't wrap around or bounce" is right
+    and must not count as claiming that it wraps around. A match counts unless its sentence negates it before it."""
+    for m in re.finditer(pattern, text or ""):
+        start = max(text.rfind(c, 0, m.start()) for c in ".!?\n") + 1
+        if not _NEGATED.search(text[start:m.start()]):
+            return True
+    return False
+
+
 def check_explain(case: dict, text: str, root: Path, *, changed: list[str] | None = None) -> str:
     from app.core.chat import cited_files
 
@@ -134,7 +148,7 @@ def check_explain(case: dict, text: str, root: Path, *, changed: list[str] | Non
         if not re.search(pat, t, re.I):
             return f"missing fact: {pat}"
     for pat in case.get("must_not", []):
-        if re.search(pat, t):
+        if claims(pat, t):
             return f"wrong claim: {pat}"
     if case.get("options"):
         lo, hi = case["options"]

@@ -12,8 +12,8 @@ from tests.test_trust_d077 import Spy
 def test_questions_about_mitra_and_outside_tech_are_not_answered_from_the_files():
     for prompt in (C.PHASED_PROMPT, C.ONE_PROMPT):
         assert C.SELF_AND_TECH in prompt
-    assert "never by looking in the project's files" in C.SELF_AND_TECH
-    assert "qwen3.5" in C.SELF_AND_TECH and "never from the project's files" in C.SELF_AND_TECH
+    assert "answer yourself from \"About you\"" in C.SELF_AND_TECH
+    assert "qwen3.5" in C.SELF_AND_TECH and "look_up, or answer from" in C.SELF_AND_TECH
 
 
 def test_a_whatsapp_draft_has_no_subject_and_whatsapp_bold():
@@ -31,3 +31,14 @@ def test_a_deep_dive_or_search_request_is_told_to_search_now(tmp_path):
                  "do a deep dive in web and tell me"):
         assert "do not ask whether to search" in _decide_note(tmp_path, said), said
     assert "do not ask whether to search" not in _decide_note(tmp_path, "hello mitra how are you doing")
+
+
+def test_a_denied_wrong_claim_is_not_a_wrong_claim():
+    """E-121 (quick score 2026-11-12 20:08, X4_wall): "The game doesn't wrap around or bounce, it simply stops" was
+    failed as the wrong claim "wraps around"."""
+    from app.core import score as S
+    pat = r"(?i)wraps? around|bounces?|teleport"
+    assert not S.claims(pat, "- The game doesn't wrap around or bounce, it simply stops when the snake hits a wall")
+    assert not S.claims(pat, "It never teleports. The game ends.")
+    assert S.claims(pat, "When it hits the wall, the snake wraps around to the other side.")
+    assert S.claims(pat, "It does not stop. It bounces back.")                 # the denial is in another sentence
