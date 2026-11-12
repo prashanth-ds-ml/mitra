@@ -136,12 +136,12 @@ brackets are the must-haves in D-077 each item serves. Steps 4-5 above are items
 | # | Item | Serves | Status |
 |---|---|---|---|
 | 1 | No claim without a source: the decide step's query runs (E-109), "confirmed"/"tests pass" checked against the turn's tool results (E-110), honest "offline" | 3, 6 | done 2026-11-12 |
-| 1b | Partner basics (D-078, must-have 13): no opening praise, agree only with a reason; "deep dive" = at least 3 queries and 4-5 pages with a bigger budget | 13 | done 2026-11-12 (score pending) |
-| 1c | Honest self-description: ABOUT_MITRA also says what Mitra cannot do yet, kept in step with this table | 7 | done 2026-11-12 (score pending) |
-| 2 | Tests after every change, retry with the failing output | 5 | done 2026-11-12: `auto_test_rounds` 3 (score pending) |
-| 3 | No "done" without a passing test in the same turn | 6 | done 2026-11-12 (score pending) |
+| 1b | Partner basics (D-078, must-have 13): no opening praise, agree only with a reason; "deep dive" = at least 3 queries and 4-5 pages with a bigger budget | 13 | done 2026-11-12 |
+| 1c | Honest self-description: ABOUT_MITRA also says what Mitra cannot do yet, kept in step with this table | 7 | done 2026-11-12 |
+| 2 | Tests after every change, retry with the failing output | 5 | done 2026-11-12: `auto_test_rounds` 3 |
+| 3 | No "done" without a passing test in the same turn | 6 | done 2026-11-12 |
 | 4 | Read before edit; no accidental whole-file overwrite | 4 | done: read-before-edit existed (tools.py); 2026-11-12 write_file refuses to shrink a 20+ line file to under half |
-| 5 | Coding practice set: Python, SQL, MongoDB; public sets with hidden tests + our own; split learn / held out | 10 | |
+| 5 | Coding practice set (`mitra practice`): Python (MBPP+, newer LiveCodeBench) and SQL (Spider subset on SQLite) first, MongoDB later with our own tasks (user 2026-11-12); hidden tests judge, Mitra writes its own tests; split learn / held out | 10 | |
 | 6 | Your real failures (/bad) become score cases | 10 | |
 | 7 | Honest keep/drop gate: re-run the cases that changed, no new failures, held-out set | 11 | |
 | 8 | Threads add, never overwrite | 12 | |

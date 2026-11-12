@@ -64,6 +64,14 @@ PARTNER = ("Be honest with the user: agree only when they are right, and say why
            "right\" or other praise. Never open with praise of any kind. Give your own view, even when it differs "
            "from theirs.")
 
+# E-116, E-117 (live 2026-11-12): "tell me about you in detail" and "about the model qwen3.5" were answered by
+# searching the project's files (a plan, a night report); E-119: a WhatsApp draft got a Subject line and **bold**
+SELF_AND_TECH = """Questions about you (Mitra): what you are, what you can and cannot do yet, how you are built:
+answer yourself from "About you" below, in detail when asked, never by looking in the project's files. A model,
+library, tool or technology that is not a file in this project (qwen3.5, pandas, Ollama): look it up or answer
+from what you know, never from the project's files. A WhatsApp or chat message: no Subject line and no Markdown;
+WhatsApp bold is *one star*."""
+
 # D-071 one Mitra: one conversational loop; the model decides whether to talk, look or change (all tools offered)
 ONE_PROMPT ="""You are Mitra, the user's thinking partner and coder, running on their own machine, in their project
 folder (its files are listed below).
@@ -88,6 +96,7 @@ Use tools only when the answer needs them:
   `### T1:` tasks is built with run_plan.
 - A fact you do not know: web_search / fetch_url.
 If it is unclear what to look at or change, ask one short question instead of searching.
+""" + SELF_AND_TECH + """
 
 A mail or message the user wants drafted: you write it FOR the user, as the user, never as Mitra. A mail has a
 'Subject:' line, then the body, then the user's mail signature copied exactly from their notes, word for word,
@@ -143,6 +152,7 @@ You have no file tools until you choose a phase. Choose one only when the messag
 - propose_plan: the user asked to build something bigger (several files) or said "build it" after a discussion.
 Deciding between options, opinions and ideas are conversation: answer them yourself. But ideas or opinions about
 this project's code (make the game harder, improve the API, review it) need look_at_code first.
+""" + SELF_AND_TECH + """
 
 A mail or message the user wants drafted: you write it FOR the user, as the user, never as Mitra. A mail has a
 'Subject:' line, then the body, then the user's mail signature copied exactly from their notes, word for word,
@@ -196,6 +206,13 @@ DEEP_NOTE = ("[Mitra: deep look-up. The user asked you to dig deep. Search at le
              "words (search each name or project on its own, then the topic with other words), open the {pages}-5 "
              "best results (fetch_url), then answer clearly (Markdown) with what you found and where (link for each "
              "point), and say what you could not find. Say plainly when a search found nothing useful.]")
+
+
+# E-118 (live 2026-11-12): "can you do a deep dive on the model once again" got "Would you like me to search?"
+_WEB_ASK = re.compile(r"\b(search (the )?(web|internet|online)|web ?search|look (it )?up online|on the (web|internet)|"
+                      r"in (the )?web|google it)\b", re.IGNORECASE)
+DECIDE_SEARCH_NOTE = ("[Mitra: the user asked you to search or dig deep: do it now (look_up, or look_at_code if it is "
+                      "about this project's files); do not ask whether to search.]")
 
 
 def is_deep(message: str) -> bool:
@@ -823,7 +840,8 @@ class ChatSession:
         self.deciding = True
         # E-101: the small-talk and ask-back rules sit in the system prompt, far from the message; a 9B forgot them
         # (B2, B3 in the A/B). The reminder goes next to the message for the decide call only.
-        reminder = HumanMessage(content=DECIDE_NOTE)
+        asks_search = is_deep(self._prev_user_full) or bool(_WEB_ASK.search(self._prev_user_full or ""))
+        reminder = HumanMessage(content=DECIDE_NOTE + (DECIDE_SEARCH_NOTE if asks_search else ""))
         at = max(i for i, m in enumerate(messages) if isinstance(m, HumanMessage))
         messages.insert(at, reminder)
         work = (self.llm, self.num_ctx, self.backend_kind)
