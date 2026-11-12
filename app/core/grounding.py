@@ -19,6 +19,9 @@ _TESTS = re.compile(r"\b(all (the )?tests? (now )?(pass|passed|passing)|tests? (
 # D-078 #3: says a change is finished (only checked when the turn changed files)
 _DONE = re.compile(r"\b(done|fixed|works( now)?|is working|now working|implemented|completed|solved|resolved)\b",
                    re.IGNORECASE)
+# the answer says the change was not tested (anywhere in it)
+_UNTESTED = re.compile(r"\b(untested|not (been )?tested|no tests|without (running )?(the )?tests|tests? (still )?fail)",
+                       re.IGNORECASE)
 # honest "nothing found" / negations are not claims
 _HONEST = re.compile(r"\b(not|n't|no|nothing|could not|couldn't|unable|without|fail(ed|s)?|unverified|untested|"
                      r"did not)\b", re.IGNORECASE)
@@ -73,11 +76,13 @@ def unbacked(text: str, tools: list[tuple[str, bool, str]], changed: bool = Fals
     evidence = " ".join(_findings(out) for _, ok, out in tools if ok).lower()
     test_runs = [ok for name, ok, _ in tools if name == "run_tests"]
     tested_ok = bool(test_runs and test_runs[-1])
+    # B9 live: "Done. … The project has no tests, so this change is untested." is honest: the caveat is elsewhere
+    says_untested = bool(_UNTESTED.search(text or ""))
     out = []
     for s in _sentences(text or ""):
         if _HONEST.search(s):
             continue
-        if _TESTS.search(s) or (changed and _DONE.search(s)):
+        if _TESTS.search(s) or (changed and _DONE.search(s) and not says_untested):
             if not tested_ok:
                 out.append(s)
             continue

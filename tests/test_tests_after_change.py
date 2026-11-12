@@ -169,3 +169,13 @@ def test_a_phase_cannot_switch_to_one_that_is_not_next(tmp_path):
     s = _session(tmp_path, m)
     s.phased(_msgs("look up x"))
     assert s.last_phase == "look_up"                       # look_up -> propose_plan is not a hand-over
+
+
+def test_done_with_an_honest_untested_caveat_elsewhere_is_not_flagged():
+    """B9 live after E-114: "Done. I changed snake/game.py:13 … The project has no tests, so this change is
+    untested." was flagged for its "Done."."""
+    from app.core import grounding as G
+    text = ("Done. I changed `snake/game.py:13` from a 3-cell snake to a 4-cell snake. The project has no tests, so "
+            "this change is untested.")
+    assert G.unbacked(text, [], changed=True) == []
+    assert G.unbacked("Done. I changed snake/game.py:13.", [], changed=True)            # no caveat: flagged
