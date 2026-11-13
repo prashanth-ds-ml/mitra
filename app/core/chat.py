@@ -150,7 +150,10 @@ You have no file tools until you choose a phase. The phases are your own switche
   or prices you may not know. Never answer those from memory.
 - make_change: the user asked you to change, fix, add or build something small and clear in this project, or to
   write, save or create code, a query or a file (also a new file in an empty folder).
-- propose_plan: the user asked to build something bigger (several files) or said "build it" after a discussion.
+- propose_plan: the user asked to build something bigger (several files), said "build it" after a discussion, or
+  pasted a spec, PRD or requirements for something to build (plan what it describes; do not just comment on it).
+When the user says yes or go ahead to work you offered, start it now with its phase. Never ask the same question
+twice.
 Deciding between options, opinions and ideas are conversation: answer them yourself. But ideas or opinions about
 this project's code (make the game harder, improve the API, review it) need look_at_code first.
 """ + SELF_AND_TECH + """
@@ -164,6 +167,66 @@ as written. Output only the text itself, with no preamble; a mail or message is 
 
 DECIDE_NOTE = ("[Mitra: small talk gets one or two friendly sentences that do not mention the project or its files. "
                "If the user is thinking out loud or deciding, end with one short question.]")
+# E-125: the yes and pasted-spec rules live in PHASED_PROMPT and in code (is_go_ahead), not in this reminder: a
+# longer reminder cost B2 its ask-back on the first live score
+
+# E-125 (live 2026-11-13, a pasted Neon Chomp PRD): Mitra asked "Should I create all the initial files now?" and the
+# user said yes six times ("yes", "ok start and go ahead", "yes to all go to auto mode", ...). Every decide call
+# talked and asked the same question again, word for word, so nothing was ever built. A yes to work Mitra offered
+# now starts that work with no decide call, and a decide answer that repeats the last one is not accepted.
+_GO = re.compile(r"\b(yes|yeah|yep|yup|sure|ok|okay|alright|go|proceed|start|continue|do it|build it|carry on|"
+                 r"go for it|sounds good|absolutely|of course|please do|haan)\b", re.IGNORECASE)
+_NOT_GO = re.compile(r"\?|\b(no|nope|not|don'?t|do not|wait|stop|hold|later|but|instead|first|before|why|what|how|"
+                     r"change|only)\b", re.IGNORECASE)
+_OFFER = re.compile(r"\b(shall|should|can|may|do you want|would you like|want me to|ready (for me )?to|ok(ay)? (for me )?"
+                    r"to|good to|go ahead and)\b[^?]{0,200}?\b(?P<verb>create|build|scaffold|start|begin|implement|write|make|"
+                    r"add|set ?up|fix|change|update|edit|apply|run|proceed|go ahead|do (it|that|this)|search|look|"
+                    r"find|read|check|plan)\b[^?]*\?", re.IGNORECASE)
+REPEAT_RATIO = 0.8  # a decide answer this close to the last answer repeats it
+GO_NOTE = ("[Mitra: the user said yes to what you offered: \"{offer}\". Do it now, all of it, without asking "
+           "again.]")
+REPEAT_NOTE = ("[Mitra: you just repeated your last answer and the user already answered it: \"{user}\". Do not ask "
+               "again. Act on their answer now (choose a phase), or say something new.]")
+
+
+def is_go_ahead(text: str) -> bool:
+    """A short yes ("yes", "ok start and go ahead", "yes to all go to auto mode") with no but / wait / question."""
+    t = " ".join((text or "").split())
+    return 0 < len(t.split()) <= 10 and bool(_GO.search(t)) and not _NOT_GO.search(t)
+
+
+def offered_phase(answer: str) -> tuple[str, str] | None:
+    """The work Mitra offered at the end of `answer` ("Should I create all the initial files now?") ->
+    (phase, the offer), or None when it did not end by offering to do something."""
+    tail = (answer or "").strip()[-500:]
+    if not tail.endswith("?"):
+        return None
+    last = re.split(r"(?<=[.!?:])\s+|\n", tail[:-1])[-1] + "?"  # the closing question only
+    m = _OFFER.search(last)
+    if m is None:
+        return None
+    offer, verb = last.strip(), m.group("verb").lower()
+    low = offer.lower()
+    if verb in ("search", "find") or re.search(r"\b(web|online|internet|look (it|that|this)? ?up)\b", low):
+        return "look_up", offer
+    if re.search(r"\bplan\b", low) and not re.search(r"\b(build|create|implement|write the code|start)\b", low):
+        return "propose_plan", offer
+    if verb in ("look", "read", "check") and not re.search(r"\b(fix|change|edit|add|create|build|write)\b", low):
+        return "look_at_code", offer
+    return "make_change", offer
+
+
+def _last_answer(messages: list, before: int) -> str:
+    """Mitra's last answer in text before message `before`."""
+    for m in reversed(messages[:before]):
+        if isinstance(m, AIMessage) and isinstance(m.content, str) and m.content.strip():
+            return m.content
+    return ""
+
+
+def repeats(new: str, old: str) -> bool:
+    a, b = " ".join((new or "").lower().split()), " ".join((old or "").lower().split())
+    return bool(a and b) and difflib.SequenceMatcher(None, a, b).ratio() >= REPEAT_RATIO
 
 PHASE_SPECS = [
     {"name": "look_at_code", "description": "Start looking at this project's files to answer a question about them.",
@@ -842,20 +905,28 @@ class ChatSession:
         # E-101: the small-talk and ask-back rules sit in the system prompt, far from the message; a 9B forgot them
         # (B2, B3 in the A/B). The reminder goes next to the message for the decide call only.
         asks_search = is_deep(self._prev_user_full) or bool(_WEB_ASK.search(self._prev_user_full or ""))
-        reminder = HumanMessage(content=DECIDE_NOTE + (DECIDE_SEARCH_NOTE if asks_search else ""))
         at = max(i for i, m in enumerate(messages) if isinstance(m, HumanMessage))
-        messages.insert(at, reminder)
-        work = (self.llm, self.num_ctx, self.backend_kind)
-        talk = getattr(self, "_talk", None)
-        if talk:  # D-074: talking is on the laptop; only the work goes to the remote GPU
-            self.llm, self.num_ctx, self.backend_kind = talk[0], talk[1], "laptop"
-            self.rec.write("talk_route", turn=self.turn_no, backend="laptop", num_ctx=talk[1], work=work[2])
-        try:
-            res = self._turn(messages, res, 1)
-        finally:
+        user = str(messages[at].content)
+        before = _last_answer(messages, at)
+        offered = offered_phase(before)
+        go_note = ""
+        if offered and is_go_ahead(user):  # E-125: a yes to work Mitra offered starts it, no decide call
             self.deciding = False
-            self.llm, self.num_ctx, self.backend_kind = work
-            messages[:] = [m for m in messages if m is not reminder]
+            name, offer = offered
+            self.phase_request = {"name": name, "args": {"what": offer}, "id": None}
+            self.rec.write("phase", turn=self.turn_no, step=0, name=name, args={"what": offer}, go_ahead=True)
+            go_note = GO_NOTE.format(offer=offer[:300])
+        else:
+            res = self._decide(messages, res, at, asks_search)
+            if not self.phase_request and repeats(res.text, before):  # E-125: the same answer again
+                # one more decide call that is told what the user answered (a "maybe tomorrow" must not start work)
+                self.rec.write("repeat", turn=self.turn_no, offered=offered[0] if offered else "")
+                note = HumanMessage(content=REPEAT_NOTE.format(user=user[:300]))
+                messages.append(note)
+                try:
+                    res = self._decide(messages, res, len(messages) - 1, asks_search, retry=True)
+                finally:
+                    messages[:] = [m for m in messages if m is not note]
         if not self.phase_request:
             return res  # talked: one call
         asked = name = self.phase_request["name"]
@@ -873,7 +944,7 @@ class ChatSession:
             note, budget_name = DEEP_NOTE.format(searches=max(searches, 2), pages=max(pages, 2)), "deep_max_steps"
         if asked not in PHASES and asked in READ_ONLY_TOOLS and asked in (phase["tools"] or ()):
             self._run_decided(messages, asked)  # E-109: the query it asked for runs, it is not dropped
-        messages.append(HumanMessage(content=note))
+        messages.append(HumanMessage(content=(go_note + "\n" if go_note else "") + note))
         self.answer_on_last_step, self.last_step_note = True, ONE_LAST_STEP_NOTE
         budget = self.harness.limit(budget_name) if budget_name else 1
         self.look_budget = budget
@@ -891,6 +962,30 @@ class ChatSession:
             more = self._turn(messages, TurnResult(journal=acted.journal), budget)
             acted = _merged(acted, more)
         return acted
+
+    def _decide(self, messages: list, res: TurnResult, at: int, asks_search: bool, retry: bool = False) -> TurnResult:
+        """The decide call (D-071): talk in text, or pick a phase. The talk reminder sits right before message `at`
+        (E-101) and is taken out after; on the laptop model when D-074 says so."""
+        self.deciding = True
+        reminder = HumanMessage(content=DECIDE_NOTE + (DECIDE_SEARCH_NOTE if asks_search else ""))
+        messages.insert(at, reminder)
+        work = (self.llm, self.num_ctx, self.backend_kind)
+        talk = getattr(self, "_talk", None)
+        if talk:  # D-074: talking is on the laptop; only the work goes to the remote GPU
+            self.llm, self.num_ctx, self.backend_kind = talk[0], talk[1], "laptop"
+            self.rec.write("talk_route", turn=self.turn_no, backend="laptop", num_ctx=talk[1], work=work[2])
+        try:
+            if retry:
+                more = self._turn(messages, TurnResult(journal=res.journal), 1)
+                more.steps += res.steps
+                res = more
+            else:
+                res = self._turn(messages, res, 1)
+        finally:
+            self.deciding = False
+            self.llm, self.num_ctx, self.backend_kind = work
+            messages[:] = [m for m in messages if m is not reminder]
+        return res
 
     def _run_decided(self, messages: list, name: str) -> None:
         """E-109 (live 2026-11-11): the decide step called web_search with "DPDP Act India SME compliance deadline";

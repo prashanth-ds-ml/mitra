@@ -137,3 +137,14 @@ max_words = 160
 facts = ['(?i)\b(my pick|i.d pick|i pick|i.d add|i.ll add|my (choice|turn))', '(?i)\b(because|since|so that|so you)']
 reference = """Added: 2. writing tests for your code. My pick for 3: running those tests after every change, because a
 test only helps if it runs every time. Your turn!"""
+
+# E-125 (live 2026-11-13): after Mitra offered to make a change, "yes" was answered six times with the same question.
+# The history holds the offer twice (it already repeated once), the state the live session was stuck in.
+[[case]]
+id = "B15_yes_after_offer"
+text = "yes go ahead"
+history = [["the game should be harder: make the snake start 4 cells long instead of 3", "I can change the starting snake in `snake/game.py` from 3 cells to 4, so it is longer from the first move. Should I make the change now?"], ["yes", "I can change the starting snake in `snake/game.py` from 3 cells to 4, so it is longer from the first move. Should I make the change now?"]]
+expect = "change"
+check = "from snake.game import Game; g = Game(); assert len(g.snake) == 4, g.snake; g.step(); assert not g.over"
+solution = { file = "snake/game.py", old = "self.snake = [(cx, cy), (cx - 1, cy), (cx - 2, cy)]", new = "self.snake = [(cx, cy), (cx - 1, cy), (cx - 2, cy), (cx - 3, cy)]" }
+reference = "Done: the snake now starts 4 cells long (snake/game.py:13)."

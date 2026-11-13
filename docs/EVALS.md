@@ -125,6 +125,21 @@ no task that passed before failed. Free RAM 6 GB at the start; 4.8 of 7.7 GB of 
 - **"changed files" on a question** (B7 run 3, X2 run 2): both ran run_tests, which leaves .pytest_cache; the score
   counts it as a change (known, Phase 3 step 2).
 
+### E-125 check (2026-11-13 20:19-21:00, Kaggle qwen3.5:latest 256K, behaviour only)
+
+| Code | Runs | Behaviour (14 old cases) | B15_yes_after_offer |
+|---|---|---|---|
+| before F-115 (faf1fa6) | 2 | 11/14, 12/14 (B2, B6, B7, B12 vary) | passes 5/5 (too easy, even with the offer repeated in the history) |
+| F-115, first prompt | 1 | 12/14 (B2, B10) | pass |
+| F-115, final (reminder unchanged) | 2 | 11/14, 11/14 (B7, B10, B12, B13, B14 vary) | pass 5/5 |
+
+- **No regression:** totals inside the noise; each miss moves between runs; B2 also missed on the old code.
+- **B15 does not reproduce the bug**: a short snake chat gets acted on. The **replay of the real conversation**
+  (the PRD + Mitra's live answers + "ok start and go ahead", scratchpad replay script) with the old logic started work
+  in **1 of 3** tries and wrote no files; the new logic skips the decide call for that yes (unit test). The new-logic
+  live replay was stopped when the user started Mitra; their live session is the check (USER_TESTS).
+- Records keep the user's message cut at 2,000 characters, so a replay sees a cut-off PRD (noted, not fixed).
+
 ## Results
 
 ### 2026-11-06 · M1 · First `mitra improve` runs (self-improvement step 3, smoke test)

@@ -150,6 +150,18 @@ def terminal_command(text: str) -> str:
     return t if m else ""
 
 
+def is_pasted_spec(raw: str) -> bool:
+    """E-125 (live 2026-11-13): a pasted Neon Chomp PRD (300+ lines, Markdown headings) was sorted as writing because
+    it names "prd". A long pasted document with several headings, whose first line does not ask to write, rewrite or
+    summarise it, describes something to build."""
+    lines = [x for x in (raw or "").splitlines() if x.strip()]
+    if len(lines) < 15 or sum(1 for x in lines if re.match(r"\s*#{1,4}\s+\S", x)) < 3:
+        return False
+    first = set(_WORD.findall(lines[0].lower()))
+    return not first & (WRITING_VERBS | {"write", "rewrite", "review", "improve", "edit", "fix", "explain",
+                                         "check", "critique", "feedback", "what", "how", "why"})
+
+
 def classify(text: str, previous: str = "", project_words: frozenset | set = frozenset()) -> str:
     """`previous`: the kind of the last request (a "make it shorter" after a mail is writing). `project_words`: names
     in the workspace (files, folders), so a question that names one is about the project."""
@@ -194,6 +206,8 @@ def classify(text: str, previous: str = "", project_words: frozenset | set = fro
         return "question" if code else "general"  # "build it" then plans it
     if previous == "writing" and REFINE.match(low):
         return "writing"
+    if is_pasted_spec(raw):
+        return "big"  # E-125: a pasted PRD / spec is something to build, not a document to write
     if _writing(words, low, raw):
         return "writing"
     if low.startswith(HOW_TO):
