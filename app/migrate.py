@@ -28,6 +28,31 @@ def _move(old: Path, new: Path) -> str:
         return f"could not move {old} yet ({exc.__class__.__name__}): still using it; close any old Mitra and retry"
 
 
+HOME_MARKS = ("data", "harness", "threads", "last_model", "roles.json", "me.md", "remote.json")
+
+
+def _is_real_home(folder: Path) -> bool:
+    """A folder CodeMitra / Mitra used as its home (records, harness, settings), not an old project's notes."""
+    return any((folder / m).exists() for m in HOME_MARKS)
+
+
+def _move_home(old: Path, new: Path) -> list[str]:
+    """Live 2026-11-14: ~/.codemitra already held a July project's notes (the old CodeMitra was once run in the home
+    folder), so the plain move was skipped and the stale folder would have been used. A new-name folder with no
+    home data in it is moved aside (kept, never deleted) and the real home moves in."""
+    if old.is_dir() and new.is_dir() and _is_real_home(old) and not _is_real_home(new):
+        aside = new.with_name(new.name + "-before-rename")
+        n = 2
+        while aside.exists():
+            aside = new.with_name(f"{new.name}-before-rename-{n}")
+            n += 1
+        first = _move(new, aside)
+        if not first.startswith("moved"):
+            return [first]
+        return [first, _move(old, new)]
+    return [_move(old, new)]
+
+
 def env() -> None:
     """An old MITRA_HOME / MITRA_HARNESS still works when the new name is not set."""
     for old, new in ENV_NAMES:
@@ -40,7 +65,7 @@ def home(user_home: Path | None = None) -> list[str]:
     base = Path(user_home) if user_home else Path.home()
     notes = []
     if not os.environ.get("CODEMITRA_HOME") or Path(os.environ["CODEMITRA_HOME"]) == base / ".codemitra":
-        notes.append(_move(base / ".mitra", base / ".codemitra"))
+        notes += _move_home(base / ".mitra", base / ".codemitra")
     cfg_old, cfg_new = base / ".config" / "mitra", base / ".config" / "codemitra"
     notes.append(_move(cfg_old, cfg_new))
     notes.append(_move(cfg_new / "mitra.toml", cfg_new / "codemitra.toml"))
@@ -79,4 +104,6 @@ def resolve_home(user_home: Path | None = None) -> Path:
         return Path(os.environ["CODEMITRA_HOME"])
     base = Path(user_home) if user_home else Path.home()
     new, old = base / ".codemitra", base / ".mitra"
-    return old if old.is_dir() and not new.exists() else new
+    if old.is_dir() and (not new.exists() or (_is_real_home(old) and not _is_real_home(new))):
+        return old  # not moved yet (or blocked): the folder with the real data, never a stale one
+    return new

@@ -34,8 +34,9 @@ def test_both_folders_present_nothing_is_overwritten(tmp_path, monkeypatch):
     home = _old_home(tmp_path)
     (home / ".codemitra").mkdir()
     (home / ".codemitra" / "keep.txt").write_text("new", encoding="utf-8")
-    migrate.home(home)
-    assert (home / ".mitra" / "me.md").is_file() and (home / ".codemitra" / "keep.txt").read_text() == "new"
+    migrate.home(home)  # a folder with no home data is moved aside, kept whole
+    assert (home / ".codemitra-before-rename" / "keep.txt").read_text() == "new"
+    assert (home / ".codemitra" / "me.md").is_file()
 
 
 def test_a_failed_move_keeps_using_the_old_folder(tmp_path, monkeypatch):
@@ -88,3 +89,24 @@ def test_the_assistant_calls_itself_codemitra():
     from app.core import chat as C
     assert "You are CodeMitra" in C.PHASED_PROMPT
     assert " Mitra" not in C.PHASED_PROMPT.replace("CodeMitra", "")
+
+
+def test_a_stale_codemitra_folder_is_moved_aside_never_used_or_deleted(tmp_path, monkeypatch):
+    """Live 2026-11-14: ~/.codemitra held a July project's notes; ~/.mitra the real 322 MB home."""
+    monkeypatch.delenv("CODEMITRA_HOME", raising=False)
+    home = _old_home(tmp_path)
+    (home / ".codemitra").mkdir()
+    (home / ".codemitra" / "brainstorm.md").write_text("july notes", encoding="utf-8")
+    assert migrate.resolve_home(home) == home / ".mitra"                  # before the move: the real one
+    notes = migrate.home(home)
+    assert (home / ".codemitra-before-rename" / "brainstorm.md").read_text(encoding="utf-8") == "july notes"
+    assert (home / ".codemitra" / "me.md").is_file() and not (home / ".mitra").exists()
+    assert migrate.resolve_home(home) == home / ".codemitra" and any("before-rename" in n for n in notes)
+
+
+def test_two_real_homes_are_both_left_alone(tmp_path, monkeypatch):
+    monkeypatch.delenv("CODEMITRA_HOME", raising=False)
+    home = _old_home(tmp_path)
+    (home / ".codemitra" / "data").mkdir(parents=True)
+    assert migrate.home(home)[:1] == [] or (home / ".mitra").is_dir()
+    assert (home / ".mitra").is_dir() and (home / ".codemitra" / "data").is_dir()
