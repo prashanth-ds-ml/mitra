@@ -2,6 +2,14 @@
 
 All notable changes, newest first. Versions follow the milestones in [docs/PLAN.md](docs/PLAN.md).
 
+## [0.8.1] - 2026-11-14 · share your sessions
+- **`codemitra share` (D-081):** share a session so CodeMitra learns from everyone's. `--setup` once (your name,
+  the private logs repo `prashanth-ds-ml/codemitra-logs`, ask at exit: ask / always / never); `--push` shows a preview
+  and pushes the light, scrubbed copy (messages, answers, which tools ran and failed, test summaries, labels; never
+  file contents, tool outputs, code, notes or paths; tokens, emails, user name and home folder replaced) with your own
+  git login. Without GitHub it writes the file to `~/.codemitra/share/out/`. The maintainer's `--pull` brings
+  everyone's sessions into the store, where CodeMitra's own learning round reads them (`coach --shared` too).
+
 ## [0.8.0] - 2026-11-14 · CodeMitra (renamed from Mitra), trust fixes, feedback on every turn
 - **Mitra is now CodeMitra (D-080).** The command is `codemitra`; `~/.mitra`, `~/.config/mitra`, each project's
   `.mitra/`, `mitra.toml` and `MITRA.md` move to the new names once, on the first `codemitra` run, with nothing lost

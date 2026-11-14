@@ -177,6 +177,18 @@ typed and what you saw (copy the terminal) helps most.
 records that by itself. Press `+` or `-` after an answer if you want to say more, and rate the session 1-5 when you
 `exit` (any other key skips). All of it stays on your machine.
 
+### Share your sessions (helps CodeMitra learn from everyone)
+CodeMitra improves from its mistakes, and yours show it mistakes it never makes for me. To share:
+```
+codemitra share --setup     # once: your name, the shared logs repo, ask when you exit? (ask / always / never)
+codemitra share --push      # any time: a preview of your newest session, then it is pushed (--all: every new one)
+```
+A shared session is **light and scrubbed**: your messages, CodeMitra's answers, which tools ran and whether they
+failed, test summaries and the feedback labels. **Never** file contents, tool outputs, the code it wrote, your notes
+or paths; tokens, emails, your user name and home folder are replaced. You see the preview first, every time. The
+logs repo is private; ask me to add your GitHub account (then `gh auth login` and `gh auth setup-git`). Without
+GitHub, `codemitra share` writes the file to `~/.codemitra/share/out/`, and you can send it to me.
+
 ## Why
 
 Coding agents like Claude Code, Codex and OpenCode can talk to local models, but they are built for frontier models:

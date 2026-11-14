@@ -2200,6 +2200,7 @@ def _learning_notices(harness) -> None:
 
 def cmd_coach(
     dry_run: bool = typer.Option(False, "--dry-run", help="Only write the digest (no Claude call)."),
+    shared: bool = typer.Option(False, "--shared", help="First bring in everyone's shared sessions (D-081)."),
 ) -> None:
     """Layer 2 (D-075): Claude reviews CodeMitra's recorded conversations since the last review and writes a coach
     report; its rules are queued for `codemitra improve --chat`, where the score decides each one."""
@@ -2208,6 +2209,10 @@ def cmd_coach(
     from app.core import improve_chat as IC
     from app.core import score as S
 
+    if shared:
+        from app.core import share as SH
+        _n, _msg = SH.pull()
+        console.print(Text(f"  {_msg}", style="m.tool"))
     files = D.run_files()
     if dry_run:
         turns = coach_mod.turns_since(files, coach_mod.last_review_t())
@@ -2224,6 +2229,62 @@ def cmd_coach(
 
 
 cli.command("coach")(cmd_coach)
+
+
+def cmd_share(
+    setup: bool = typer.Option(False, "--setup", help="Once: your name, the logs repo, whether to ask at exit."),
+    do_push: bool = typer.Option(False, "--push", help="Also commit + push to the logs repo with your git login."),
+    pull_all: bool = typer.Option(False, "--pull", help="(Maintainer) bring everyone's shared sessions into the store."),
+    every: bool = typer.Option(False, "--all", help="All sessions not shared yet (default: the newest one)."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="No question after the preview."),
+    repo: str = typer.Option("", "--repo", help="The logs repo (default prashanth-ds-ml/codemitra-logs)."),
+    name: str = typer.Option("", "--name", help="Your name in the logs repo (a folder people/<name>/)."),
+    at_exit: str = typer.Option("", "--at-exit", help="ask | always | never: share each session when you exit."),
+) -> None:
+    """Share your sessions so CodeMitra learns from everyone's (D-081): light and scrubbed (your messages, its
+    answers, which tools ran and failed, the labels; no file contents, no tokens, no paths), previewed first."""
+    from app.core import dashboard as D
+    from app.core import share as SH
+
+    if setup:
+        cur = SH.settings()
+        new_repo = repo or cur.get("repo") or SH.DEFAULT_REPO
+        new_name = name or cur.get("name") or typer.prompt("Your name in the logs repo", default=SH.friend_name())
+        mode = at_exit or cur.get("at_exit") or typer.prompt("Share each session when you exit? ask / always / never",
+                                                            default="ask")
+        if mode not in SH.AT_EXIT:
+            console.print(Text(f"--at-exit is one of {', '.join(SH.AT_EXIT)}", style="m.err"))
+            raise typer.Exit(2)
+        SH.save_settings(repo=new_repo, name=new_name, at_exit=mode)
+        ok, err = SH.check_access(new_repo)
+        console.print(Text(f"  ✓ sharing to {new_repo} as people/{SH.friend_name()}/ · at exit: {mode}", style="m.tool")
+                      if ok else Text(f"  ✗ cannot reach {new_repo} yet: {err}\n  Ask Prashanth to add your GitHub "
+                                      "account to it, then run `gh auth login` and `gh auth setup-git`.", style="m.err"))
+        return
+    if pull_all:
+        n, msg = SH.pull(repo or None)
+        console.print(Text(f"  {msg}" + ("  ·  `codemitra coach` reviews them" if n else ""), style="m.tool"))
+        return
+    todo = SH.unshared(D.run_files())
+    if not todo:
+        console.print(Text("  Nothing new to share: every session is shared already.", style="m.tool"))
+        return
+    chosen = todo if every else todo[:1]
+    files = SH.export(chosen)
+    for f in files:
+        console.print(Text(SH.preview(f), style="m.text"))
+    console.print(Text(f"  {len(files)} session(s), light and scrubbed: messages, answers, which tools ran, labels. "
+                       "No file contents, tokens or paths.", style="m.faint"))
+    where = (repo or SH.settings().get("repo") or SH.DEFAULT_REPO) if do_push else str(files[0].parent)
+    if not yes and not typer.confirm(f"Share {'to ' + where if do_push else 'these (written to ' + where + ')'}?",
+                                     default=True):
+        console.print(Text("  Not shared.", style="m.faint"))
+        return
+    ok, msg, _ = SH.share(chosen, do_push=do_push)
+    console.print(Text(("  ✓ " if ok else "  ✗ ") + msg, style="m.tool" if ok else "m.err"))
+
+
+cli.command("share")(cmd_share)
 
 
 def cmd_cases(
@@ -3417,6 +3478,23 @@ def _chat():
                 if _stars:
                     chat.rate_session(int(_stars))
                     console.print(Text(f"  thanks: {_stars}/5 noted", style="m.faint"))
+            try:  # D-081: share this session, only if you chose ask / always in `codemitra share --setup`
+                from app.core import share as _SH
+                from app.core import store as _store
+                _mode = _SH.settings().get("at_exit", "never")
+                if _mode in ("ask", "always") and chat.turn_no >= 1:
+                    _todo = _SH.unshared([_store.mirror_path(chat.rec.path) or chat.rec.path])[:1]
+                    _go = bool(_todo) and _mode == "always"
+                    if _todo and _mode == "ask":
+                        console.print(Text(f"  share this session (light, scrubbed) to "
+                                           f"{_SH.settings().get('repo', _SH.DEFAULT_REPO)}? y (any other key skips)",
+                                           style="m.faint"))
+                        _go = bool(ui.keys.one_key("yY"))
+                    if _go:
+                        _ok, _msg, _ = _SH.share(_todo, do_push=True)
+                        console.print(Text(("  ✓ " if _ok else "  ✗ ") + _msg, style="m.faint"))
+            except Exception as _exc:  # noqa: BLE001 - sharing must never block leaving
+                console.print(Text(f"  could not share: {str(_exc)[:120]}", style="m.faint"))
             console.print(Text("  Bye.", style="m.dim"))
             break
 

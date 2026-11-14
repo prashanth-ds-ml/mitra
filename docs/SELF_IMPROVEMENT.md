@@ -226,3 +226,31 @@ the evidence. `/bad <why>` after a wrong answer is the most useful signal you ca
 
 You no longer copy conversations into Claude Code: the records hold them. Still paste what the screen looked like
 (layout problems are not in the records).
+
+## 14. CodeMitra learns by itself first; a coach only guides (D-082, 2026-11-14) · PLAN, waiting for your go
+
+**Your rule (2026-11-14):** "first of all i want mitra to self improve it self, even after having good amount of logs
+and traces ig mitra is not improving then we will introduce coach either you or any frontier model to guide it and
+tell what to do but not directly fix it, mitra should go through the guide or things told by the coach or frontier
+model and then act based on that and learn."
+
+**What it changes:** today `codemitra coach` (layer 2, D-075) runs whenever you call it, and its rules go straight
+into the queue. Under D-082 the order is:
+
+| Step | Who | What |
+|---|---|---|
+| 1 | CodeMitra alone | Every labelled turn (D-079) from you and friends (D-081, `codemitra share --pull`) is evidence. Each 👎 turn becomes a replay case (the conversation up to it + what a good answer must do). |
+| 2 | CodeMitra alone | Its learning round proposes one change from that evidence, tests it fairly (temperature 0, the cases it targets must pass, no other case may fail in all of 3 runs) and keeps it or drops it (with the reason, so it is not tried again). |
+| 3 | measured, not a timer | **"Stuck"** = the same kind of mistake keeps coming back: the "same mistake twice" count does not fall over N rounds (start: 3 rounds or 2 weeks with 30+ new labelled turns), or K proposals in a row are dropped. |
+| 4 | the coach, only when stuck | A frontier model (Claude Code via `claude -p`, or another) reads the evidence and writes **guidance**: what goes wrong, why it thinks so, what to try, what to check. It writes no code, no rule text and no prompt edits. |
+| 5 | CodeMitra | Reads the guidance, makes its own change (rule, prompt, setting; a code change is a proposal you approve), and step 2's test decides. The guidance is kept with the result, so we see which guidance helped. |
+
+**Why the coach must not fix:** a fix written by the coach teaches CodeMitra nothing and hides whether its own loop
+works. With guidance only, every kept change is CodeMitra's own, and the records show whether it can act on advice.
+
+**What I would build, in order (each with tests, then a live round):**
+1. The fair test (temperature 0, targeted + 3-run regression check). The 3 rules dropped so far fell to noise (§12).
+2. Replay cases from real 👎 turns (yours + shared), half held out.
+3. The "same mistake twice" number and the stuck trigger, on the dashboard.
+4. `codemitra coach` becomes the guide: runs only when stuck (or when you ask), writes guidance, never rules.
+5. CodeMitra's round reads open guidance and proposes from it.

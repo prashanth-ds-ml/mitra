@@ -101,6 +101,12 @@ def turns_since(files: list[Path], since_t: float) -> list[dict]:
         if not f.name.startswith("chat-"):  # only your conversations: not plan tasks, score or improve runs
             continue
         from app.core import cases as cases_mod
+        cut = since_t
+        if f.parent.name.startswith("shared-"):  # D-081: a friend's session counts from when it arrived, not when said
+            try:
+                cut = -1.0 if f.stat().st_mtime > since_t else float("inf")
+            except OSError:
+                cut = float("inf")
         for rows in cases_mod._sessions(_rows(f)):  # E-120: turn numbers restart in every session
             by_turn: dict = {}
             for r in rows:
@@ -113,7 +119,7 @@ def turns_since(files: list[Path], since_t: float) -> list[dict]:
                 by_turn.setdefault(n, []).append(r)
             for n, rs in by_turn.items():
                 start = next((r for r in rs if r.get("kind") == "turn_start"), None)
-                if not start or float(start.get("t") or 0) <= since_t:
+                if not start or float(start.get("t") or 0) <= cut:
                     continue
                 you = str(start.get("user", ""))
                 if not you or you.startswith("/"):
