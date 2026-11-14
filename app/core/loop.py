@@ -239,11 +239,19 @@ def run_tool(ws: T.Workspace, name: str, args: dict) -> tuple[str, T.TestRun | N
         if name == "check_code":
             return T.check_code(ws, args.get("path", ".") or "."), None
         if name == "run_tests":
-            extra = T.test_args(ws, str(args.get("path") or ""), str(args.get("keyword") or ""),
-                                bool(args.get("first_failure")))
-            run = T.run_tests(ws, extra=extra)
+            folder, path = str(args.get("folder") or "").strip("/\\"), str(args.get("path") or "")
+            if folder and path:  # E-126: a path inside the project folder is given relative to it
+                full, base = ws.path(path), ws.path(folder)
+                try:
+                    path = full.relative_to(base).as_posix()
+                except ValueError:
+                    folder = ""  # a file outside the project folder: run from the workspace root
+            extra = T.test_args(ws, "", str(args.get("keyword") or ""), bool(args.get("first_failure")))
+            if path:
+                extra = [path if folder else ws.rel(ws.path(path))] + extra
+            run = T.run_tests(ws, extra=extra, folder=folder)
             head = "PASSED" if run.passed else "FAILED"
-            scope = f" ({' '.join(extra)})" if extra else ""
+            scope = f" ({' '.join(([f'in {folder}/'] if folder else []) + extra)})" if extra or folder else ""
             return f"{head}{scope}: {run.summary}\n\n{run.output}", run
         return (f"✗ Unknown tool '{name}'. Tools: list_files, read_file, search, make_dir, write_file, edit_file, "
                 "append_file, check_code, run_tests, finish."), None

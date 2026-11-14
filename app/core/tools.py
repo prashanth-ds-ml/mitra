@@ -456,6 +456,38 @@ def has_tests(root: Path, max_depth: int = 4) -> bool:
     return False
 
 
+_PROJECT_MARKS = ("pyproject.toml", "setup.py", "setup.cfg", "pytest.ini", "tox.ini", "conftest.py", "tests", "test")
+
+
+def is_multi_project(root: Path) -> bool:
+    """A folder of projects: the root has no project files of its own and at least one top-level folder does
+    (mitra-try: brick-breaker/tests). The snake game's snake/ and web/ are parts of one project, not projects."""
+    root = Path(root)
+    if any((root / m).exists() for m in _PROJECT_MARKS):
+        return False
+    try:
+        tops = [d for d in root.iterdir() if d.is_dir() and not d.name.startswith(".") and d.name not in _TEST_SKIP]
+    except OSError:
+        return False
+    return any(any((d / m).exists() for m in _PROJECT_MARKS) for d in tops)
+
+
+def project_dir(root: Path, path: str) -> str:
+    """E-126 (live 2026-11-13): mitra-try holds two projects, brick-breaker/ and neon_chomp/. After Mitra wrote
+    neon_chomp files, the tests that ran were brick-breaker's ("37 passed"), so broken code looked green. The project
+    a file belongs to: its top-level folder when the workspace root is not itself one project (no tests or project
+    files of its own at the top); '' when the root is the project."""
+    root = Path(root).resolve()
+    if any((root / m).exists() for m in _PROJECT_MARKS) or not is_multi_project(root):
+        return ""
+    try:
+        p = (root / path).resolve()
+        rel = (p if p.is_dir() else p.parent).relative_to(root)
+    except (ValueError, OSError):
+        return ""
+    return rel.parts[0] if rel.parts and (root / rel.parts[0]).is_dir() else ""
+
+
 def _has_pytest(python: str) -> bool:
     if python not in _PYTEST_CHECK:
         try:
@@ -519,19 +551,22 @@ def test_args(ws: Workspace, path: str = "", keyword: str = "", first_failure: b
     return extra
 
 
-def run_tests(ws: Workspace, command: str | None = None, extra: list[str] | None = None) -> TestRun:
+def run_tests(ws: Workspace, command: str | None = None, extra: list[str] | None = None,
+              folder: str = "") -> TestRun:
+    """`folder`: run inside one project folder of the workspace (E-126), as you would run that project's tests."""
     cmd = command or ws.test_command
+    cwd = ws.path(folder) if folder else ws.root
     args = cmd.split()
     if extra:
         if "pytest" not in cmd:
             raise ToolError(f"The test command '{cmd}' is not pytest: run_tests cannot select a file or keyword.")
         args += extra
     if args and args[0] in ("python", "python3", "py"):
-        args[0] = project_python(ws.root)
+        args[0] = project_python(cwd if any((cwd / v).is_dir() for v in (".venv", "venv", "env")) else ws.root)
     t0 = time.monotonic()
     env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONIOENCODING": "utf-8"}
     try:
-        proc = subprocess.run(args, cwd=ws.root, capture_output=True, text=True, timeout=TEST_TIMEOUT_S,
+        proc = subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=TEST_TIMEOUT_S,
                               encoding="utf-8", errors="replace", env=env)
         out, ok = (proc.stdout + proc.stderr).strip(), proc.returncode == 0
     except subprocess.TimeoutExpired:

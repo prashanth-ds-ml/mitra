@@ -180,9 +180,24 @@ _NOT_GO = re.compile(r"\?|\b(no|nope|not|don'?t|do not|wait|stop|hold|later|but|
                      r"change|only)\b", re.IGNORECASE)
 _OFFER = re.compile(r"\b(shall|should|can|may|do you want|would you like|want me to|ready (for me )?to|ok(ay)? (for me )?"
                     r"to|good to|go ahead and)\b[^?]{0,200}?\b(?P<verb>create|build|scaffold|start|begin|implement|write|make|"
-                    r"add|set ?up|fix|change|update|edit|apply|run|proceed|go ahead|do (it|that|this)|search|look|"
-                    r"find|read|check|plan)\b[^?]*\?", re.IGNORECASE)
+                    r"add|set ?up|fix|change|update|edit|apply|run|proceed|go ahead|do (it|that|this)|continue|"
+                    r"keep going|go on|move on|finish|complete|search|look|find|read|check|plan)\b[^?]*\?",
+                    re.IGNORECASE)
+# E-126: "Would you like me to keep debugging, or would you prefer a break?" - a yes does not say which one
+_EITHER = re.compile(r",? or (would|should|do|shall|can|could|maybe|we|you|i|focus|just|take|keep|first)\b",
+                     re.IGNORECASE)
+_MARKDOWN = re.compile(r"[*_`#>]+")
+# E-126 (live 2026-11-13, turns 8-18): "fix it" / "go ahead and complete" started by reading a file, landed in the
+# read-only look phase, and every edit was refused; the user's message asked for a change
+_ASKS_CHANGE = re.compile(r"\b(fix|fixes|fixing|add|build|create|make|write|implement|change|update|edit|complete|"
+                          r"finish|repair|correct|resolve|solve|refactor|rename|remove|delete|apply|install|do (it|that|"
+                          r"this|so|the)|go ahead|continue|keep going)\b", re.IGNORECASE)
+_ASKS_ONLY = re.compile(r"\b(first tell me|just tell me|only tell me|don'?t (change|fix|edit)|do not (change|fix|edit)|"
+                        r"without changing|explain|review .* (first|only)|tell me where)\b", re.IGNORECASE)
 REPEAT_RATIO = 0.8  # a decide answer this close to the last answer repeats it
+CLAIM_NOTE = ("[Mitra: your last answer said {claims}, but this turn's tool results do not back it: {facts}. If "
+              "an earlier turn did it, say which; otherwise, in your next answer, first correct it plainly for the "
+              "user.]")
 GO_NOTE = ("[Mitra: the user said yes to what you offered: \"{offer}\". Do it now, all of it, without asking "
            "again.]")
 REPEAT_NOTE = ("[Mitra: you just repeated your last answer and the user already answered it: \"{user}\". Do not ask "
@@ -198,22 +213,35 @@ def is_go_ahead(text: str) -> bool:
 def offered_phase(answer: str) -> tuple[str, str] | None:
     """The work Mitra offered at the end of `answer` ("Should I create all the initial files now?") ->
     (phase, the offer), or None when it did not end by offering to do something."""
-    tail = (answer or "").strip()[-500:]
-    if not tail.endswith("?"):
+    # E-126: live answers end in bold ("**Should I start building now?**"); the fix missed every one of them
+    tail = _MARKDOWN.sub("", (answer or "")).strip()[-500:]
+    end = tail.rfind("?")
+    rest = tail[end + 1:].strip() if end >= 0 else ""
+    # "Should I start building now? If yes, I'll create the structure first." (live turn 4): one line may follow
+    if end < 0 or len(rest) > 200 or "\n" in rest or (
+            rest and not re.match(r"(if (yes|so)|once|then)\b", rest, re.IGNORECASE)):
         return None
-    last = re.split(r"(?<=[.!?:])\s+|\n", tail[:-1])[-1] + "?"  # the closing question only
+    last = re.split(r"(?<=[.!?:])\s+|\n", tail[:end])[-1].strip() + "?"  # the closing question only
     m = _OFFER.search(last)
-    if m is None:
+    if m is None or _EITHER.search(last):
         return None
     offer, verb = last.strip(), m.group("verb").lower()
     low = offer.lower()
     if verb in ("search", "find") or re.search(r"\b(web|online|internet|look (it|that|this)? ?up)\b", low):
         return "look_up", offer
-    if re.search(r"\bplan\b", low) and not re.search(r"\b(build|create|implement|write the code|start)\b", low):
+    # "Shall I write a plan first?" plans; "Shall I proceed with this plan?" (live turn 20) builds it
+    if re.search(r"\b(write|make|draft|put together|propose|come up with) (up )?(a |the |an )?(\w+ )?plan\b", low):
         return "propose_plan", offer
     if verb in ("look", "read", "check") and not re.search(r"\b(fix|change|edit|add|create|build|write)\b", low):
         return "look_at_code", offer
     return "make_change", offer
+
+
+def asks_change(text: str) -> bool:
+    """The user's message asks for a change ("fix it", "go ahead and complete all the required things"), not only
+    for a look ("first tell me where we are having issues")."""
+    t = text or ""
+    return bool(_ASKS_CHANGE.search(t)) and not _ASKS_ONLY.search(t)
 
 
 def _last_answer(messages: list, before: int) -> str:
@@ -455,6 +483,18 @@ class RemoteGone(Exception):
     """The remote GPU (Kaggle) stopped answering: switch to the laptop, write the report, stop (D-062 B3)."""
 
 
+def is_remote_slow(exc: BaseException) -> bool:
+    """Cloudflare's 524: the tunnel reached the remote, which sent nothing for 120 s. The remote is up; one call
+    was too long before its first byte (E-126). Not a reason to end the Kaggle session."""
+    text = str(exc).lower()
+    return getattr(exc, "status_code", None) == 524 or "error 524" in text or "a timeout occurred" in text
+
+
+SLOW_NOTE = ("[Mitra: your last step took too long and was cut off before it reached the user. Do the same work in "
+             "smaller steps: write long files in parts (write_file with the first ~150 lines, then append_file), "
+             "and edit one block at a time.]")
+
+
 def is_remote_down(exc: BaseException) -> bool:
     """A remote that is gone: a lost connection, a tunnel that no longer resolves, or Cloudflare's 5xx pages."""
     if is_connection_error(exc):
@@ -625,6 +665,7 @@ class ChatSession:
         self.path = "loop"          # which path ran it: loop | plan_first | resume_brief (more in later steps)
         self.thinking: bool | None = None  # the model's thinking setting for this role (None = model default)
         self._prev_user_full = ""   # the last request in full, to notice when you ask the same thing again
+        self.focus = ""             # E-126: the project folder this conversation works on (several in one folder)
         self.answer_on_last_step = False  # D-068 step 2: the last step gets no tools, so a turn always ends answered
         self.last_step_note = LAST_STEP_NOTE  # what the model is told on that last step
         self.deciding = False       # D-071 phased: the first call offers only the phase switches (PHASE_SPECS)
@@ -704,8 +745,63 @@ class ChatSession:
         if self._prev_user_full and SIG.is_rephrase(self._prev_user_full, str(user)):
             self.signal("rephrase", of_turn=self.turn_no - 1)
         self._prev_user_full = str(user)
+        named = self._named_project(str(user))
+        if named and named != self.focus:  # "we are talking about neon chomp": the focus follows the user
+            self.focus = named
+            self.rec.write("focus", turn=self.turn_no, folder=named, by="user")
         said = " ".join(str(user).split())
         self._last_user = said if len(said) <= 50 else said[:49] + "…"
+
+    def _projects(self) -> list[str]:
+        """The project folders of a workspace that holds several (E-126), [] when the root is one project."""
+        if not T.is_multi_project(self.ws.root):
+            return []
+        try:
+            return sorted(d.name for d in self.ws.root.iterdir() if d.is_dir() and not d.name.startswith((".", "_"))
+                          and d.name not in T._TEST_SKIP and d.name != "mitra-home")
+        except OSError:
+            return []
+
+    def _named_project(self, text: str) -> str:
+        """The project folder the message names ("neon chomp", "neon_chomp/", "brick breaker"), or ''."""
+        low = re.sub(r"[_\-/\\.]+", " ", (text or "").lower())
+        hits = [d for d in self._projects() if re.search(r"\b" + re.escape(re.sub(r"[_\-.]+", " ", d.lower()))
+                                                          + r"\b", low)]
+        return hits[0] if len(hits) == 1 else ""
+
+    def _touch_project(self, name: str, args: dict) -> None:
+        """A file changed or read in a project folder makes that folder the focus (E-126)."""
+        path = str(args.get("path") or "")
+        if not path or name not in CHANGE_TOOLS + ("read_file", "make_dir"):
+            return
+        folder = T.project_dir(self.ws.root, path)
+        if folder and folder != self.focus and (name != "read_file" or not self.focus):
+            self.focus = folder
+            self.rec.write("focus", turn=self.turn_no, folder=folder, by=name)
+        elif folder and name in CHANGE_TOOLS:
+            self.focus = folder
+
+    def focus_note(self) -> str:
+        """One line that keeps the model on the project being worked on, when the folder holds several."""
+        others = [d for d in self._projects() if d != self.focus]
+        if not self.focus or not others:
+            return ""
+        return (f"[Mitra: we are working on {self.focus}/ (the project changed or named last). Read and change "
+                f"files there; {', '.join(o + '/' for o in others[:4])} are other projects: touch them only if the "
+                "user names them.]")
+
+    def _turn_facts(self, res: TurnResult) -> str:
+        """What this turn really did, from its tool results: files changed, refused changes, the last test run."""
+        changed = sorted({Path(e["path"]).name for e in res.journal})
+        refused = [n for n, ok, _ in self.turn_tools if not ok and n in CHANGE_TOOLS]
+        tests = [(ok, out) for n, ok, out in self.turn_tools if n == "run_tests"]
+        parts = [f"changed {', '.join(changed)}" if changed else "changed no files"]
+        if refused:
+            parts.append(f"{len(refused)} change(s) not made")
+        if tests:
+            parts.append("the last test run " + ("passed" if tests[-1][0] else
+                                                 f"failed ({T.test_summary(tests[-1][1])[:80]})"))
+        return "; ".join(parts)
 
     def note_request(self, user: str, kind: str, path: str, outcome: str, seconds: float = 0.0, **info) -> None:
         """A request handled outside the chat loop (resume brief, plan first) is still a numbered turn in the records,
@@ -779,6 +875,11 @@ class ChatSession:
         if self.mode in ("plan", "read-only") and name not in READ_ONLY_TOOLS:
             return f"✗ {name} is not available in plan mode (read-only). Describe the change instead.", False
         if self.allowed_tools is not None and name not in self.allowed_tools:  # the role's promise, enforced (E-055)
+            if self.path == "phased" and self.last_phase:  # E-126: a phase, not a limit of Mitra or the "interface"
+                nxt = " or ".join(PHASE_NEXT.get(self.last_phase, ())) or "a different phase"
+                return (f"✗ {name} is not part of this {self.last_phase.replace('_', ' ')} step. If the user asked "
+                        f"for it, call {nxt} to switch; never tell the user you cannot change files. "
+                        f"Available now: {', '.join(self.allowed_tools) or 'none'}."), False
             return (f"✗ {name} is not available to the {self.role} role. "
                     f"Available: {', '.join(self.allowed_tools) or 'none'}."), False
         try:
@@ -931,8 +1032,11 @@ class ChatSession:
             return res  # talked: one call
         asked = name = self.phase_request["name"]
         if name not in PHASES:  # it called a real tool by name: the phase that has it
+            # E-126: a read to start a change ("fix it" -> read_file) is the change phase, which reads too
+            wants_change = asks_change(user) or bool(go_note) or (is_go_ahead(user) and asks_change(before[-300:]))
             name = ("make_change" if name in ("edit_file", "write_file", "append_file", "make_dir", "run_command",
-                                              "run_plan")
+                                              "run_plan") or (wants_change and name not in ("web_search",
+                                                                                            "fetch_url"))
                     else "look_up" if name in ("web_search", "fetch_url") else "look_at_code")
         phase = PHASES[name]
         self.last_phase = name
@@ -942,9 +1046,11 @@ class ChatSession:
             searches, pages = self.harness.limit("deep_min_searches"), self.harness.limit("deep_min_pages")
             self.deep = {"searches": 0, "pages": 0, "min_searches": searches, "min_pages": pages}
             note, budget_name = DEEP_NOTE.format(searches=max(searches, 2), pages=max(pages, 2)), "deep_max_steps"
-        if asked not in PHASES and asked in READ_ONLY_TOOLS and asked in (phase["tools"] or ()):
+        if asked not in PHASES and asked in READ_ONLY_TOOLS | {"run_tests"} and (
+                phase["tools"] is None or asked in phase["tools"]):  # the change phase (None) has every tool
             self._run_decided(messages, asked)  # E-109: the query it asked for runs, it is not dropped
-        messages.append(HumanMessage(content=(go_note + "\n" if go_note else "") + note))
+        focus = self.focus_note()  # E-126: stay on the project being worked on
+        messages.append(HumanMessage(content="\n".join(x for x in (go_note, focus, note) if x)))
         self.answer_on_last_step, self.last_step_note = True, ONE_LAST_STEP_NOTE
         budget = self.harness.limit(budget_name) if budget_name else 1
         self.look_budget = budget
@@ -967,7 +1073,9 @@ class ChatSession:
         """The decide call (D-071): talk in text, or pick a phase. The talk reminder sits right before message `at`
         (E-101) and is taken out after; on the laptop model when D-074 says so."""
         self.deciding = True
-        reminder = HumanMessage(content=DECIDE_NOTE + (DECIDE_SEARCH_NOTE if asks_search else ""))
+        focus = self.focus_note()  # only in a folder of several projects (E-126)
+        reminder = HumanMessage(content=DECIDE_NOTE + (DECIDE_SEARCH_NOTE if asks_search else "")
+                                + (" " + focus if focus else ""))
         messages.insert(at, reminder)
         work = (self.llm, self.num_ctx, self.backend_kind)
         talk = getattr(self, "_talk", None)
@@ -993,7 +1101,11 @@ class ChatSession:
         "Confirmed". A read-only tool named in the decide step now runs first, and its result replaces the
         placeholder the switch wrote."""
         args, call_id = self.phase_request.get("args") or {}, self.phase_request.get("id")
+        if name == "run_tests" and self.focus and "folder" not in args:
+            args = {**args, "folder": self.focus}  # E-126
         out, ok = self._run(name, args, self._run_plan)
+        if ok:
+            self._touch_project(name, args)
         self.hooks.show(name, args, out, ok)
         self.turn_tools.append((name, ok, out))
         self.rec.write("tool", turn=self.turn_no, step=1, name=name, args=args, ok=ok, output=out[:3000],
@@ -1010,13 +1122,15 @@ class ChatSession:
         rounds = self.harness.limit("auto_test_rounds")
         if rounds <= 1:
             return ""
-        if not T.has_tests(self.ws.root):
+        folder = self.focus  # E-126: the tests of the project that changed, never another project's
+        where = f"this project ({folder}/)" if folder else "this project"
+        if not T.has_tests(self.ws.path(folder) if folder else self.ws.root):
             if self._no_tests_said:
                 return ""
             self._no_tests_said = True
-            return ("[Mitra: this project has no tests, so your change was not checked by running tests. Tell the "
+            return (f"[Mitra: {where} has no tests, so your change was not checked by running tests. Tell the "
                     "user plainly that it is untested.]")
-        out, ok = self._run("run_tests", {}, self._run_plan)
+        out, ok = self._run("run_tests", {"folder": folder} if folder else {}, self._run_plan)
         if out.startswith("✗") and "not available" in out:
             return ""  # this role cannot run tests
         summary = (T.test_summary(out) or out.strip().splitlines()[0] if out.strip() else "no output")[:200]
@@ -1024,7 +1138,8 @@ class ChatSession:
         res.last_test_ok, res.last_test_summary = ok, summary
         self.hooks.show("run_tests", {"after_change": True}, out, ok)
         self.turn_tools.append(("run_tests", ok, out))
-        self.rec.write("tool", turn=self.turn_no, step=step, name="run_tests", args={}, ok=ok, output=out[:3000],
+        self.rec.write("tool", turn=self.turn_no, step=step, name="run_tests",
+                       args={"folder": folder} if folder else {}, ok=ok, output=out[:3000],
                        after_change=True)
         self._last_auto = (out, ok)
         if ok:
@@ -1160,6 +1275,10 @@ class ChatSession:
             res.unverified = claims
             self.rec.write("grounding", turn=self.turn_no, claims=[c[:300] for c in claims],
                            tools=[n for n, _, _ in self.turn_tools])
+            # E-126: the claim stays in the history, so the next turn built on it ("did you do that fix?" got a
+            # second false answer); the facts go right after it
+            messages.append(HumanMessage(content=CLAIM_NOTE.format(
+                claims="; ".join(f'"{c[:160]}"' for c in claims[:3]), facts=self._turn_facts(res))))
         self.rec.write("turn_end", turn=self.turn_no, steps=res.steps, stopped=res.stopped, reason=res.stop_reason,
                        text=res.text[:2000], tokens_in=res.tokens_in, tokens_out=res.tokens_out,
                        ctx_used=res.ctx_used, seconds=round(time.monotonic() - t0, 1), outcome=turn_outcome(res),
@@ -1177,6 +1296,9 @@ class ChatSession:
         specs = H.apply_tools(tool_specs(self.mode), self.harness)
         if self.allowed_tools is not None:  # the role's tool set (routing)
             specs = [s for s in specs if s["name"] in self.allowed_tools]
+            if (self.path == "phased" and self.last_phase in ("look_at_code", "look_up")
+                    and asks_change(self._prev_user_full)):  # E-126: the way out of a look, offered as a tool
+                specs += [s for s in PHASE_SPECS if s["name"] == "make_change"]
         if self.deciding:  # D-071 phased: talk, or pick a phase; no real tools yet
             specs = list(PHASE_SPECS)
         bound = self.llm.bind_tools(specs) if specs else self.llm  # the reply path: no tools at all (D-068)
@@ -1184,6 +1306,7 @@ class ChatSession:
                             max_failures=self.harness.limit("max_failures"))
         bad_calls = 0
         conn_retried = False
+        slow_retried = False
         runaway_retried = False
         empty_nudged = False
         for step in range(1, max_steps + 1):
@@ -1208,6 +1331,19 @@ class ChatSession:
                 messages.append(HumanMessage(content=RUNAWAY_NOTE))
                 continue
             except Exception as exc:  # Ollama could not read the model's tool call (E-044)
+                if self.backend_kind == "remote" and is_remote_slow(exc):
+                    # E-126 (live 2026-11-13, turn 5): Cloudflare's 524 = it reached Kaggle, which sent nothing for
+                    # 120 s (one long tool call); Kaggle was fine, but the turn was ended as "Kaggle ended"
+                    self.rec.write("model_error", turn=self.turn_no, step=step, error=str(exc)[:500], slow=True,
+                                   retry=not slow_retried, remote=True)
+                    if not slow_retried:
+                        slow_retried = True
+                        self.hooks.show("retry", {}, "one model call took over 120 s through the Kaggle tunnel; "
+                                        "asking for a smaller step", False)
+                        messages.append(HumanMessage(content=SLOW_NOTE))
+                        continue
+                    return self._wrap_up(messages, res, "a model call took over 120 s twice (the Kaggle tunnel's "
+                                                        "limit); Kaggle itself is still running")
                 if self.backend_kind == "remote" and is_remote_down(exc):  # D-062 B3: a tunnel blip, or gone
                     self.rec.write("model_error", turn=self.turn_no, step=step, error=str(exc)[:500],
                                    retry=not conn_retried, remote=True)
@@ -1306,6 +1442,14 @@ class ChatSession:
                     # called make_change inside the look phase and was told it is "not available"
                     switch_to = name
                     out, ok = f"ok: switching to the {name.replace('_', ' ')} phase; its tools come next.", True
+                elif (self.path == "phased" and self.last_phase in ("look_at_code", "look_up") and not refused
+                      and name in CHANGE_TOOLS + ("make_dir", "run_command") and self.mode not in ("plan", "read-only")
+                      and asks_change(self._prev_user_full)):
+                    # E-126 (live 2026-11-13, 5 turns): asked to fix, the 9B read first, then called edit_file in
+                    # the look phase; "not available to the chat role" made it tell the user to edit by hand
+                    switch_to = "make_change"
+                    out, ok = (f"Not run yet: switching to the change phase so you can change files. Call {name} "
+                               "again in the next step."), False
                 elif refused:
                     out, ok = refused, False
                 elif name == "run_tests" and not args and self._last_auto is not None:
@@ -1313,7 +1457,11 @@ class ChatSession:
                     out, ok = self._last_auto[0] + "\n(The same run as after your last change: nothing changed since.)", \
                         self._last_auto[1]
                 else:
+                    if name == "run_tests" and self.focus and "folder" not in args:
+                        args = {**args, "folder": self.focus}  # E-126: this project's tests, not every project's
                     out, ok = self._run(name, args, self._run_plan)
+                    if ok:
+                        self._touch_project(name, args)
                 if name == "run_tests":
                     res.tests_run += 1
                     res.last_test_ok = ok

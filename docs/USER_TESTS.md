@@ -12,6 +12,16 @@ machine or your judgment. Updated every release.
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
 
+## 2026-11-14 · Neon Chomp live check (E-125, E-126)
+
+Restart Mitra in mitra-try (header: the new commit). On Kaggle or the laptop.
+- [ ] "i cant move the orb in neon chomp, check the keyboard controls and fix them" → it changes files (no "apply it
+      manually"), and the tests that run are neon_chomp's (`in neon_chomp/`), not brick-breaker's
+- [ ] It answers a bold "Should I …?" with work when you say "yes", without asking again
+- [ ] No "fixed" / "running successfully" while a test fails; if one slips through, the next answer corrects it
+- [ ] It stays on neon_chomp (never reads brick-breaker files unless you name it)
+- [ ] `python neon_chomp.py` in neon_chomp/: the arrows and WASD move the orb
+
 ## 2026-11-11 · Two self-improvement layers (D-075)
 
 - [ ] `mitra coach`: the report lands in ~/.mitra/coach/ with findings from your sessions; rules it suggests show as queued
