@@ -14,7 +14,8 @@ import os
 from pathlib import Path
 
 PROJECT_NAMES = ((".mitra", ".codemitra"), ("mitra.toml", "codemitra.toml"), ("MITRA.md", "CODEMITRA.md"))
-ENV_NAMES = (("MITRA_HOME", "CODEMITRA_HOME"), ("MITRA_HARNESS", "CODEMITRA_HARNESS"))
+ENV_NAMES = (("MITRA_HOME", "CODEMITRA_HOME"), ("MITRA_HARNESS", "CODEMITRA_HARNESS"),
+             ("MITRA_MCP_NO_DEFAULTS", "CODEMITRA_MCP_NO_DEFAULTS"), ("MITRA_CLAUDE_CONFIG", "CODEMITRA_CLAUDE_CONFIG"))
 
 
 def _move(old: Path, new: Path) -> str:

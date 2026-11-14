@@ -39,7 +39,7 @@ def check_plan(plan: Path) -> tuple[int, str]:
 
 def _state_file() -> Path:
     from app import config
-    return config._mitra_home() / "night.json"
+    return config._codemitra_home() / "night.json"
 
 
 def launch(plan: Path, project: Path, hours: float, model: str) -> dict:

@@ -8,7 +8,7 @@ import numpy as np
 from rich.text import Text
 
 
-_MITRA_BANNER = dedent(
+_CODEMITRA_BANNER = dedent(
     r"""
  __       __ __   __
 |  \     /  \  \ |  \
@@ -63,9 +63,9 @@ def generate_ascii_art(image_path: str, size: Tuple[int, int] = (40, 40), chars:
 	return "\n".join(lines)
 
 
-def generate_mitra_banner_art() -> Text:
+def generate_codemitra_banner_art() -> Text:
 	"""Return the fixed CodeMitra startup banner supplied for the CLI."""
-	return Text(_MITRA_BANNER, style="bold #87ceeb", no_wrap=True)
+	return Text(_CODEMITRA_BANNER, style="bold #87ceeb", no_wrap=True)
 
 
 def generate_color_block_art(

@@ -1,19 +1,19 @@
-# Task catalog: what Mitra must do well, by priority (D-067)
+# Task catalog: what CodeMitra must do well, by priority (D-067)
 
-The measuring stick for Mitra. Every task here becomes a drill or a level with checks Mitra never sees (hidden
-tests, evaluation thresholds, browser or SQL checks) in `mitra-playground`, and is run on a schedule. A change to
-Mitra is good only if it moves these numbers.
+The measuring stick for CodeMitra. Every task here becomes a drill or a level with checks CodeMitra never sees (hidden
+tests, evaluation thresholds, browser or SQL checks) in `codemitra-playground`, and is run on a schedule. A change to
+CodeMitra is good only if it moves these numbers.
 
 ## Purpose (agreed 2026-11-10)
 
 - **For personal use** (the user is an AI engineer), later adaptable to other kinds of engineer through profile packs
   (full-stack, DevOps, frontend, database developer).
-- **Mitra's own brain does the work:** small open models with a growing harness, run on free GPU time (Kaggle now,
+- **CodeMitra's own brain does the work:** small open models with a growing harness, run on free GPU time (Kaggle now,
   Modal later) or the laptop. It thinks, plans, tests, fixes, runs and (with your OK) deploys.
-- **Primary target: small and medium tasks, done properly and correctly.** For big tasks Mitra does the pieces
+- **Primary target: small and medium tasks, done properly and correctly.** For big tasks CodeMitra does the pieces
   handed to it (by you or by Claude Code).
-- **A coach** (Claude or another big model) reviews Mitra's work periodically and writes a report with harness
-  improvements; Mitra tests each one and keeps only what helps (Harness²-style). Over time it needs the coach less.
+- **A coach** (Claude or another big model) reviews CodeMitra's work periodically and writes a report with harness
+  improvements; CodeMitra tests each one and keeps only what helps (Harness²-style). Over time it needs the coach less.
 - **Learns from its user:** corrections, approvals, 👍/👎, your own code and recurring tasks, kept locally and editable.
 
 ## Definitions
@@ -22,7 +22,7 @@ Mitra is good only if it moves these numbers.
 |---|---|---|---|
 | **Small** | 1-2 files, under ~50 changed lines | done directly | none (checks green → done; `/undo` available) |
 | **Medium** | 2-6 files, ~50-300 lines, maybe a new module | a short plan (2-4 steps) | one "Go" on the plan |
-| **Big** | many files / long-running (fine-tune, full system) | planned by you or a coach | Mitra does the assigned pieces |
+| **Big** | many files / long-running (fine-tune, full system) | planned by you or a coach | CodeMitra does the assigned pieces |
 
 **Correct** means: the task's own checks pass (including hidden ones); nothing that passed before breaks; it did
 what you meant; it says honestly when it could not finish.
@@ -30,9 +30,9 @@ what you meant; it says honestly when it could not finish.
 ## Catalog
 
 Priority: **P1** first batch (build the checks and measure now) · **P2** next · **P3** later.
-Status: ✓ exists in mitra-playground · ○ planned in the playground ladder · new = not yet anywhere.
+Status: ✓ exists in codemitra-playground · ○ planned in the playground ladder · new = not yet anywhere.
 
-| Area | Task | How Mitra proves it did it right | Size | Priority | Status |
+| Area | Task | How CodeMitra proves it did it right | Size | Priority | Status |
 |---|---|---|---|---|---|
 | Everyday code | Fix a failing test; add a flag; rename; add a test; explain a function (drills on existing code) | the given tests pass; nothing else breaks; explanations checked by questions | small | **P1** | new |
 | AI engineering | Clean or transform a dataset (pandas) | output schema and row checks on a sample | small | **P1** | new |

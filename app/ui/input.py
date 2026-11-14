@@ -142,7 +142,7 @@ class FileIndex:
         return [p for _, _, p in sorted(scored)[:n]]
 
 
-class MitraCompleter(Completer):
+class CodeMitraCompleter(Completer):
     """`/` commands with a description; `@` file paths from the workspace."""
 
     def __init__(self, commands: list[tuple[str, str]], files: FileIndex | None) -> None:
@@ -340,7 +340,7 @@ class InputBox:
             multiline=True,
             prompt_continuation=lambda width, line_number, wrap_count: "  ",
             history=history,
-            completer=MitraCompleter(commands, FileIndex(workspace)),
+            completer=CodeMitraCompleter(commands, FileIndex(workspace)),
             complete_while_typing=True,
             reserve_space_for_menu=0,  # no empty block under the input; the menu still opens (E-047)
             key_bindings=make_key_bindings(state, print_folded=print_folded),

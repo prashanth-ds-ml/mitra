@@ -69,8 +69,8 @@ def test_the_deep_dive_nudge_can_be_switched_off_in_the_harness(tmp_path):
 
 # ── 1c: knows what it cannot do yet ────────────────────────────────────────────────────────────────────────────
 
-def test_about_mitra_says_what_is_not_built_yet():
-    about = C.ABOUT_MITRA
+def test_about_codemitra_says_what_is_not_built_yet():
+    about = C.ABOUT_CODEMITRA
     assert "tests run by themselves" in about.split("Not built yet")[0]        # built (D-078 #2): an ability now
     for gap in ("Wikipedia, GitHub, arXiv, Hugging Face",
                 "outside this project folder", "not straight away"):

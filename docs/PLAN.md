@@ -13,16 +13,16 @@ Plan v2 (2026-11-05, D-017); v1 is in [archive/PLAN-v1-2026-10-24.md](archive/PL
 Work top to bottom. Each line points to its plan; the milestone lists below keep the detail.
 
 **0. Record everything that helps self-improvement, first** ([SELF_IMPROVEMENT.md](SELF_IMPROVEMENT.md) section 4, agreed 2026-11-07)
-- [x] 0a. Mitra code version, machine state, prompt-processing + load time on every turn / call (with A5) (2026-11-07)
-- [x] 0b. Your corrections (files you changed after Mitra, short diff), declined edits and commands (2026-11-07)
+- [x] 0a. CodeMitra code version, machine state, prompt-processing + load time on every turn / call (with A5) (2026-11-07)
+- [x] 0b. Your corrections (files you changed after CodeMitra, short diff), declined edits and commands (2026-11-07)
 - [x] 0c. Trace the wrap-up, compaction and failed calls; crash rows (2026-11-07)
 - [x] 0d. `/good`, `/bad <why>` (= A4) (2026-11-07)
-- [x] 0e. Dashboard: trends day by day, by Mitra version, by project / model / kind; first try, time to green; corrections, declines, crashes; project filter, all sessions (2026-11-07)
-- [ ] **You:** restart Mitra after each update (a running session keeps the old code)
+- [x] 0e. Dashboard: trends day by day, by CodeMitra version, by project / model / kind; first try, time to green; corrections, declines, crashes; project filter, all sessions (2026-11-07)
+- [ ] **You:** restart CodeMitra after each update (a running session keeps the old code)
 
 **X. Experiments, first after the brick-breaker night** ([EXPERIMENTS.md](EXPERIMENTS.md), I-20)
 - [ ] X1. Score night 1 with the hidden judge (`brick-breaker-night-judge/JUDGE.md`); first registry entry by hand
-- [ ] X2. `mitra judge` + `mitra night` write registry entries automatically
+- [ ] X2. `codemitra judge` + `codemitra night` write registry entries automatically
 - [ ] X3. Dashboard "Experiments" section: table, side-by-side comparisons, "what chose this default"
 - [ ] X4. Model screen re-run (qwen3.5 / mimo-v2.6:9b / deepseek-r1:8b --think on), entry in the registry
 - [ ] X5. E-048: status line inside the prompt (no empty block in tall terminals)
@@ -34,13 +34,13 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 - [x] 4. `/good`, `/bad <why>` on the last turn (S1) (done as 0d, 2026-11-07)
 - [x] 5. Prompt-processing time in every trace (step M; decides I-8) (done in 0a, 2026-11-07)
 - [ ] 6. Adaptive thinking (E2) + Level 01 benchmark on/adaptive, 9B and 4B (overnight, your OK)
-- [ ] 7. **You:** use Mitra daily on small real tasks with tests and mark turns, about a week (person task)
+- [ ] 7. **You:** use CodeMitra daily on small real tasks with tests and mark turns, about a week (person task)
 
 **Planning first (moved ahead of B, user 2026-11-07: breaking work down is the key differentiator; [FIRST_TWO_WEEKS.md](FIRST_TWO_WEEKS.md))**
-- [ ] 13. `/plan`: Mitra writes plan.md with a test per task (9B, thinking on); you approve or edit it
+- [ ] 13. `/plan`: CodeMitra writes plan.md with a test per task (9B, thinking on); you approve or edit it
 - [ ] 14. Plan check: every task has a test, and each test **fails before** the task and **passes after** (red-then-green, so tests cannot be fake)
 - [ ] 14b. Re-plan a failing step: retry with the error, then split it or fix an earlier step, then "needs help"
-- [ ] 14c. Planner experiment: level 02 with the hand-written plan vs Mitra's own plan (hidden tests decide)
+- [ ] 14c. Planner experiment: level 02 with the hand-written plan vs CodeMitra's own plan (hidden tests decide)
 - [ ] 14d. Planning numbers on the dashboard: first-try tasks, re-plans, needs help, plan edited before approval
 - [x] 14e-1. Role routing: model, max context, tools, MCP servers, thinking, read-only paths per role; `/role`, live `/model use`, `/model role`; route rows (D-052, 2026-11-08)
 - [ ] 14e-0. Decide I-19: build the phase loop as a LangGraph pipeline (checkpoints, approval interrupt, code-decided edges) — [PIPELINES.md](PIPELINES.md); experiment 12 confirms
@@ -48,30 +48,30 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 - [ ] 14f. Model screen for the roles (downloaded 2026-11-08): **mimo-v2.6:9b** (builder etc.), **deepseek-r1:8b** (planner), D-051; then Level 01 with mimo vs qwen3.5 and the planner eval; ornith-1.5 only if these fall short
 
 **B. Memory that lasts** ([HANDOFF_VAULT_PLAN.md](HANDOFF_VAULT_PLAN.md), I-10, I-9, D-043)
-- [ ] 8. Vault basics: `MitraVault`, `Mitra/` layout, safe writes, import of old `.mitra/` memory
+- [ ] 8. Vault basics: `MitraVault`, `CodeMitra/` layout, safe writes, import of old `.codemitra/` memory
 - [ ] 9. Startup context from the vault + `recall` / `remember` / `read_note`
 - [ ] 10. Compaction summaries saved to the vault
 - [ ] 11. Handoff report + "start fresh" pop-up (2nd compaction)
 - [ ] 12. Plans and lessons in the vault
 
-**C. Mitra plans and builds by itself** (M3, I-12)
+**C. CodeMitra plans and builds by itself** (M3, I-12)
 - [ ] 15. Runner tools: `start_program` / `stop_program` (games, servers in the background), `setup_env` (project venv via uv)
-- [ ] 16. `mitra run plan.md` unattended: branch, commit per task, RAM guard, stop/resume, "needs help" briefs, report
-- [x] 16a. Overnight stopgap: `mitra night` / `/run [plan] [hours]` (keep-awake, time limit, NIGHT_REPORT.md, --write-tests) (D-053, 2026-11-08)
+- [ ] 16. `codemitra run plan.md` unattended: branch, commit per task, RAM guard, stop/resume, "needs help" briefs, report
+- [x] 16a. Overnight stopgap: `codemitra night` / `/run [plan] [hours]` (keep-awake, time limit, NIGHT_REPORT.md, --write-tests) (D-053, 2026-11-08)
 - [ ] 16b. Overnight mode (I-16, [OVERNIGHT_MODE.md](OVERNIGHT_MODE.md)): `/prd`, full-access profile inside the project, keep-awake, one model all night (qwen3.5:latest at 256K, evening memory check), deploy + health check, morning report; first trials: level 02 from a PRD, night A (9B only, 256K) vs night B (9B plans + 4B builds, both 256K), D-048
 
-**D. Practice ladder, one level per kind** (mitra-playground; hidden tests decide)
+**D. Practice ladder, one level per kind** (codemitra-playground; hidden tests decide)
 - [ ] 17. Level 02: second arcade game (+ `screenshot` tool: the model looks at the game; qwen3.5 has vision)
 - [ ] 17b. Design-kit skill: light CSS framework, tokens, 3-4 layouts; default style for sites and overnight demos
 - [ ] 18. Level 03: portfolio site (+ Playwright MCP brought forward from M4) + visual self-check with `screenshot` before "done"
 - [ ] 19. New DB-design level: schema from a spec, hidden tests on constraints and queries (+ `sql` tool)
 - [ ] 20. Level 04: API + DB (+ `http_request`, localhost only)
 - [ ] 21. Tool sets by project type (core always; game / web / db sets only when the project needs them) + BM25 ranking for `mcp_find`
-- [ ] 22. Overnight self-improvement on the levels (`mitra improve`, kept only if hidden tests improve; scheduled task needs your OK)
+- [ ] 22. Overnight self-improvement on the levels (`codemitra improve`, kept only if hidden tests improve; scheduled task needs your OK)
 
 **E. After about two weeks of real use** (judged on the dashboard)
 - [ ] 23. Decide the context size per model from real use (E1)
-- [ ] 24. `mitra improve` on real-session patterns (S2) and auto-revert of harness changes that make things worse (S5)
+- [ ] 24. `codemitra improve` on real-session patterns (S2) and auto-revert of harness changes that make things worse (S5)
 - [ ] 25. Serena on/off trial (M4)
 - [ ] 26. Level 06: small web app; then real projects of each kind whose level passed (+ shadcn/ui MCP for React apps)
 
@@ -81,7 +81,7 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 ---
 
 ## Before starting
-- [x] Name decided: Mitra (D-006) (2026-10-24)
+- [x] Name decided: CodeMitra (D-006) (2026-10-24)
 - [x] Repo decided: new repo `prashanth-ds-ml/mitra`, local folder `portfolio/05-mitra` (D-007) (2026-10-24)
 - [x] GPU, VRAM and power cap written in STATUS.md (2026-10-24)
 - [x] "Go on M0" given (2026-10-24)
@@ -109,10 +109,10 @@ Work top to bottom. Each line points to its plan; the milestone lists below keep
 - [ ] **Kill check 1:** if stock agents already pass most tasks, the best one becomes the builder (SCOPE kill rule)
 - [ ] Release v0.0 + post: "Why coding agents break on your laptop" (prompt-overhead chart)
 
-## M1 Core agent loop + `mitra solve` (one task, built for small models)
+## M1 Core agent loop + `codemitra solve` (one task, built for small models)
 The same loop runs the terminal assistant (M2), the plan runner (M3) and the benchmark.
 - [x] ~~Built on LangGraph~~ A plain Python loop with LangChain chat models (D-037: simpler, testable with a scripted model); our own short prompts
-- [x] Headless command `mitra solve "task" --test "pytest ..." --json` (exit 0/1) (2026-11-06; also `--plan` runs a plan task by task)
+- [x] Headless command `codemitra solve "task" --test "pytest ..." --json` (exit 0/1) (2026-11-06; also `--plan` runs a plan task by task)
 - [ ] Prompt + tool descriptions under ~3K tokens, checked in CI
 - [ ] Procedure vs knowledge split: system prompt says only how to work; SDK quirks and project facts are skills loaded on demand (I-3, Harness² INV/DOM)
 - [ ] AGENTS.md loaded with a byte budget; most specific file kept, broader files dropped first (dsh `agent-instructions`)
@@ -131,7 +131,7 @@ The same loop runs the terminal assistant (M2), the plan runner (M3) and the ben
 - [ ] Model settings in config: context length, KV-cache type (`q8_0` option on the bench server), thinking on/off and thinking budget (D-020) (context per model and `thinking = auto|on|off` done 2026-11-06; KV-cache type is an Ollama server setting; no thinking budget in Ollama for qwen3.5)
 - [x] Fresh round after a failed test run, with a short handoff note (status, evidence, next step) (dsh `tool-ralph`) (2026-11-06: after 3 failing test runs or a 90% full context; up to 3 rounds)
 - [x] Rollback when rounds run out (2026-11-06: solve(rollback=True); run_plan rolls back failed tasks)
-- [ ] Every run saved with authorship per part (Mitra / Claude / me) and secrets scrubbed, so it can become training data later (D-022) (JSONL record with author "mitra" done 2026-11-06; secret scrubbing still to do)
+- [ ] Every run saved with authorship per part (CodeMitra / Claude / me) and secrets scrubbed, so it can become training data later (D-022) (JSONL record with author "mitra" done 2026-11-06; secret scrubbing still to do)
 - [x] Record/replay: recorded model replies replay in tests without Ollama (I-1, dsh `llm-replay`) (2026-11-06: app/core/replay.py)
 - [ ] Fault tests: a scripted fake model returns malformed tool calls, empty replies, stalls and errors; harness must recover or fail cleanly (dsh `llm-mock-server`) (empty replies, errors, repeats, bad tool calls done in tests/test_core.py and test_chat_core.py; stalls to do)
 - [ ] Unit tests for every part above
@@ -139,7 +139,7 @@ The same loop runs the terminal assistant (M2), the plan runner (M3) and the ben
 
 - [x] The terminal chat runs on the core loop; keyword router, planner / brainstorm / file / shell / reader / web agent loops, work modes and plugins removed (D-037, 2026-11-06: -5,212 lines app, -2,805 lines tests)
 
-## M2 Terminal assistant (`mitra`)
+## M2 Terminal assistant (`codemitra`)
 - [x] Code renamed CodeMitra -> Mitra (files, config, `.mitra/`, banner); 615 tests pass (2026-11-05)
 Design, ability list and what happens to local-codex's code: [M2_PLAN.md](M2_PLAN.md).
 - [x] MCP SDK choice: official `mcp` 2.3.0, tested on Windows against a stdio server (D-030, F-008) (2026-11-05)
@@ -155,9 +155,9 @@ Design, ability list and what happens to local-codex's code: [M2_PLAN.md](M2_PLA
 - [x] Terminal interface part 2 (D-035, 2026-11-06): multi-line input with shift+enter, editing keys, saved history + ctrl+r, `/` menu with descriptions, `@` file search, paste folding, esc to stop with type-ahead, shift+tab modes, title + bell notifications, folded command output + ctrl+o, ctrl+l
 - [ ] `/model`, `/context`, `/think`; prompt tokens and context use in the status line, warning before the limit
 - [ ] Project notes (AGENTS.md / CLAUDE.md) within the byte budget; skills loaded on demand (FastAPI, LangGraph, Next.js, uv on Windows)
-- [x] Model picker and `/model list` show only compatible models: chat + native tool calling, >= 1.5B parameters, >= 32K context; `mitra models --all` shows the rest and why (2026-11-05)
+- [x] Model picker and `/model list` show only compatible models: chat + native tool calling, >= 1.5B parameters, >= 32K context; `codemitra models --all` shows the rest and why (2026-11-05)
 - [ ] `/doctor`: free RAM, GPU/VRAM, Ollama up, model loaded, context really applied (first version 2026-11-05: resources + permissions + MCP)
-- [x] MCP client (D-028): stdio + Streamable HTTP, standard `mcpServers` config (`.mitra/mcp.json`), `/mcp` list / on / off / test / import (from Claude Code) / trust / call (2026-11-05)
+- [x] MCP client (D-028): stdio + Streamable HTTP, standard `mcpServers` config (`.codemitra/mcp.json`), `/mcp` list / on / off / test / import (from Claude Code) / trust / call (2026-11-05)
 - [x] MCP safety: read tools free, every write tool asks (even in auto-edit), refused when no one can approve, secrets masked in results and logs, every call logged and timed, big results trimmed (2026-11-05)
 - [ ] Day-one servers started and tested on Windows with real packages: git, GitHub, Context7, filesystem, Semgrep (configured as defaults 2026-11-05; first real start needs the user's OK to download them); versions pinned after
 - [ ] local-codex parts not in the v1 list archived (git history), per M2_PLAN.md
@@ -167,7 +167,7 @@ Design, ability list and what happens to local-codex's code: [M2_PLAN.md](M2_PLA
 
 ## M2 UI polish (D-056, agreed 2026-11-08)
 One item at a time, each with a test (prompt_toolkit test input/output or rich capture) and its own commit. Build only
-with Mitra and nights stopped (L-041); restart Mitra afterwards. A short check in a real tall terminal per pass goes
+with CodeMitra and nights stopped (L-041); restart CodeMitra afterwards. A short check in a real tall terminal per pass goes
 to USER_TESTS.md.
 
 **First: the /run fixes**
@@ -196,7 +196,7 @@ to USER_TESTS.md.
 
 **Pass C: details**
 - [ ] C4 Mode as a coloured badge (ask / auto-edit / plan)
-- [ ] C5 Placeholder in the empty input ("Ask Mitra · / commands · @ files")
+- [ ] C5 Placeholder in the empty input ("Ask CodeMitra · / commands · @ files")
 - [ ] C6 `/` menu: name left, description right, sized to content, matched letters highlighted
 - [ ] C7 Paste chips `[pasted text #1 · 14 lines]` in their own colour
 - [ ] C8 One-line hint while a night is live ("night running · /night to watch · ctrl+c stops watching")
@@ -212,30 +212,30 @@ to USER_TESTS.md.
 - [ ] C25 Long replies folded after ~60 lines (ctrl+o)
 - [ ] C26 Diffs with line numbers, a file header, word-level highlights
 - [ ] C27 One approval card for Bash / Edit / Run plan with keys y / a / n
-- [ ] C28 Always "No, and tell Mitra why" in approvals
+- [ ] C28 Always "No, and tell CodeMitra why" in approvals
 - [ ] C33 `/good` / `/bad` as a toast in the status line, right turn number
 - [ ] C35 Unknown command → closest match ("did you mean /plan check?")
 - [ ] C36 Layered ctrl+c: stop model → clear input → quit, each with a hint
-- [ ] C37 Terminal title shows the state ("Mitra · working…", "waiting for you", "night 2/5")
+- [ ] C37 Terminal title shows the state ("CodeMitra · working…", "waiting for you", "night 2/5")
 - [ ] C38 Fewer greens: green stays the brand; success / warning (new amber) / error / info clearly apart
 - [ ] C39 `--plain` / `NO_COLOR` and an ASCII fallback for terminals without good Unicode
 - [ ] C40 Light theme option (`/theme`)
 
 ## I-6 Dashboard (D-041, [DASHBOARD_PLAN.md](DASHBOARD_PLAN.md))
-- [x] Step 0: central append-only store `~/.mitra/data/` + `projects.json`; old records merged on every build (2026-11-07)
+- [x] Step 0: central append-only store `~/.codemitra/data/` + `projects.json`; old records merged on every build (2026-11-07)
 - [x] Step 1: full traces (messages, reply, thinking, tool calls, model, context; prompt once, deltas) + turn outcome (2026-11-07)
 - [x] Step 2: session timeline (2026-11-07)
 - [x] Step 3: tools / MCP servers and models (2026-11-07)
 - [x] Step 4: improvement per harness version, "not enough data" under 20 turns (2026-11-07)
-- [x] Step 5: training data counts + `mitra report --export-training` (2026-11-07)
-- [x] Localhost: `mitra dashboard` on 127.0.0.1:8765, Refresh button (D-042, 2026-11-07)
+- [x] Step 5: training data counts + `codemitra report --export-training` (2026-11-07)
+- [x] Localhost: `codemitra dashboard` on 127.0.0.1:8765, Refresh button (D-042, 2026-11-07)
 - [ ] Step 6: rebuilt on session end + `/report` (done 2026-11-07); you look at the page with real data before it is pushed
 
 ## M3 Local planning + unattended runner
 - [ ] Plan format (one Markdown file): feature, design notes, tasks with files, expected behaviour, test command, order
-- [ ] `/plan`: Mitra writes a plan in that format with the local 9B (thinking on); I can edit it before running (D-025)
+- [ ] `/plan`: CodeMitra writes a plan in that format with the local 9B (thinking on); I can edit it before running (D-025)
 - [ ] Plan check: every task has a test command and files; a plan that fails the check is rewritten before running
-- [ ] `mitra run plan.md` (also `/run` inside the terminal app): works through tasks on a feature branch, one commit per task, never touches `main` (run_plan does branch + commit per task + needs-help + report since 2026-11-06; the `mitra run` command, resume and RAM guard still to do)
+- [ ] `codemitra run plan.md` (also `/run` inside the terminal app): works through tasks on a feature branch, one commit per task, never touches `main` (run_plan does branch + commit per task + needs-help + report since 2026-11-06; the `codemitra run` command, resume and RAM guard still to do)
 - [ ] Stuck task (rounds used up) → "needs help" brief (failing output, `file:line`, what was tried); runner moves on; tasks that depend on it are skipped
 - [ ] RAM guard: pauses when free RAM drops below the preflight rule, resumes when it recovers
 - [ ] Stop and resume: a killed run picks up at the next unfinished task
@@ -244,8 +244,8 @@ to USER_TESTS.md.
 - [ ] Release v0.3 + post: "My laptop built a feature while I was at work"
 
 ## M4 Comparison: settings, MCP, Harness²
-- [ ] Benchmark grown to ~20 single tasks + feature tasks from the `mitra-playground` ladder (levels 1-6) and my projects + a small public-benchmark slice
-- [ ] `mitra bench` reruns everything; results JSON committed
+- [ ] Benchmark grown to ~20 single tasks + feature tasks from the `codemitra-playground` ladder (levels 1-6) and my projects + a small public-benchmark slice
+- [ ] `codemitra bench` reruns everything; results JSON committed
 - [ ] Settings sweep on the tuning half: context 32K / 64K / 128K, thinking off / on; best setting per model kept, reported on held-out
 - [ ] Tool registry (`find_tool`) over every connected MCP server: short descriptions of our own, only the 1-2 tools a step needs go into the prompt
 - [ ] More servers through the registry: Serena, GitHub (test repo, scoped token), SQLite/Postgres (read-only SQL by default), Docker, AWS (LocalStack, or a read-only IAM profile)
@@ -259,16 +259,16 @@ to USER_TESTS.md.
 - [ ] Research Desk MCP server added to project 04: `search_library`, `get_report` (read-only) (agreed 2026-11-07: as planned here)
 - [ ] Ops sandbox = playground level 07: Docker Compose (demo API, seeded Postgres, LocalStack), test GitHub repo, planted problems with checkable answers
 - [ ] MCP comparison on the same model and tasks: all tools in the prompt vs registry vs core only (pass rate, right-tool rate, prompt tokens, time, blocked unsafe calls)
-- [ ] Harness² tuning in WSL (Codex executor pointed at local Ollama) on the tuning half; three columns: stock, stock + Harness², Mitra
+- [ ] Harness² tuning in WSL (Codex executor pointed at local Ollama) on the tuning half; three columns: stock, stock + Harness², CodeMitra
 - [ ] Failure analysis from trajectories: every failed run labelled (broken tool call, wrong file, gave up, loop, timeout, test tampering, infra); counts in EVALS.md
 - [ ] EVALS.md: method, every config, every result
-- [ ] **Kill check 2:** if Mitra does not clearly beat stock agents, the best stock agent becomes the builder engine behind Mitra's terminal app
+- [ ] **Kill check 2:** if CodeMitra does not clearly beat stock agents, the best stock agent becomes the builder engine behind CodeMitra's terminal app
 - [ ] Release v0.4 + posts: the comparison table; "One laptop, a 9B model, 6 real MCP servers: an incident solved end to end"
 
 ## M5 Review + lessons loop
 - [ ] Review view in the terminal app: report + diffs per run; I accept, reject with a comment, or split a "needs help" task
 - [ ] Fallback: a "needs help" brief I can paste into Claude Code; its tokens are counted
-- [ ] Review comments and failure labels turned into lesson proposals for Mitra's skills file
+- [ ] Review comments and failure labels turned into lesson proposals for CodeMitra's skills file
 - [ ] A lesson is kept only if more tuning tasks pass; reported on held-out; I see each one
 - [ ] Lessons file capped at ~1K tokens; lessons that stop helping are dropped
 - [ ] Meter: share of tasks and features done fully locally; Claude tokens spent on fallbacks (from Claude Code session logs)
@@ -284,7 +284,7 @@ to USER_TESTS.md.
 - [ ] Release v1.0 + post: the article
 
 ## M7 Personal fine-tune (only with enough data)
-- [ ] Dataset builder: Mitra-only passing runs (authorship filter), secret scrub, dedupe, train / held-out split by project and date
+- [ ] Dataset builder: CodeMitra-only passing runs (authorship filter), secret scrub, dedupe, train / held-out split by project and date
 - [ ] Licensed public coding data mixed in (licence of each source written in EVALS.md)
 - [ ] Gate: a few hundred passing runs before the first training run
 - [ ] QLoRA fine-tune of the small model locally (e.g. Unsloth); 9B only if a short rented GPU is needed

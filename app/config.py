@@ -588,21 +588,21 @@ LARGE_MODEL_PARAMETERS = 6_000_000_000
 DEFAULT_MODELS = ("qwen3.5:4b", "qwen3.5:9b", "qwen3.5:latest")  # first installed one is used on a first start
 
 
-def _mitra_home() -> pathlib.Path:
+def _codemitra_home() -> pathlib.Path:
     from app import migrate  # D-080: ~/.codemitra, or ~/.mitra until it has moved
     return migrate.resolve_home()
 
 
 def load_last_model() -> str:
     try:
-        return (_mitra_home() / "last_model").read_text(encoding="utf-8").strip()
+        return (_codemitra_home() / "last_model").read_text(encoding="utf-8").strip()
     except OSError:
         return ""
 
 
 def save_last_model(name: str) -> None:
     try:
-        home = _mitra_home()
+        home = _codemitra_home()
         home.mkdir(parents=True, exist_ok=True)
         (home / "last_model").write_text(name.strip() + "\n", encoding="utf-8")
     except OSError:
@@ -613,7 +613,7 @@ CONTEXT_CHOICES = {"32k": 32_768, "64k": 65_536, "128k": 131_072, "192k": 196_60
 
 
 def _context_file() -> pathlib.Path:
-    return _mitra_home() / "context.json"
+    return _codemitra_home() / "context.json"
 
 
 def load_context_choice(name: str) -> int:

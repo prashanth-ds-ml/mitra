@@ -6,18 +6,18 @@ import subprocess
 from functools import lru_cache
 from pathlib import Path
 
-MITRA_ROOT = Path(__file__).resolve().parents[2]
+CODEMITRA_ROOT = Path(__file__).resolve().parents[2]
 
 
 @lru_cache(maxsize=1)
 def code_version() -> str:
     """Short git commit of the CodeMitra repo, `-dirty` with uncommitted changes to tracked files; `unknown` without git."""
     try:
-        head = subprocess.run(["git", "-C", str(MITRA_ROOT), "rev-parse", "--short", "HEAD"],
+        head = subprocess.run(["git", "-C", str(CODEMITRA_ROOT), "rev-parse", "--short", "HEAD"],
                               capture_output=True, text=True, timeout=5)
         if head.returncode != 0 or not head.stdout.strip():
             return "unknown"
-        dirty = subprocess.run(["git", "-C", str(MITRA_ROOT), "status", "--porcelain", "--untracked-files=no"],
+        dirty = subprocess.run(["git", "-C", str(CODEMITRA_ROOT), "status", "--porcelain", "--untracked-files=no"],
                                capture_output=True, text=True, timeout=5)
         return head.stdout.strip() + ("-dirty" if dirty.stdout.strip() else "")
     except (OSError, subprocess.SubprocessError):

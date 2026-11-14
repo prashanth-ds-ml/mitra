@@ -9,12 +9,12 @@ It completes M3 (unattended runner, D-025) and the C block of PLAN "Next up", pl
 ## A night, end to end
 | When | Who | What |
 |---|---|---|
-| Evening (~10 min) | you + Mitra | discuss the idea; `/prd` writes `PRD.md` (or bring your own); Mitra writes `plan.md` from it; you approve the plan (2 min, recommended); `mitra overnight PRD.md --hours 4` |
-| 0 Preflight | Mitra (you still there) | 9B at 256K fits? (else what to close); disk; git repo + branch `mitra/overnight-<date>`; project venv; keep Windows awake; time budget set |
-| 1 Plan | Mitra | thinking on: tasks with files and a test each, ending with "app runs on localhost and answers"; plan check (red-then-green); skipped if you approved a plan already |
-| 2 Build | Mitra | task by task: code → tests → fix → re-plan the step when stuck → "needs help" and skip after N rounds; one commit per task |
-| 3 Deploy | Mitra | start the app on a free port, health check (HTTP 200 / process alive / smoke test); leave it running for the demo or stop it and print the command |
-| 4 Report | Mitra | morning report (and a handoff in the vault once B exists): tasks done / needs help, tests, demo URL, time, tokens, dashboard link |
+| Evening (~10 min) | you + CodeMitra | discuss the idea; `/prd` writes `PRD.md` (or bring your own); CodeMitra writes `plan.md` from it; you approve the plan (2 min, recommended); `codemitra overnight PRD.md --hours 4` |
+| 0 Preflight | CodeMitra (you still there) | 9B at 256K fits? (else what to close); disk; git repo + branch `mitra/overnight-<date>`; project venv; keep Windows awake; time budget set |
+| 1 Plan | CodeMitra | thinking on: tasks with files and a test each, ending with "app runs on localhost and answers"; plan check (red-then-green); skipped if you approved a plan already |
+| 2 Build | CodeMitra | task by task: code → tests → fix → re-plan the step when stuck → "needs help" and skip after N rounds; one commit per task |
+| 3 Deploy | CodeMitra | start the app on a free port, health check (HTTP 200 / process alive / smoke test); leave it running for the demo or stop it and print the command |
+| 4 Report | CodeMitra | morning report (and a handoff in the vault once B exists): tasks done / needs help, tests, demo URL, time, tokens, dashboard link |
 | Morning | you | open the demo, read the report, mark the run 👍/👎, decide the next night |
 
 ## Full access, inside the project only
@@ -22,7 +22,7 @@ It completes M3 (unattended runner, D-025) and the C block of PLAN "Next up", pl
   everything can be undone.
 - Packages only into the project's own venv / `node_modules`; never the system Python.
 - Never: `git push`, deleting outside the folder, system settings, credential stores; every command has a timeout.
-- Kill switch: `.mitra/STOP` file or ctrl+c; automatic stop at the time budget or critical RAM.
+- Kill switch: `.codemitra/STOP` file or ctrl+c; automatic stop at the time budget or critical RAM.
 
 ## Models: decided by an A/B test of two nights (user, 2026-11-07, D-048)
 | Night | Setup | Switches |
@@ -42,10 +42,10 @@ It completes M3 (unattended runner, D-025) and the C block of PLAN "Next up", pl
 - Speed: ~8 tok/s measured at 256K (12 GB, 43% GPU); with other apps closed it should be at least that. A step with
   thinking ~60-120 s → **~120-200 model steps in 3-4 h**.
 - Long nights: compaction at ~205K (E-046), a handoff after the second compaction (I-9), so the context stays clean.
-- **The memory check happens before you leave**: at the evening start Mitra checks the 9B at 256K fits comfortably
+- **The memory check happens before you leave**: at the evening start CodeMitra checks the 9B at 256K fits comfortably
   and, if not, says what to close (D-040) while you are there. During the night nothing is switched: if RAM gets
-  critical Mitra pauses, and stops cleanly if it does not recover. Disk is checked the same way.
-- Laptop: Mitra keeps Windows awake during the run; plugged in; the GPU power cap still applies.
+  critical CodeMitra pauses, and stops cleanly if it does not recover. Disk is checked the same way.
+- Laptop: CodeMitra keeps Windows awake during the run; plugged in; the GPU power cap still applies.
 - To measure once, not a default: KV cache `q4_0` instead of `q8_0` (more of the model on the GPU, faster; may cost
   quality): one benchmark night before deciding.
 
@@ -55,7 +55,7 @@ depend on it, keep going. Every decision is recorded (records + traces), so the 
 
 ## Self-improvement: separate from the build
 No rule changes in the middle of a build (it would make the run unreliable and unjudgeable). The night records
-everything; if time is left after the build, `mitra improve` may run on the night's failure patterns with the usual
+everything; if time is left after the build, `codemitra improve` may run on the night's failure patterns with the usual
 benchmark gate. Next nights then start with the improved harness, and the dashboard compares nights per version.
 
 ## What fits in 3-4 hours (honest)
@@ -64,7 +64,7 @@ One model, the 9B at 256K, ~8 tok/s; a step ~60-120 s with thinking → **~120-2
 handoffs, or a plan of plans. The plan is the weak spot: approving it before bed is the best insurance.
 
 ## New pieces (beyond the C block)
-1. `/prd`: Mitra writes a PRD from the discussion (goals, features, out of scope, acceptance = tests, how to run it).
+1. `/prd`: CodeMitra writes a PRD from the discussion (goals, features, out of scope, acceptance = tests, how to run it).
 2. Overnight profile: full access inside the project, the limits above, kill switch, time budget.
 3. Keep-awake during the run.
 4. Evening memory/disk check for the 9B at 256K; pause/stop on critical RAM at night (no switching).
@@ -78,15 +78,15 @@ handoffs, or a plan of plans. The plan is the weak spot: approving it before bed
 ## Decisions (user agreed to the defaults, 2026-11-07)
 | Question | Default |
 |---|---|
-| Plan | **You approve it before you sleep** (2 min). If not approved in time, Mitra runs on its own plan and the report says so |
+| Plan | **You approve it before you sleep** (2 min). If not approved in time, CodeMitra runs on its own plan and the report says so |
 | Network at night | **Package installs and web search allowed, inside the project only** (project venv / node_modules; every install listed in the report); nothing else: no push, no uploads |
 | After the build | **The app stays running on localhost** for the morning demo; the report gives the link and the stop/restart command; nothing is left running if the build failed |
-| Leftover time | **Stop when the build is done**; no `mitra improve` during a night at first (the night's failures are recorded for the next day) |
+| Leftover time | **Stop when the build is done**; no `codemitra improve` during a night at first (the night's failures are recorded for the next day) |
 | Time budget | **Until done, at most 4 hours** (`--hours` changes it per night) |
 
 ## Better-looking demos (user agreed, 2026-11-07)
 1. **Design-kit skill** (not an MCP): a light CSS framework (e.g. Pico.css or Tailwind via CDN), colour and spacing
-   tokens, 3-4 page layouts (landing, dashboard, form, game screen); Mitra fills in a proven design instead of
+   tokens, 3-4 page layouts (landing, dashboard, form, game screen); CodeMitra fills in a proven design instead of
    inventing one. Offline, plain HTML, the default style for overnight builds.
 2. **Visual self-check**: Playwright + `screenshot` (qwen3.5 has vision) before "done", and in the overnight deploy step.
 3. **shadcn/ui MCP** (official, local, free) for React / Next.js web apps, when those start (level 06, real apps).
@@ -98,5 +98,5 @@ Names and terms of each server checked before adding.
 1. Approve the plan before you sleep (recommended), or fully hands-off from the PRD?
 2. At night: allow package installs into the project and web search, or offline only?
 3. After the build: leave the app running for the morning demo, or stop it and print the command?
-4. Leftover time: `mitra improve` on the night's failures, or stop when the build is done?
+4. Leftover time: `codemitra improve` on the night's failures, or stop when the build is done?
 5. Time budget: fixed (3-4 h), or "until done or N hours"?

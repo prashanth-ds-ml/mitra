@@ -19,7 +19,7 @@ def test_defaults_follow_d051_and_fall_back_to_the_chat_model(monkeypatch):
     assert model == "qwen3.5:latest" and "not installed" in source
 
 
-def test_your_choice_and_mitra_toml_win(monkeypatch):
+def test_your_choice_and_codemitra_toml_win(monkeypatch):
     monkeypatch.setattr(config, "load_last_model", lambda: "qwen3.5:latest")
     have = {"qwen3.5:latest", "qwen3.5:4b", "mimo-v2.6:9b"}
     R.save_choice("builder", "qwen3.5:4b")

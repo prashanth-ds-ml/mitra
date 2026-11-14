@@ -18,11 +18,11 @@ machine or your judgment. Updated every release.
 - [ ] `+1 for this` typed as a message still types normally (only a first key on an empty prompt rates)
 - [ ] After a turn that changed files: a dim "worked? + yes · − no" line (not after every turn)
 - [ ] `exit` after 3+ turns: "rate this session 1–5"; a digit is noted, any other key skips
-- [ ] Say "why dont you do that" after an answer: `mitra coach` / the records show it as unhappy for that turn
+- [ ] Say "why dont you do that" after an answer: `codemitra coach` / the records show it as unhappy for that turn
 
 ## 2026-11-14 · Neon Chomp live check (E-125, E-126)
 
-Restart Mitra in mitra-try (header: the new commit). On Kaggle or the laptop.
+Restart CodeMitra in mitra-try (header: the new commit). On Kaggle or the laptop.
 - [ ] "i cant move the orb in neon chomp, check the keyboard controls and fix them" → it changes files (no "apply it
       manually"), and the tests that run are neon_chomp's (`in neon_chomp/`), not brick-breaker's
 - [ ] It answers a bold "Should I …?" with work when you say "yes", without asking again
@@ -32,36 +32,36 @@ Restart Mitra in mitra-try (header: the new commit). On Kaggle or the laptop.
 
 ## 2026-11-11 · Two self-improvement layers (D-075)
 
-- [ ] `mitra coach`: the report lands in ~/.mitra/coach/ with findings from your sessions; rules it suggests show as queued
-- [ ] Use Mitra, mark 3 wrong answers with `/bad <why>`, exit: "learning in the background" appears
-- [ ] ~20 min later, start Mitra: "learned since last time: …" (or nothing if the rule was dropped); `mitra harness`
+- [ ] `codemitra coach`: the report lands in ~/.codemitra/coach/ with findings from your sessions; rules it suggests show as queued
+- [ ] Use CodeMitra, mark 3 wrong answers with `/bad <why>`, exit: "learning in the background" appears
+- [ ] ~20 min later, start CodeMitra: "learned since last time: …" (or nothing if the rule was dropped); `codemitra harness`
 
-## 2026-11-11 · Behaviour fixes + `mitra improve --chat` (E-101, D-073)
+## 2026-11-11 · Behaviour fixes + `codemitra improve --chat` (E-101, D-073)
 
-- [ ] Restart Mitra. "good what about you" after "hi": no project talk; "i am thinking mitra": ends with a question
+- [ ] Restart CodeMitra. "good what about you" after "hi": no project talk; "i am thinking mitra": ends with a question
 - [ ] "brainstorm ideas to make <your game> harder": it reads the code first, 3-5 ideas with file:line
-- [ ] A wrong answer: `/bad <why>` (this is evidence for `mitra improve --chat`)
-- [ ] With Mitra closed: `mitra improve --chat --dry-run` shows the evidence count and one proposed rule
-- [ ] When the GPU is free (~20 min): `mitra improve --chat`, then `mitra harness` shows any kept rule
+- [ ] A wrong answer: `/bad <why>` (this is evidence for `codemitra improve --chat`)
+- [ ] With CodeMitra closed: `codemitra improve --chat --dry-run` shows the evidence count and one proposed rule
+- [ ] When the GPU is free (~20 min): `codemitra improve --chat`, then `codemitra harness` shows any kept rule
 
-## 2026-11-11 · One Mitra + qwen3.5 (v0.7.0)
+## 2026-11-11 · One CodeMitra + qwen3.5 (v0.7.0)
 
-- [ ] Restart Mitra: the header shows qwen3.5:latest; "hi", "i am thinking…", "either X or Y" get short replies, no file reading
+- [ ] Restart CodeMitra: the header shows qwen3.5:latest; "hi", "i am thinking…", "either X or Y" get short replies, no file reading
 - [ ] "how does the paddle move?" reads the code and cites file:line; "make … " changes and tests it
 - [ ] "build a feedback web app" shows a plan and asks before building
 - [ ] Talk about an idea, type `exit` ("remembering this conversation"), restart, "let's continue the … idea"
-- [ ] `mitra kaggle start`: qwen3.5:latest at 256K, fully on the GPU
+- [ ] `codemitra kaggle start`: qwen3.5:latest at 256K, fully on the GPU
 
 ## 2026-11-11 · The status line (v0.6.3)
 
-- [ ] Restart Mitra: bottom right shows CPU · RAM free · GPU; after an answer also tok/s
+- [ ] Restart CodeMitra: bottom right shows CPU · RAM free · GPU; after an answer also tok/s
 - [ ] Open Chrome tabs until RAM is low: RAM turns orange; a slow answer turns tok/s orange
 
-## 2026-11-11 · `mitra score` and talking ideas through (D-068 step 3, v0.6.0)
+## 2026-11-11 · `codemitra score` and talking ideas through (D-068 step 3, v0.6.0)
 
-- [ ] Restart Mitra; "can we brainstorm on <an idea>" answers (no plan); then "ok lets build it" plans it with what you discussed
+- [ ] Restart CodeMitra; "can we brainstorm on <an idea>" answers (no plan); then "ok lets build it" plans it with what you discussed
 - [ ] Plan-first on Kaggle no longer fails with error 524
-- [ ] `mitra score --quick` on the laptop; once on Kaggle: `mitra kaggle start`, then `mitra score --remote`
+- [ ] `codemitra score --quick` on the laptop; once on Kaggle: `codemitra kaggle start`, then `codemitra score --remote`
 
 ## 2026-11-10 · Questions about code (D-068 step 2, v0.5.0)
 
@@ -71,7 +71,7 @@ Restart Mitra in mitra-try (header: the new commit). On Kaggle or the laptop.
 
 ## 2026-11-10 · Everyday chat (D-068 step 1, v0.4.0)
 
-- [ ] Check `~/.mitra/me.md` (seeded with your name, signature, tone, stack): change anything that is not you
+- [ ] Check `~/.codemitra/me.md` (seeded with your name, signature, tone, stack): change anything that is not you
 - [ ] "hi" answers at once, no tools
 - [ ] "draft a mail to …" gives a mail in your voice, signed as you, nothing invented; "make it shorter" refines it
 - [ ] `/copy`, then paste into your mail app: the text arrives intact
@@ -94,15 +94,15 @@ Restart Mitra in mitra-try (header: the new commit). On Kaggle or the laptop.
 
 - [ ] Status line shows `☁ kaggle · … h left` on Kaggle and `💻 laptop` after `/kaggle stop`
 - [ ] shift+tab to plan mode: next message runs on the laptop (one ☁/💻 line); back: on Kaggle
-- [ ] Stop the Kaggle run from kaggle.com while Mitra works: report in `.mitra/reports/`, your message back in the box
+- [ ] Stop the Kaggle run from kaggle.com while CodeMitra works: report in `.codemitra/reports/`, your message back in the box
 - [ ] Write work with Kaggle off: asked once; Yes starts it in the background and the status line shows progress
-- [ ] Fresh machine (empty ~/.mitra): first start offers Kaggle; Yes opens the settings page and takes the token
+- [ ] Fresh machine (empty ~/.codemitra): first start offers Kaggle; Yes opens the settings page and takes the token
 
-## 2026-11-10 · `mitra kaggle` (D-061)
+## 2026-11-10 · `codemitra kaggle` (D-061)
 
-- [ ] With Mitra closed: `uv tool install --reinstall -e C:\Users\prash\projects\langchain\portfolio\05-mitra` (adds the kaggle package)
-- [ ] `mitra kaggle status`: your hours (used / 30 / reset)
-- [ ] `mitra kaggle start`: stages, then ready within ~8 min; `mitra` header says remote GPU and shows the hours line
+- [ ] With CodeMitra closed: `uv tool install --reinstall -e C:\Users\prash\projects\langchain\portfolio\05-mitra` (adds the kaggle package)
+- [ ] `codemitra kaggle status`: your hours (used / 30 / reset)
+- [ ] `codemitra kaggle start`: stages, then ready within ~8 min; `codemitra` header says remote GPU and shows the hours line
 - [ ] In the chat: `/kaggle stop` switches back to this machine; Kaggle shows the run ended; `/kaggle start` switches live
 - [ ] Leave it unused 30+ min: the run ends by itself
 
@@ -111,9 +111,9 @@ Restart Mitra in mitra-try (header: the new commit). On Kaggle or the laptop.
 Needs your Kaggle account and a real session; tested here only with the local Ollama behind the proxy.
 
 - [ ] Kaggle: phone verified; Settings shows the weekly GPU quota (write it in STATUS)
-- [ ] Import `remote/kaggle/mitra_kaggle_server.ipynb`, GPU T4 x2 + Internet on, Run All: it prints `mitra remote set ...` within ~6 min; the load line says "fully on GPU" at 262144
-- [ ] Laptop: paste the line, start `mitra`: header `remote GPU`, `☁ runs on kaggle at 256K`; a chat reply streams
-- [ ] `/run` a small plan on it; `mitra remote off` afterwards; stop the Kaggle session
+- [ ] Import `remote/kaggle/codemitra_kaggle_server.ipynb`, GPU T4 x2 + Internet on, Run All: it prints `codemitra remote set ...` within ~6 min; the load line says "fully on GPU" at 262144
+- [ ] Laptop: paste the line, start `codemitra`: header `remote GPU`, `☁ runs on kaggle at 256K`; a chat reply streams
+- [ ] `/run` a small plan on it; `codemitra remote off` afterwards; stop the Kaggle session
 
 ## 2026-11-10 · `/free` (D-059)
 
@@ -121,7 +121,7 @@ Closing real programs needs you: automated tests use stand-ins and never close a
 
 - [ ] `/free` lists Edge, Code, Chrome, Claude ... with sizes; Edge and Chrome are pre-ticked, Code and Claude are not
 - [ ] space / 1-9 tick, enter closes: Edge closes like ✕ and reopens its tabs next time
-- [ ] a program with a save prompt stays open: Mitra asks before forcing; "No" leaves it open
+- [ ] a program with a save prompt stays open: CodeMitra asks before forcing; "No" leaves it open
 - [ ] the last line shows GB freed and a new ✓/⚠/✗, and the model then loads
 
 ## 2026-11-06 · Terminal keys (D-035)

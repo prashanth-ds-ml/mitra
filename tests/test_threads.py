@@ -67,7 +67,7 @@ def test_bad_model_output_writes_nothing(tmp_path):
     assert T.parse_threads('[{"title": "x"}]') == []                              # no summary: not a thread
 
 
-def test_the_score_seeds_a_thread_and_one_mitra_gets_it(tmp_path):
+def test_the_score_seeds_a_thread_and_one_codemitra_gets_it(tmp_path):
     from app.core import chat as C
     from app.core import score as S
     from app.core import store

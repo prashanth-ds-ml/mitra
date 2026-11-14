@@ -57,7 +57,7 @@ def test_same_folder_name_in_two_places_stays_apart(tmp_path):
     assert a != b and S.project_name(a) == S.project_name(b) == "app"
 
 
-def test_records_under_mitra_home_go_to_their_own_slug(tmp_path):
+def test_records_under_codemitra_home_go_to_their_own_slug(tmp_path):
     bench = H.home() / "harness" / "runs" / "v2" / "T01.jsonl"
     assert S.mirror_path(bench).relative_to(S.runs_root()).parts[0] == S.HOME_SLUG
     assert S.mirror_path(S.runs_root() / "a" / "b.jsonl") is None  # store files are never mirrored again

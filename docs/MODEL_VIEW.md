@@ -7,19 +7,19 @@ Budget: 3,000 tokens per view for the fixed prompt + tool specs (SCOPE.md; check
 
 | View | Part | Chars | Est. tokens |
 |---|---|---:|---:|
-| Chat (`mitra`) | System prompt (`app.core.chat.CHAT_PROMPT`) | 1,149 | 329 |
-| Chat (`mitra`) | Tool specs (`app.core.chat.tool_specs("approve")`) | 3,759 | 1,074 |
-| **Chat (`mitra`)** | **total** | | **1,403** |
-| Solve (`mitra solve`) | System prompt (`app.core.loop.SYSTEM_PROMPT`) | 619 | 177 |
-| Solve (`mitra solve`) | Tool specs (`app.core.tools.TOOL_SPECS`) | 2,543 | 727 |
-| **Solve (`mitra solve`)** | **total** | | **904** |
+| Chat (`codemitra`) | System prompt (`app.core.chat.CHAT_PROMPT`) | 1,149 | 329 |
+| Chat (`codemitra`) | Tool specs (`app.core.chat.tool_specs("approve")`) | 3,759 | 1,074 |
+| **Chat (`codemitra`)** | **total** | | **1,403** |
+| Solve (`codemitra solve`) | System prompt (`app.core.loop.SYSTEM_PROMPT`) | 619 | 177 |
+| Solve (`codemitra solve`) | Tool specs (`app.core.tools.TOOL_SPECS`) | 2,543 | 727 |
+| **Solve (`codemitra solve`)** | **total** | | **904** |
 
-## Chat (`mitra`)
+## Chat (`codemitra`)
 
 ### System prompt (`app.core.chat.CHAT_PROMPT`): ~329 tokens
 
 ````text
-You are Mitra, a local coding assistant working in the user's project folder.
+You are CodeMitra, a local coding assistant working in the user's project folder.
 
 Answer questions directly when you can. For work on the project, use the tools and keep going until it is done:
 look first (list_files, read_file, search), make small changes (edit_file, write_file), check them (run_tests or
@@ -56,12 +56,12 @@ changes you did not make.
 {"name": "run_plan", "description": "Build a plan file task by task: implement each task until its 'Done when' tests pass, then run all tests. Runs in the plan's folder.", "parameters": {"type": "object", "properties": {"plan_path": {"type": "string"}}, "required": ["plan_path"]}}
 ````
 
-## Solve (`mitra solve`)
+## Solve (`codemitra solve`)
 
 ### System prompt (`app.core.loop.SYSTEM_PROMPT`): ~177 tokens
 
 ````text
-You are Mitra, a coding agent. You work inside one project folder using tools.
+You are CodeMitra, a coding agent. You work inside one project folder using tools.
 
 How to work:
 1. Look first: list_files, then read the files that matter (the task, plan.md, the tests).

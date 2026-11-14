@@ -59,7 +59,7 @@ def show_banner():
     return None
 
 
-_MITRA_MD_TEMPLATE = """\
+_CODEMITRA_MD_TEMPLATE = """\
 # Project Rules
 
 <!-- CodeMitra will follow these rules in every response. -->
@@ -95,7 +95,7 @@ _MITRA_MD_TEMPLATE = """\
 - Confirm before running destructive commands
 """
 
-_MITRA_TOML_TEMPLATE = """\
+_CODEMITRA_TOML_TEMPLATE = """\
 model = ""                   # legacy fallback; prefer local_model
 local_model = ""             # leave empty to pick at startup
 codegen_model = "kimi-k2.5:cloud"  # used only when cloud codegen is enabled
@@ -129,14 +129,14 @@ def _run_init() -> None:
     if rules_path.exists():
         console.print("[m.dim]CODEMITRA.md already exists — skipped.[/m.dim]")
     else:
-        rules_path.write_text(_MITRA_MD_TEMPLATE, encoding="utf-8")
+        rules_path.write_text(_CODEMITRA_MD_TEMPLATE, encoding="utf-8")
         created.append("CODEMITRA.md")
 
     toml_path = cwd / "codemitra.toml"
     if toml_path.exists():
         console.print("[m.dim]codemitra.toml already exists — skipped.[/m.dim]")
     else:
-        toml_path.write_text(_MITRA_TOML_TEMPLATE, encoding="utf-8")
+        toml_path.write_text(_CODEMITRA_TOML_TEMPLATE, encoding="utf-8")
         created.append("codemitra.toml")
 
     if created:
@@ -2647,7 +2647,7 @@ def _chat():
     # D-071: "one" = one conversational loop (the model decides to talk, look or change); "router" = D-068 paths
     architecture = str(cfg.get("architecture") or "").strip().lower()
     architecture = architecture if architecture in ("one", "phased", "router") else "phased"  # D-071 A/B winner
-    one_mitra = architecture in ("one", "phased")  # one loop: the model decides (phased: decide, then act)
+    one_codemitra = architecture in ("one", "phased")  # one loop: the model decides (phased: decide, then act)
     harness = harness_mod.load()
     system_prompt = harness_mod.apply_prompt(
         {"one": ONE_PROMPT, "phased": PHASED_PROMPT}.get(architecture, CHAT_PROMPT), harness)  # + learned rules
@@ -2672,7 +2672,7 @@ def _chat():
     # (workspace plugins were removed with the old engine, M1 stage 2)
 
     ctx_text = memory.load_context(cfg["workspace"])
-    if ctx_text and one_mitra:  # lighter context (D-071): only what you wrote under "## Notes", not recent topics
+    if ctx_text and one_codemitra:  # lighter context (D-071): only what you wrote under "## Notes", not recent topics
         ctx_text = memory.context_notes(ctx_text)
     if ctx_text:
         system_prompt += f"\n\n## Project Memory (from .codemitra/context.md)\n{ctx_text}"
@@ -2685,12 +2685,12 @@ def _chat():
 
     from app.core import resume as resume_mod  # D-065 P1: where we stopped, from the records (before this session)
     resume_brief = resume_mod.brief(pathlib.Path(cfg["workspace"]))
-    if resume_brief and not one_mitra:  # one CodeMitra: "where did we stop" is answered from the records on request
+    if resume_brief and not one_codemitra:  # one CodeMitra: "where did we stop" is answered from the records on request
         system_prompt += f"\n\n{resume_brief}\nFor 'where did we stop' questions answer from this; do not search."
         loaded.append("where we stopped")
 
     plan_text = memory.load_plan(cfg["workspace"])
-    if plan_text and not one_mitra:  # one CodeMitra reads the plan when the work needs it
+    if plan_text and not one_codemitra:  # one CodeMitra reads the plan when the work needs it
         system_prompt += f"\n\n## Active Plan (from .codemitra/plan.md)\n{plan_text}"
         loaded.append("plan")
 
@@ -2702,7 +2702,7 @@ def _chat():
         loaded.append("your notes")
 
     from app.core import threads as threads_mod  # D-071: what was said, decided and left open, per discussion
-    if one_mitra:
+    if one_codemitra:
         from app.core.chat import project_outline
         _outline = project_outline(pathlib.Path(cfg["workspace"]))  # so "the snake" means the code, not biology
         if _outline:
@@ -3224,7 +3224,7 @@ def _chat():
         return get_local_llm(model, temperature, base_url=cfg.get("ollama_local_base_url"), num_ctx=num_ctx,
                              num_gpu=num_gpu, reasoning=False if _think_cache[model] else None)
 
-    if one_mitra:  # sessions closed without `exit` were not remembered yet: catch up in the background (D-071)
+    if one_codemitra:  # sessions closed without `exit` were not remembered yet: catch up in the background (D-071)
         _runs_dir = pathlib.Path(cfg["workspace"]) / ".codemitra" / "runs"
         _behind = [f for f in sorted(_runs_dir.glob("chat-*.jsonl"))[-3:] if threads_mod.pending_turns(f)]
         if _behind:
@@ -3388,7 +3388,7 @@ def _chat():
                 context=hook_ctx,
             ))
             _rebuild_dashboard(quiet=True)  # the page always shows every session so far (D-041)
-            if one_mitra and threads_mod.pending_turns(chat.rec.path):
+            if one_codemitra and threads_mod.pending_turns(chat.rec.path):
                 console.print(Text("  remembering this conversation (ctrl+c skips) …", style="m.faint"))
                 try:
                     _titles = threads_mod.summarize(_reply_llm(), chat.rec.path,
@@ -3935,7 +3935,7 @@ def _chat():
                 architecture == "phased" and chat.role == "chat" and not force_kind):
             _maybe_offer_kaggle()  # phased chat: only after a turn that worked (below), never for talk (D-074)
 
-        if request_kind == "big" and (force_kind or not one_mitra):  # D-065 P4/P5: plan first (one CodeMitra: /plan)
+        if request_kind == "big" and (force_kind or not one_codemitra):  # D-065 P4/P5: plan first (one CodeMitra: /plan)
             _t_plan = time.monotonic()
             _plan_info = _plan_first(planner_mod.with_discussion(user_input, messages) if talked_first
                                      else user_input) or {}
@@ -3956,7 +3956,7 @@ def _chat():
             chat.mode = session_mode
             chat.request_kind, chat.path = request_kind, "loop"  # D-068: recorded with the turn
             typed_buffer.clear()
-            if one_mitra and chat.role == "chat" and not force_kind:  # D-071: the model decides
+            if one_codemitra and chat.role == "chat" and not force_kind:  # D-071: the model decides
                 _extra = "\n\n".join(x for x in (_fresh_notes(), threads_mod.relevant_text(user_input)) if x)
                 _talk = None
                 if bsession.kind == backend_mod.REMOTE and architecture == "phased":

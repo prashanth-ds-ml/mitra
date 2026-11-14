@@ -9,7 +9,7 @@ from app.config import (
     load,
 )
 
-MITRA_NOTES = str(pathlib.Path(".codemitra") / "instructions.md")
+CODEMITRA_NOTES = str(pathlib.Path(".codemitra") / "instructions.md")
 COPILOT_NOTES = str(pathlib.Path(".github") / "copilot-instructions.md")
 
 
@@ -39,19 +39,19 @@ def test_budget_constant():
 
 
 def test_small_files_are_kept_whole_and_in_config_order(tmp_path):
-    _write_all(tmp_path, {"AGENTS.md": 100, "CLAUDE.md": 100, MITRA_NOTES: 100, COPILOT_NOTES: 100})
+    _write_all(tmp_path, {"AGENTS.md": 100, "CLAUDE.md": 100, CODEMITRA_NOTES: 100, COPILOT_NOTES: 100})
     cfg = load(cwd=str(tmp_path))
     paths = [item["path"] for item in cfg["project_instructions"]]
-    assert paths == ["AGENTS.md", "CLAUDE.md", MITRA_NOTES, COPILOT_NOTES]
+    assert paths == ["AGENTS.md", "CLAUDE.md", CODEMITRA_NOTES, COPILOT_NOTES]
     assert all(_NOTES_CUT_LINE not in item["content"] for item in cfg["project_instructions"])
 
 
 def test_broad_file_is_dropped_first(tmp_path):
     # .codemitra (5K) + root files (3K each) = 11K; copilot file (3K) does not fit.
-    _write_all(tmp_path, {"AGENTS.md": 3000, "CLAUDE.md": 3000, MITRA_NOTES: 5000, COPILOT_NOTES: 3000})
+    _write_all(tmp_path, {"AGENTS.md": 3000, "CLAUDE.md": 3000, CODEMITRA_NOTES: 5000, COPILOT_NOTES: 3000})
     cfg = load(cwd=str(tmp_path))
     by_path = {item["path"]: item["content"] for item in cfg["project_instructions"]}
-    assert by_path[MITRA_NOTES] == (tmp_path / MITRA_NOTES).read_text(encoding="utf-8")
+    assert by_path[CODEMITRA_NOTES] == (tmp_path / CODEMITRA_NOTES).read_text(encoding="utf-8")
     assert by_path["AGENTS.md"] == (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
     assert by_path["CLAUDE.md"] == (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
     # The copilot file gets what is left (about 1K), cut with the marker line.
@@ -74,14 +74,14 @@ def test_partly_fitting_file_is_cut_on_a_line_with_marker():
 def test_most_specific_file_wins_the_budget():
     items = [
         {"path": "AGENTS.md", "content": _lines("A", 8000)},
-        {"path": MITRA_NOTES, "content": _lines("M", 8000)},
+        {"path": CODEMITRA_NOTES, "content": _lines("M", 8000)},
     ]
     out = _apply_notes_budget(items)
     by_path = {item["path"]: item["content"] for item in out}
-    assert by_path[MITRA_NOTES] == items[1]["content"]
+    assert by_path[CODEMITRA_NOTES] == items[1]["content"]
     assert by_path["AGENTS.md"].endswith(_NOTES_CUT_LINE)
     # Output keeps the configured order.
-    assert [item["path"] for item in out] == ["AGENTS.md", MITRA_NOTES]
+    assert [item["path"] for item in out] == ["AGENTS.md", CODEMITRA_NOTES]
     assert _total_bytes(out) <= PROJECT_NOTES_BUDGET_BYTES
 
 
@@ -96,11 +96,11 @@ def test_files_after_a_cut_are_dropped():
 
 def test_file_dropped_when_too_little_room_for_marker():
     items = [
-        {"path": MITRA_NOTES, "content": "x" * (PROJECT_NOTES_BUDGET_BYTES - 10)},
+        {"path": CODEMITRA_NOTES, "content": "x" * (PROJECT_NOTES_BUDGET_BYTES - 10)},
         {"path": "AGENTS.md", "content": _lines("A", 500)},
     ]
     out = _apply_notes_budget(items)
-    assert [item["path"] for item in out] == [MITRA_NOTES]
+    assert [item["path"] for item in out] == [CODEMITRA_NOTES]
 
 
 def test_multibyte_text_is_cut_on_a_char_boundary():

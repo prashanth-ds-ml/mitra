@@ -1,4 +1,4 @@
-# Mitra's ideal behaviour (D-066)
+# CodeMitra's ideal behaviour (D-066)
 
 One sentence: **code decides the phase; each phase is one role with a narrow job, only its own tools, a budget, a
 thinking setting and the right machine; code gathers the context and runs the checks; "done" means green.**
@@ -12,7 +12,7 @@ logic" thought for 5 minutes. Every message ran as `chat` with every tool, think
 | Request | Path |
 |---|---|
 | Small talk ("hi", "thanks", "ok") | **reply** (no tools) + the "where we stopped" brief |
-| Where did we stop / status | the **brief** from Mitra's records, no model call |
+| Where did we stop / status | the **brief** from CodeMitra's records, no model call |
 | Question ("explain…", "how does…") | **explain** (read only, 6 steps) → answer |
 | Fix a bug ("test X fails", "error …") | code runs the tests → **debug** → code checks → **report** |
 | Small change (one clear edit) | **build** → code checks → **debug** if red (2 rounds) → **report** |
@@ -27,7 +27,7 @@ logic" thought for 5 minutes. Every message ran as `chat` with every tool, think
 MCP tools are given **directly** by name to the roles that need them (not through `mcp_find` / `mcp_call`, which a
 small model rarely uses well). `*` = only when the project needs it (section 4).
 
-| Role | Job | Mitra tools | MCP tools | Thinking | Budget | Runs on |
+| Role | Job | CodeMitra tools | MCP tools | Thinking | Budget | Runs on |
 |---|---|---|---|---|---|---|
 | chat | small talk; general requests | none for small talk; everything incl. `mcp_find`/`mcp_call`, `run_plan` for unsorted requests | all enabled (via find/call) | off | 1 call (small talk) | laptop |
 | explainer | answer questions about the code | `list_files`, `read_file` (outline), `search`, `web_search`, `fetch_url`, `answer`, `ask_user` | Serena (find symbol, overview, references), git (log, blame), context7, MarkItDown*, research-desk*, PostgreSQL/SQLite* (read-only) | off | 6 steps, then must `answer` | laptop |
@@ -37,7 +37,7 @@ small model rarely uses well). `*` = only when the project needs it (section 4).
 | debugger | make red green | `read_file`, `search`, `edit_file`, `check_code`, `run_tests` (structured), `run_command`, `finish` | Serena, git (diff, log), PostgreSQL/SQLite* (read-only), Playwright* | on | 10 steps × 2 rounds, then back to the planner | Kaggle when up |
 | reviewer | read the final diff; report problems (never edits) | `read_file`, `search`, `answer` | git (diff); **semgrep is run by code** in the final checks | on | 2 calls | laptop |
 | deployer (later) | start the app, check it works | `run_command`, `run_tests`, `answer` | Playwright*, Docker* | off | 8 steps | laptop |
-| reporter | summary + `.mitra/resume.md` | none (code gives it the facts) | none | off | 1 call | laptop |
+| reporter | summary + `.codemitra/resume.md` | none (code gives it the facts) | none | off | 1 call | laptop |
 
 When a budget runs out the role must answer or report what it has; it never loops. Each role's prompt holds only
 its own tools (CI checks the prompt budget per role).
@@ -58,7 +58,7 @@ its own tools (CI checks the prompt budget per role).
 
 ## 4. Tools and MCP servers: the full list
 
-### Mitra's own tools
+### CodeMitra's own tools
 | Tool | Status |
 |---|---|
 | `list_files`, `read_file` (outline for large files), `search`, `make_dir`, `write_file`, `edit_file`, `append_file`, `check_code`, `run_tests`, `run_command`, `web_search`, `fetch_url`, `finish` | have; `run_command` becomes tolerant, `run_tests` structured |
@@ -84,9 +84,9 @@ its own tools (CI checks the prompt budget per role).
 | Docker | deployer | later, with the deploy path |
 | AWS docs / LocalStack | none by default | ops work only (PLAN M4) |
 | Chrome DevTools | none (Playwright first) | maybe later |
-| **Never:** filesystem, fetch, memory, sequential thinking, time (duplicate Mitra's own tools or add nothing for a small model); Redis, Sentry, Cloudflare, Postman (production / infrastructure, not Mitra's job) | | |
+| **Never:** filesystem, fetch, memory, sequential thinking, time (duplicate CodeMitra's own tools or add nothing for a small model); Redis, Sentry, Cloudflare, Postman (production / infrastructure, not CodeMitra's job) | | |
 
-Per-project offer: on the first start in a project Mitra looks at it (remote, `package.json`, database libraries,
+Per-project offer: on the first start in a project CodeMitra looks at it (remote, `package.json`, database libraries,
 documents) and offers the matching servers once; `/mcp` changes it any time.
 
 ## 5. What you see
@@ -94,7 +94,7 @@ documents) and offers the matching servers once; `/mcp` changes it any time.
 - One status line: where it runs (☁ kaggle / 💻 laptop), model, context, hours left.
 - A live checklist for plans: `✓ T1  ✓ T2  ▶ T3 test  · T4`.
 - One line per phase change ("explaining: read only", "building T2", "checks: 12 passed"), not walls of output.
-- At the end: what changed, the checks, what is next (also in `.mitra/resume.md`); `/undo` always works.
+- At the end: what changed, the checks, what is next (also in `.codemitra/resume.md`); `/undo` always works.
 
 ## 6. Build order
 

@@ -126,8 +126,8 @@ def _completions(completer, text):
 class TestCompleter:
     def _make(self, root, extra=()):
         from app.main import _COMMAND_HELP
-        from app.ui.input import FileIndex, MitraCompleter
-        return MitraCompleter(list(_COMMAND_HELP) + list(extra), FileIndex(str(root)))
+        from app.ui.input import FileIndex, CodeMitraCompleter
+        return CodeMitraCompleter(list(_COMMAND_HELP) + list(extra), FileIndex(str(root)))
 
     def test_slash_menu_lists_commands_with_descriptions(self, tmp_path):
         items = _completions(self._make(tmp_path), "/m")

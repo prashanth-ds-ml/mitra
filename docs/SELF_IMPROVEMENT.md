@@ -1,4 +1,4 @@
-# Self-improvement: how Mitra gets better as you use it (design, brainstorm 2026-11-07)
+# Self-improvement: how CodeMitra gets better as you use it (design, brainstorm 2026-11-07)
 
 Status: **design notes from the 2026-11-07 discussions; nothing in "missing" is built.** The build order is in
 PLAN.md "Next up" (item 0 first). Related plans: [DASHBOARD_PLAN.md](DASHBOARD_PLAN.md) (built, D-041/D-042),
@@ -17,21 +17,21 @@ are better on enough turns (20+) or on hidden tests.
 
 | Stage | Have (2026-11-07) | Missing | How it helps |
 |---|---|---|---|
-| 1 Record | step records; full traces with thinking (new sessions); central never-delete store; turn outcome; model + context per turn | Mitra code version, machine state, prompt-processing time, wrap-up / compaction / failed calls, crashes (item 0, A5) | every result tied to *which Mitra* under *which conditions*: fair before/after |
+| 1 Record | step records; full traces with thinking (new sessions); central never-delete store; turn outcome; model + context per turn | CodeMitra code version, machine state, prompt-processing time, wrap-up / compaction / failed calls, crashes (item 0, A5) | every result tied to *which CodeMitra* under *which conditions*: fair before/after |
 | 2 Judge | inferred: tests passed/failed, stopped by you, tool failures, retries | **your verdict** (`/good` `/bad`, A4), **your corrections**, **declined edits** (item 0) | ground truth: "answered" does not mean "right" |
 | 3 Find patterns | `analyze.py` failure patterns (missing files, no tests after code, interrupted, ...) | patterns from your marks and corrections; "check_code would have caught this" (A2) | fix what hurts you most first |
-| 4 Propose | `mitra improve`: local 9B proposes one rule / tool text / limit for the top pattern | proposals from real-session patterns (E24) | fixes aimed at your real problems |
+| 4 Propose | `codemitra improve`: local 9B proposes one rule / tool text / limit for the top pattern | proposals from real-session patterns (E24) | fixes aimed at your real problems |
 | 5 Test | A/B on the bench tune half; kept only if more hidden tests pass at <=120% tokens | more levels per kind (D17-20), night runs (D22, your OK) | proven on many tasks before it reaches you |
-| 6 Keep / undo | versioned harness, `mitra harness revert N` | auto-suggested undo when real-session numbers get worse after a change (E24) | bad "improvements" do not stay |
-| 7 Remember | `.mitra/context.md` (hidden from Obsidian); compaction summaries lost | the vault: facts, `remember` / `recall`, summaries, handoffs (B8-B12) | no relearning the same project every session |
-| 8 Train | `mitra report --export-training` | usable turns (needs use + marks), before/after pairs (S3), fine-tune (M7) | the model itself gets better at your work |
+| 6 Keep / undo | versioned harness, `codemitra harness revert N` | auto-suggested undo when real-session numbers get worse after a change (E24) | bad "improvements" do not stay |
+| 7 Remember | `.codemitra/context.md` (hidden from Obsidian); compaction summaries lost | the vault: facts, `remember` / `recall`, summaries, handoffs (B8-B12) | no relearning the same project every session |
+| 8 Train | `codemitra report --export-training` | usable turns (needs use + marks), before/after pairs (S3), fine-tune (M7) | the model itself gets better at your work |
 
 Weakest stage today: **2 (judge)**, then **7 (remember)** and the **volume** behind 4, 5 and 8.
 
 ## 3. Found 2026-11-07: the running session was on old code
 The chat started at 19:18; the store and traces (D-041) were committed at 19:52. That session kept writing its
 normal record (merged into the store by hand, 40 lines) but no traces and no outcomes. **A restart (`exit`, then
-`mitra`) loads the new code** (checked: the `mitra` command imports this repo). Until the code version is
+`codemitra`) loads the new code** (checked: the `codemitra` command imports this repo). Until the code version is
 recorded (item 0), the dashboard cannot split sessions before and after such a change.
 
 ## 4. Item 0: record everything that helps self-improvement (design)
@@ -39,12 +39,12 @@ Small additions to what is already recorded; each has a dashboard view (section 
 
 | Signal | How it is captured | Row |
 |---|---|---|
-| **Mitra code version** | short git commit of the Mitra repo (+ `-dirty` if uncommitted changes), read once per process with a timeout | `code_version` on `turn_start` / `start` and in trace calls |
+| **CodeMitra code version** | short git commit of the CodeMitra repo (+ `-dirty` if uncommitted changes), read once per process with a timeout | `code_version` on `turn_start` / `start` and in trace calls |
 | **Machine state** | at session start: model, context, memory-fit verdict, free RAM, free VRAM; per turn: free RAM (cheap) | `session` row; `ram_free_gb` on `turn_start` |
-| **Your corrections** | at the end of each turn Mitra keeps the content it left in the files it changed; at the next turn start it compares; a file you changed in between is a correction, saved with a short diff (scrubbed, capped) | `user_edit` (author `user`, `of_turn` = the turn it corrects) |
+| **Your corrections** | at the end of each turn CodeMitra keeps the content it left in the files it changed; at the next turn start it compares; a file you changed in between is a correction, saved with a short diff (scrubbed, capped) | `user_edit` (author `user`, `of_turn` = the turn it corrects) |
 | **Declined edits / commands** | where an edit approval is refused (`_before_write`) and where a command is declined (`ShellResult.denied`), with your reason if given | `declined` (author `user`, tool, path or command, reason) |
 | **Calls not traced yet** | the wrap-up call at a step limit, the compaction call, and failed calls (E-044 parse errors, model errors: input saved, reply empty, error text) | trace `call` with `error` / `purpose` (`wrap_up`, `compact`) |
-| **Crashes** | the chat's error handler also writes a row (error + last traceback lines), not only `.mitra/errors.log` | `crash` |
+| **Crashes** | the chat's error handler also writes a row (error + last traceback lines), not only `.codemitra/errors.log` | `crash` |
 | **Prompt-processing time** (A5) | from Ollama's reply metadata: prompt tokens processed, prompt time, generation time, **load time** (shows model reloads) | on each trace `call` |
 | **Your verdict** (A4) | `/good [note]`, `/bad [why]` on the last turn; the last one counts | `feedback` (author `user`, `of_turn`, verdict, note) |
 
@@ -55,7 +55,7 @@ Rules:
   `/good` turns are usable even without tests (open question 1).
 - Nothing is sent anywhere; the store keeps it all (D-041).
 
-## 5. Trends: how Mitra changes with use
+## 5. Trends: how CodeMitra changes with use
 Two views, both from the store:
 
 **a) By day (or week), usage and health over time** - one row per metric, a small line per metric, the latest
@@ -63,7 +63,7 @@ value and the change since the first week:
 
 | Metric | Shows |
 |---|---|
-| sessions, turns, model steps, tool calls | how much Mitra is used |
+| sessions, turns, model steps, tool calls | how much CodeMitra is used |
 | tokens in / out per turn, context used (median, max) | cost and context pressure |
 | steps per turn, seconds per turn, tok/s, prompt-processing seconds, model reloads | speed |
 | tool failures per turn, retries per turn, crashes | robustness |
@@ -71,31 +71,31 @@ value and the change since the first week:
 | 👍 / 👎, your corrections per turn, declined per turn | your judgment |
 | usable training turns (cumulative) | progress to the fine-tune (target 300) |
 
-**b) By Mitra version (and harness version), is it improving** - the same metrics per version, so a code change or
+**b) By CodeMitra version (and harness version), is it improving** - the same metrics per version, so a code change or
 a learned rule shows as a before/after. "Not enough data" under 20 turns.
 
 Small inline SVG lines (no chart library), so the page stays one local file.
 
 ## 6. Dashboard: what each view adds
-Existing: Sessions, Tools, Models, Is Mitra improving (by harness version), Training data, Problems, Learned rules,
+Existing: Sessions, Tools, Models, Is CodeMitra improving (by harness version), Training data, Problems, Learned rules,
 Improve attempts, Harness history, Playground results.
 
 To add (with item 0, A4, A5 and trends):
 - **Trends** (section 5a) at the top.
-- **Is Mitra improving** grouped by **Mitra version · harness version**, with 👍/👎, corrections, declines, tokens
+- **Is CodeMitra improving** grouped by **CodeMitra version · harness version**, with 👍/👎, corrections, declines, tokens
   and tok/s columns (section 5b).
 - **Sessions**: machine state on each session line; 👍/👎, corrections and declines on each turn; a project filter;
   all sessions listed (folded), not only the newest 40.
 - **Your corrections and declined edits**: per session, with the diff or reason.
 - **Crashes**: time, error, session.
 - **Models**: prompt-processing seconds and model reloads.
-- **What Mitra learned**: each rule with its effect since it was added (failures per turn before → after).
+- **What CodeMitra learned**: each rule with its effect since it was added (failures per turn before → after).
 
 ## 7. The dashboard link
-- Live: **`http://127.0.0.1:8765/`**, always the same, while `mitra dashboard` runs (Refresh button). If the port is
+- Live: **`http://127.0.0.1:8765/`**, always the same, while `codemitra dashboard` runs (Refresh button). If the port is
   taken it says so; `--port` picks another.
-- File: **`C:\Users\prash\.mitra\dashboard.html`**, always the same, rebuilt when a Mitra session ends.
-- Option (not decided): start `mitra dashboard` at Windows login (a scheduled task, a few MB of RAM).
+- File: **`C:\Users\prash\.codemitra\dashboard.html`**, always the same, rebuilt when a CodeMitra session ends.
+- Option (not decided): start `codemitra dashboard` at Windows login (a scheduled task, a few MB of RAM).
 
 ## 10. Breaking work down is the key differentiator (user, 2026-11-07)
 Evidence: the same 4B scored 71/72 on Level 01 with a good plan and tests, and looped on crashes free-form
@@ -108,7 +108,7 @@ Evidence: the same 4B scored 71/72 on Level 01 with a good plan and tests, and l
 Today: 2-4 partly work (`run_plan`, tests decide, fresh rounds). Missing: the planner (`/plan`, plan check) and
 re-planning, now first after item 0 and A1-A5 ([FIRST_TWO_WEEKS.md](FIRST_TWO_WEEKS.md)). Measured per kind of
 project: tasks passed first try, re-plans, needs help, plan edited by you before approval, and the planner
-experiment (hand-written plan vs Mitra's own plan on the same level).
+experiment (hand-written plan vs CodeMitra's own plan on the same level).
 
 ## 11. More users (brainstorm 2026-11-07): I-14, I-15 in SCOPE
 - A friend's sessions: export on his machine, import into your store under his name; explicit consent, incl. for
@@ -119,7 +119,7 @@ experiment (hand-written plan vs Mitra's own plan on the same level).
 ## 9. Does the model's reasoning improve with use? And training on usage (brainstorm 2026-11-07)
 **The model's own reasoning does not change with use**: Ollama runs fixed weights. What improves with use is
 everything around it, so its *effective* reasoning (model + what it is told) gets better:
-1. the harness (learned rules, tool texts, limits from `mitra improve`);
+1. the harness (learned rules, tool texts, limits from `codemitra improve`);
 2. memory (project facts, handoffs, lessons in the vault);
 3. when it thinks (adaptive thinking, E2);
 4. **experience recall (new idea, I-13):** for a task like one solved before (tests passed or 👍, not corrected),
@@ -127,17 +127,17 @@ everything around it, so its *effective* reasoning (model + what it is told) get
 5. a better base model when one comes out (model screen, one command to switch).
 
 **Training on usage data (M7, rules in SCOPE / D-022): yes, planned.**
-- Data: only verified turns (tests passed or 👍, no corrections, all Mitra, traced), with the thinking.
+- Data: only verified turns (tests passed or 👍, no corrections, all CodeMitra, traced), with the thinking.
 - Methods: fine-tune on its own verified trajectories (rejection-sampling fine-tuning / STaR style) + learning
   what to avoid from 👍/👎 (KTO, which needs no matched pairs) and before/after pairs (DPO, S3).
 - Then: GGUF into Ollama as a new model, model screen + playground hidden tests vs the base model; **kept only if
   it wins on held-out tasks**.
 - Limits: mostly teaches behaviour (tool choice, your style, fewer format mistakes); deep reasoning gains need far
   more data than a few hundred turns. The 4B fits a QLoRA run on the 8 GB GPU with sequences cut to ~4-8K tokens;
-  the 9B on long traces likely needs a rented GPU (to decide later; D-025 local-only is about running Mitra).
+  the 9B on long traces likely needs a rented GPU (to decide later; D-025 local-only is about running CodeMitra).
   Training on its own outputs can amplify mistakes, hence verified turns only and the held-out test. Check the
   Qwen licence before training (believed Apache 2.0).
-- What to do now: restart Mitra after updates, use it on tasks with tests, mark turns 👍/👎: every verified turn
+- What to do now: restart CodeMitra after updates, use it on tasks with tests, mark turns 👍/👎: every verified turn
   becomes a training example.
 
 ## 8. Answers (user, 2026-11-07)
@@ -146,7 +146,7 @@ everything around it, so its *effective* reasoning (model + what it is told) get
 | 1 | `/good` on an untested turn | **Usable for training**, marked `untested` in the export so a training run can leave such turns out or give them less weight |
 | 2 | Trends | **Day by day** |
 | 3 | Your corrections | **Store the diffs**: capped ~4K chars per file, secrets scrubbed, never for `.env`-like or binary files, local only (the diff is the "after" half of a before/after pair) |
-| 4 | Dashboard start | **Only when you run `mitra dashboard`** (no auto-start at login) |
+| 4 | Dashboard start | **Only when you run `codemitra dashboard`** (no auto-start at login) |
 | 5 | More trends | By **project**, **model**, **kind of task** (game / site / DB / app / other, from the project's files); two headline numbers: **first-try success** (tests pass, no correction from you) and **time to green** (first code edit to tests passing) |
 | 6 | Experience recall (I-13) | **Open, think it through**: how "similar" is judged, stale solutions, a wrong lesson repeated, token budget |
 | 7 | Training and domain reasoning | Corrected together: Research Desk MCP + the vault add **knowledge and context** (better in the domain from day one, no change to the model); training on verified usage changes **behaviour in the domain** (stack, conventions, tool choice, fewer repeat mistakes: a narrow reasoning gain); much harder tasks than the base model can do are not expected from a 4B/9B and a few hundred examples: they come from `/plan` breaking work into tested steps. Knowledge + behaviour + structure together; held-out domain tests show what each adds |
@@ -154,7 +154,7 @@ everything around it, so its *effective* reasoning (model + what it is told) get
 ## 9. Does the model's reasoning improve with use? And training on usage (brainstorm 2026-11-07)
 **The model's own reasoning does not change with use**: Ollama runs fixed weights. What improves with use is
 everything around it, so its *effective* reasoning (model + what it is told) gets better:
-1. the harness (learned rules, tool texts, limits from `mitra improve`);
+1. the harness (learned rules, tool texts, limits from `codemitra improve`);
 2. memory (project facts, handoffs, lessons in the vault);
 3. when it thinks (adaptive thinking, E2);
 4. **experience recall (new idea, I-13):** for a task like one solved before (tests passed or 👍, not corrected),
@@ -162,17 +162,17 @@ everything around it, so its *effective* reasoning (model + what it is told) get
 5. a better base model when one comes out (model screen, one command to switch).
 
 **Training on usage data (M7, rules in SCOPE / D-022): yes, planned.**
-- Data: only verified turns (tests passed or 👍, no corrections, all Mitra, traced), with the thinking.
+- Data: only verified turns (tests passed or 👍, no corrections, all CodeMitra, traced), with the thinking.
 - Methods: fine-tune on its own verified trajectories (rejection-sampling fine-tuning / STaR style) + learning
   what to avoid from 👍/👎 (KTO, which needs no matched pairs) and before/after pairs (DPO, S3).
 - Then: GGUF into Ollama as a new model, model screen + playground hidden tests vs the base model; **kept only if
   it wins on held-out tasks**.
 - Limits: mostly teaches behaviour (tool choice, your style, fewer format mistakes); deep reasoning gains need far
   more data than a few hundred turns. The 4B fits a QLoRA run on the 8 GB GPU with sequences cut to ~4-8K tokens;
-  the 9B on long traces likely needs a rented GPU (to decide later; D-025 local-only is about running Mitra).
+  the 9B on long traces likely needs a rented GPU (to decide later; D-025 local-only is about running CodeMitra).
   Training on its own outputs can amplify mistakes, hence verified turns only and the held-out test. Check the
   Qwen licence before training (believed Apache 2.0).
-- What to do now: restart Mitra after updates, use it on tasks with tests, mark turns 👍/👎: every verified turn
+- What to do now: restart CodeMitra after updates, use it on tasks with tests, mark turns 👍/👎: every verified turn
   becomes a training example.
 
 ## 8. Open questions (for the brainstorm)
@@ -180,7 +180,7 @@ everything around it, so its *effective* reasoning (model + what it is told) get
 2. Trends by day, by week, or both?
 3. Your corrections are stored as diffs of your code (scrubbed of secrets, local only). OK, or only "file X was
    changed, N lines"?
-4. Auto-start `mitra dashboard` at login: yes / no?
+4. Auto-start `codemitra dashboard` at login: yes / no?
 5. Anything else you want to see trending (e.g. per project, per kind of task: game / site / DB / app)?
 6. Experience recall (I-13): worth planning, and before or after the vault?
 7. Training: 4B locally first, and is a rented GPU for the 9B acceptable later?
@@ -192,7 +192,7 @@ by itself:
 
 - **Recorded today:** every turn (kind, path, machine, notes version, time to first word), quiet signals (rephrase,
   interrupt, `/undo`, `/copy`), `/good` `/bad`, your edits after a turn, threads.
-- **`mitra improve` exists but is manual and coding-only:** a local model proposes one harness change for the top
+- **`codemitra improve` exists but is manual and coding-only:** a local model proposes one harness change for the top
   *coding* pattern in the records (tool errors, repeats); the benchmark's tune half (coding tasks) decides. It cannot
   see or prove a conversation fix. The harness is still v0 with no learned rules.
 - **Of the 6 misses left after the A/B,** about 4 are rule-type (small talk mentions the project folder; the memory
@@ -200,16 +200,16 @@ by itself:
   look first) and a learned rule could fix them; 2 are mostly model accuracy (a date in a summary, a missing detail).
 
 What is missing for "it improves as we use it" (Phase B in BUILD_ORDER):
-1. **The judge is `mitra score`** (behaviour, writing, explain, ideas, coding), not only the coding benchmark.
+1. **The judge is `codemitra score`** (behaviour, writing, explain, ideas, coding), not only the coding benchmark.
 2. **The proposer reads conversation signals** (rephrases, `/bad`, interrupts) and the score's failed cases.
 3. **It runs on a schedule** (nightly or every few sessions), keeps only changes that hold or raise the score, and
    shows you what changed, with an undo.
 
 Next choice for the user: fix the 4 rule-type misses directly (fast, proven by the score), or first wire
-`mitra improve` to `mitra score` + conversation signals so such misses get proposed and tested automatically.
+`codemitra improve` to `codemitra score` + conversation signals so such misses get proposed and tested automatically.
 
 **User chose both (2026-11-11).** The 4 misses were fixed by hand (E-101). Points 1 and 2 above are built as
-`mitra improve --chat` (D-073): the judge is the quick score's model categories, the proposer reads the score's
+`codemitra improve --chat` (D-073): the judge is the quick score's model categories, the proposer reads the score's
 failed cases and your signals, one rule per round, kept only with +2 cases and no category lower. Point 3 (a
 schedule) is open: it needs your choice of when, since a round holds the GPU for ~20 minutes. The real chat records
 are thin so far (25 run files, 3 `/bad`, no rephrase signals): until they grow, the score's failures carry most of
@@ -217,12 +217,12 @@ the evidence. `/bad <why>` after a wrong answer is the most useful signal you ca
 
 ## 13. The two layers (D-075, 2026-11-11)
 
-| | Layer 1: Mitra by itself | Layer 2: the coach (Claude) |
+| | Layer 1: CodeMitra by itself | Layer 2: the coach (Claude) |
 |---|---|---|
-| Runs | at exit, in the background, when 3+ new signals or a queued rule wait | `mitra coach`, when the header reminds you (7 days / 40 turns) |
+| Runs | at exit, in the background, when 3+ new signals or a queued rule wait | `codemitra coach`, when the header reminds you (7 days / 40 turns) |
 | Sees | your signals + the score's failed cases | every recorded turn, flagged ones first |
 | Changes | one rule per round, kept only if the score rises (+2, no category lower) | writes a report; its rules go to layer 1's queue; code fixes go to a Claude Code session |
-| Where | ~/.mitra/harness (attempts, queue, auto logs) | ~/.mitra/coach (reports, digests) |
+| Where | ~/.codemitra/harness (attempts, queue, auto logs) | ~/.codemitra/coach (reports, digests) |
 
 You no longer copy conversations into Claude Code: the records hold them. Still paste what the screen looked like
 (layout problems are not in the records).

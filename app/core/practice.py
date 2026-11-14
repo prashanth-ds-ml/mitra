@@ -189,7 +189,7 @@ def evalplus_test(row: dict) -> tuple[str, str]:
     """(hidden test code, call) for an EvalPlus row: the reference solution (renamed) and CodeMitra's function run on the
     same inputs, results compared (a float tolerance; as sets when the task's own example compares sets)."""
     entry = row["entry_point"]
-    ref_src = re.sub(rf"\b{re.escape(entry)}\b", "_mitra_ref", reference(row))
+    ref_src = re.sub(rf"\b{re.escape(entry)}\b", "_codemitra_ref", reference(row))
     inputs = (row.get("base_input") or []) + (row.get("plus_input") or [])[:PLUS_INPUTS]
     as_set = bool(re.search(rf"set\(\s*{re.escape(entry)}\(", row.get("prompt", "") + row.get("assertion", "")))
     atol = float(row.get("atol") or 0)
@@ -206,7 +206,7 @@ def evalplus_test(row: dict) -> tuple[str, str]:
             "    return a == b\n"
             "def _check(fn):\n"
             "    for i, inp in enumerate(_INPUTS):\n"
-            "        want = _mitra_ref(*_copy.deepcopy(inp))\n"
+            "        want = _codemitra_ref(*_copy.deepcopy(inp))\n"
             "        got = fn(*_copy.deepcopy(inp))\n"
             "        ok = set(got) == set(want) if _AS_SET else _same(got, want)\n"
             "        assert ok, f'input {i}: got {got!r:.200}, want {want!r:.200}'\n")

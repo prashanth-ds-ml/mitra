@@ -1,7 +1,7 @@
 # Evals
 
 Method and every result, whatever it shows. Raw results live in `results/` and are rerun with one command
-(`mitra bench`, from M2). Each result section names the git commit, models, agent configs and machine state.
+(`codemitra bench`, from M2). Each result section names the git commit, models, agent configs and machine state.
 
 ## Method
 - **Benchmark v0 (2026-10-24):** `bench/base` is a small FastAPI shop (`shop/`) on a fake internal payments SDK
@@ -36,16 +36,16 @@ Method and every result, whatever it shows. Raw results live in `results/` and a
 - **Metrics:** pass rate, fixed prompt tokens, broken tool calls, turns, wall time; from M3: frontier tokens, ₹, GPU Wh
 - **Rules:** same tasks, same model, same context and timeout for every agent; runs repeated N times; failures kept
 
-## The measuring set (D-068 step 3, D-069): `mitra score`
+## The measuring set (D-068 step 3, D-069): `codemitra score`
 
 Every run appends a row to `results/scores.jsonl` (versions, model, machine, every case).
 
-| Date | Mitra | Model | Machine | Score | Failed |
+| Date | CodeMitra | Model | Machine | Score | Failed |
 |---|---|---|---|---|---|
 | 2026-11-11 01:03 | 0.5.1 | mimo-v2.6:9b | laptop | sorting 46/46 · writing 0/3 · explain 4/4 · ideas 1/2 | W1_team_mail: signature not exactly: Regards, / Prashanth; W2_leave_mail: signature not exactly: Regards, / Prashanth; W3_summary: missing: 1 February; I1_harder: 10 options (want 3-5) |
 | 2026-11-11 10:22 | 0.6.0 | mimo-v2.6:9b | laptop | writing 1/1 · explain 1/1 (only W1_team_mail, X4_wall: live check after the deep dive) | none |
 
-## One Mitra A/B (D-071, D-072): router vs one loop vs decide-then-act, mimo vs qwen3.5
+## One CodeMitra A/B (D-071, D-072): router vs one loop vs decide-then-act, mimo vs qwen3.5
 
 Laptop (RTX 5050 8 GB). Same quick set: behaviour 10 · writing 3 · explain 4 · ideas 2 (+ sorting, no model).
 
@@ -95,7 +95,7 @@ current code with the 1d line 7/12 passed, without it 5/12, and **the Phase 1 co
 this laptop; a regression check compares runs made under the same conditions only. Phase 3 starts with a fresh
 baseline (after a restart), never mixing morning and evening runs.
 
-## Coding practice (D-078 step 5, `mitra practice`)
+## Coding practice (D-078 step 5, `codemitra practice`)
 
 Laptop (RTX 5050 8 GB), qwen3.5:latest, phased, 128K. 20 tasks (the fixed first 20), Python from MBPP+/HumanEval+,
 SQL from Spider; hidden checks decide.
@@ -135,16 +135,16 @@ no task that passed before failed. Free RAM 6 GB at the start; 4.8 of 7.7 GB of 
 
 - **No regression:** totals inside the noise; each miss moves between runs; B2 also missed on the old code.
 - **B15 does not reproduce the bug**: a short snake chat gets acted on. The **replay of the real conversation**
-  (the PRD + Mitra's live answers + "ok start and go ahead", scratchpad replay script) with the old logic started work
+  (the PRD + CodeMitra's live answers + "ok start and go ahead", scratchpad replay script) with the old logic started work
   in **1 of 3** tries and wrote no files; the new logic skips the decide call for that yes (unit test). The new-logic
-  live replay was stopped when the user started Mitra; their live session is the check (USER_TESTS).
+  live replay was stopped when the user started CodeMitra; their live session is the check (USER_TESTS).
 - Records keep the user's message cut at 2,000 characters, so a replay sees a cut-off PRD (noted, not fixed).
 
 ## Results
 
-### 2026-11-06 · M1 · First `mitra improve` runs (self-improvement step 3, smoke test)
+### 2026-11-06 · M1 · First `codemitra improve` runs (self-improvement step 3, smoke test)
 - **Model:** builder qwen3.5:4b at 128K; proposer qwen3.5:4b (the 9B needs ~11 GB free RAM, 7.8 GB was free).
-- **Setup:** `mitra improve --proposer qwen3.5:4b --tasks T01 --max-steps 20`, scratch `MITRA_HOME` (the real
+- **Setup:** `codemitra improve --proposer qwen3.5:4b --tasks T01 --max-steps 20`, scratch `CODEMITRA_HOME` (the real
   harness untouched). Run records: the Level 01 run (6 tasks, 28 calls); top pattern `tool_error` 4x (reads of paths
   that did not exist yet).
 - **Proposal:** rule "Always verify file existence with list_files before attempting to read or edit it."
@@ -174,7 +174,7 @@ no task that passed before failed. Free RAM 6 GB at the start; 4.8 of 7.7 GB of 
 - **What it means:** three of five agents spend ~12K tokens, three times Ollama's 4K default context, before reading
   any code; at the default they would be silently cut (L-001). With clean configs the overhead is lower than the
   20-33K figures reported for setups with plugins and MCP servers, so README and SCOPE now quote our numbers. Prompt
-  size alone does not prove these agents fail on small models; the baselines (next) decide that. Mitra's target stays
+  size alone does not prove these agents fail on small models; the baselines (next) decide that. CodeMitra's target stays
   ~3K (post 2 is now "~12K to ~3K").
 
 ### 2026-10-26 · M0 · Model check on the two picks (D-015)
@@ -237,10 +237,10 @@ against 128K. Free RAM with the 9B loaded at 256K was about 1.1 GB, so other hea
 The 4B gains GPU share but still spills at 128K, so its speed barely moves. Chosen: 9B at 256K, 4B stays at 128K
 (user, 2026-11-07). Answer quality with the q8_0 cache is not measured yet; the next Level 01 run on each model checks it.
 
-### 2026-11-06 · M1 · First playground run: level 01 (snake), Mitra core loop
+### 2026-11-06 · M1 · First playground run: level 01 (snake), CodeMitra core loop
 
-`python scripts/run_level.py levels/01-snake --builder mitra --model qwen3.5:4b --max-steps 30` (mitra-playground),
-commit a5cf5c7 + 97041d3, qwen3.5:4b at 128K, thinking auto, plan run task by task (`mitra solve --plan`).
+`python scripts/run_level.py levels/01-snake --builder codemitra --model qwen3.5:4b --max-steps 30` (codemitra-playground),
+commit a5cf5c7 + 97041d3, qwen3.5:4b at 128K, thinking auto, plan run task by task (`codemitra solve --plan`).
 
 | Task | Model calls | Tool calls | Result |
 |---|---|---|---|
@@ -254,7 +254,7 @@ commit a5cf5c7 + 97041d3, qwen3.5:4b at 128K, thinking auto, plan run task by ta
 Total 428 s. Visible tests 17/17; visible + hidden 71/72: **not passed**. The miss:
 `test_food_never_lands_on_the_snake[0]`: in `step()` the model calls `place_food()` before inserting the new head,
 so the new food can be placed on the cell the head is moving into (1 of 40 seeds). No fresh rounds, rollbacks,
-text tool calls or model errors were needed. Result file: mitra-playground `results/01-snake/20261106-1950-*.json`.
+text tool calls or model errors were needed. Result file: codemitra-playground `results/01-snake/20261106-1950-*.json`.
 
 ## Result template
 

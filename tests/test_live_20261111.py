@@ -107,7 +107,7 @@ def test_a_workspace_in_the_temp_folder_is_never_mirrored_to_your_store(tmp_path
     assert store.mirror_path(project) is not None
 
 
-def test_your_mitra_toml_thinking_wins_over_the_role_table():
+def test_your_codemitra_toml_thinking_wins_over_the_role_table():
     """Review 2026-11-11: with every role set to on/off, `thinking = "on"` in codemitra.toml changed nothing."""
     from app.core import roles
 
@@ -138,7 +138,7 @@ def test_the_sweep_of_everyday_follow_ups_is_sorted_right():
     assert got == [(p, t, w) for p, t, w in SWEEP]
 
 
-def test_a_mitra_command_typed_in_the_chat_is_recognised():
+def test_a_codemitra_command_typed_in_the_chat_is_recognised():
     """Live 2026-11-11: the user typed `codemitra score` in the chat; it was explained as a question about the project."""
     from app.core.intent import terminal_command
 

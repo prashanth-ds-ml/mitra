@@ -38,7 +38,7 @@ def test_a_role_cannot_run_a_tool_outside_its_set(tmp_path):
     assert shown[0][1] is False and "not available to the reviewer role" in shown[0][2]
 
 
-def test_model_use_beats_local_model_in_mitra_toml():
+def test_model_use_beats_local_model_in_codemitra_toml():
     """E-054: `/model use X` saved the last model, but codemitra.toml local_model (and an older chat choice) won."""
     cfg = {"local_model": "qwen3.5:4b"}
     have = {"qwen3.5:4b", "deepseek-r1:8b", "mimo-v2.6:9b"}

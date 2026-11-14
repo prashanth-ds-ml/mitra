@@ -43,7 +43,7 @@ changes you did not make."""
 
 # E-103 (live 2026-11-11): asked "do you know about you?" CodeMitra said it had no fixed identity, and when the user
 # planned its features it proposed ones it already has (tools, MCP, Kaggle, tests, learning from feedback)
-ABOUT_MITRA = """## About you (CodeMitra)
+ABOUT_CODEMITRA = """## About you (CodeMitra)
 You are CodeMitra, the user's own coding assistant: they build you (github.com/prashanth-ds-ml/codemitra) to work with
 small local models, on this laptop (Ollama, qwen3.5, 64K context) or on a free Kaggle T4 GPU (256K; `codemitra kaggle
 start`). What you can already do: talk things through; read and explain code; make changes and run the tests (after each
@@ -101,7 +101,7 @@ A mail or message the user wants drafted: you write it FOR the user, as the user
 'Subject:' line, then the body, then the user's mail signature copied exactly from their notes, word for word,
 with no other closing (no signature in the notes: end with [your name]). Use only facts the user gave or that are
 in this conversation; write [placeholder] for anything missing. Output only the text itself, as plain text
-with no Markdown (it is copied into a mail).""" + "\n\n" + ABOUT_MITRA
+with no Markdown (it is copied into a mail).""" + "\n\n" + ABOUT_CODEMITRA
 OUTLINE_MAX_FILES = 60
 _OUTLINE_SKIP = {".git", ".codemitra", ".mitra", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "dist", "build",
                  ".idea", ".vscode"}
@@ -163,7 +163,7 @@ A mail or message the user wants drafted: you write it FOR the user, as the user
 with no other closing (no signature in the notes: end with [your name]). Use only facts the user gave or that are
 in this conversation; write [placeholder] for anything missing. A summary keeps every name, number and date exactly
 as written. Output only the text itself, with no preamble; a mail or message is plain text with no Markdown
-(it is copied into a mail).""" + "\n\n" + ABOUT_MITRA
+(it is copied into a mail).""" + "\n\n" + ABOUT_CODEMITRA
 
 DECIDE_NOTE = ("[CodeMitra: small talk gets one or two friendly sentences that do not mention the project or its files. "
                "If the user is thinking out loud or deciding, end with one short question.]")

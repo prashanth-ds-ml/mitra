@@ -16,8 +16,8 @@ FAKE_SERVER = pathlib.Path(__file__).resolve().parent / "fixtures" / "fake_mcp_s
 def isolated(tmp_path, monkeypatch):
     """Own ~/.codemitra per test; no built-in servers unless a test asks for them."""
     monkeypatch.setenv("CODEMITRA_HOME", str(tmp_path / "home"))
-    monkeypatch.setenv("MITRA_MCP_NO_DEFAULTS", "1")
-    monkeypatch.setenv("MITRA_CLAUDE_CONFIG", str(tmp_path / "claude.json"))
+    monkeypatch.setenv("CODEMITRA_MCP_NO_DEFAULTS", "1")
+    monkeypatch.setenv("CODEMITRA_CLAUDE_CONFIG", str(tmp_path / "claude.json"))
     yield
     mcp.manager().close_all()
 
@@ -43,7 +43,7 @@ def fake_entry(**extra):
 # ── config ──────────────────────────────────────────────────────────────────
 
 def test_defaults_include_the_day_one_servers(monkeypatch, workspace):
-    monkeypatch.delenv("MITRA_MCP_NO_DEFAULTS")
+    monkeypatch.delenv("CODEMITRA_MCP_NO_DEFAULTS")
     specs = {s.name: s for s in mcp.discover(workspace)}
 
     for name in ("git", "github", "context7", "semgrep"):
@@ -54,7 +54,7 @@ def test_defaults_include_the_day_one_servers(monkeypatch, workspace):
 
 
 def test_user_file_overrides_a_default_per_key(monkeypatch, workspace):
-    monkeypatch.delenv("MITRA_MCP_NO_DEFAULTS")
+    monkeypatch.delenv("CODEMITRA_MCP_NO_DEFAULTS")
     write_user_servers({"github": {"env_commands": {"GITHUB_TOKEN": "gh auth token -u someone"}}})
 
     github = mcp.find(mcp.discover(workspace), "github")

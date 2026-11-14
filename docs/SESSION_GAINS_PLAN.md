@@ -19,7 +19,7 @@ parse it. The retry note helps after the fact; this avoids it.
 **Change**
 - New tool `append_file(path, content)`: adds `content` to the end of a file written or read this turn. Same rules
   as `write_file`: inside the workspace, journalled for `/undo`, approval in ask mode (the card shows only the
-  added lines; "yes to all" covers the rest of the turn). In the chat and in `mitra solve`.
+  added lines; "yes to all" covers the rest of the turn). In the chat and in `codemitra solve`.
 - One prompt line: "Write a file longer than ~150 lines in parts: write_file with the first part, then
   append_file for the rest."
 - The E-044 retry note says "use append_file" instead of the edit_file trick.
@@ -56,9 +56,9 @@ and is not recorded anywhere.
   same run record, so it reaches the store and survives with it. Repeating changes the verdict (the last one counts).
 - Effects:
   - Training data: `/bad` turns are always out ("you marked it bad"); `/good` turns are usable even without tests
-    (a good answer or explanation is worth learning from), still only if all Mitra and traced.
+    (a good answer or explanation is worth learning from), still only if all CodeMitra and traced.
   - Dashboard: 👍/👎 and the note on each turn; per harness version a good/bad count; a `marked_bad` pattern
-    with your notes as examples, so `mitra improve` sees them.
+    with your notes as examples, so `codemitra improve` sees them.
 - `/help` lists both; nothing is asked after a turn (no nagging).
 - Your feedback row is yours (author `user`) but does not count as "written by someone else" for the turn.
 
@@ -84,7 +84,7 @@ and is not recorded anywhere.
 
 **Done when**
 - Unit tests: the policy gives on/off as listed for each case; the flag reaches the model call; `/think` switches it.
-- **Benchmark (the real test):** Level 01 (mitra-playground) with the 9B, `thinking = on` vs `adaptive`: pass rate
+- **Benchmark (the real test):** Level 01 (codemitra-playground) with the 9B, `thinking = on` vs `adaptive`: pass rate
   (hidden tests), build time, tokens. Kept as the default only if the pass rate is not lower. Same for the 4B.
   Recorded in EVALS, whatever it shows. Needs free RAM (close heavy apps; the start check says how much).
 

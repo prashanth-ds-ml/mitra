@@ -1,4 +1,4 @@
-# Progress log: how Mitra was built
+# Progress log: how CodeMitra was built
 
 The detailed record behind the [case study](CASE_STUDY.md): one row per working session or milestone, in order.
 Numbers link to [EVALS.md](EVALS.md); bugs to [ERROR_LOG.md](ERROR_LOG.md); fixes to [FIX_LOG.md](FIX_LOG.md);
@@ -22,7 +22,7 @@ decisions to [DECISIONS.md](DECISIONS.md).
 
 Filled from EVALS.md at each milestone.
 
-| Metric | Stock agents (best) | Mitra v0.1 | v0.2 | v0.3 |
+| Metric | Stock agents (best) | CodeMitra v0.1 | v0.2 | v0.3 |
 |---|---|---|---|---|
 | Pass rate, qwen 4B | - | - | - | - |
 | Pass rate, qwen 9B | - | - | - | - |
@@ -31,5 +31,5 @@ Filled from EVALS.md at each milestone.
 | % solved locally (with escalation) | n/a | n/a | n/a | - |
 | Frontier ₹ per task | - | - | - | - |
 | GPU Wh per solved task | - | - | - | - |
-| 2026-11-10 | v0.1.0 preview | Colleague preview prepared: deep-dive review fixes (E-050..E-066), `/free`, Kaggle GPU (`mitra kaggle start|stop|status`, first live start worked: mimo 256K fully on GPU, 37.6 tok/s), README rewritten for first-time users, feedback + bug issue forms, dependencies pinned, fresh-clone install checked in isolated dirs (9 s, `mitra 0.1.0`), secret scan of files and history clean | v0.1.0 (tag + push waiting for the user's go) |
-| 2026-11-11 | D-068 steps 1-3b | v0.4.0-v0.7.0 in two days: everyday chat (mail, general), the explainer, `mitra score` (sorting, behaviour, writing, explain, ideas, small, medium; validated set), two deep dives (13 + 4 fixes, E-076..E-100), status line + working footer, conversation memory (threads), output cap + runaway guard. Root-level redesign: the word-rule router replaced by One Mitra, phased (decide with only look / change / plan, then act). Model: qwen3.5:latest replaces mimo-v2.6 (mimo turned conversation into builds; plain-chat probe + A/B). A/B (qwen, 64K): phased 13/19 in 8.3 min, router 12/19, one 11/19; mimo best 11/19 in 25 min. 882 tests | v0.7.0 (1e811cc), pushed |
+| 2026-11-10 | v0.1.0 preview | Colleague preview prepared: deep-dive review fixes (E-050..E-066), `/free`, Kaggle GPU (`codemitra kaggle start|stop|status`, first live start worked: mimo 256K fully on GPU, 37.6 tok/s), README rewritten for first-time users, feedback + bug issue forms, dependencies pinned, fresh-clone install checked in isolated dirs (9 s, `mitra 0.1.0`), secret scan of files and history clean | v0.1.0 (tag + push waiting for the user's go) |
+| 2026-11-11 | D-068 steps 1-3b | v0.4.0-v0.7.0 in two days: everyday chat (mail, general), the explainer, `codemitra score` (sorting, behaviour, writing, explain, ideas, small, medium; validated set), two deep dives (13 + 4 fixes, E-076..E-100), status line + working footer, conversation memory (threads), output cap + runaway guard. Root-level redesign: the word-rule router replaced by One CodeMitra, phased (decide with only look / change / plan, then act). Model: qwen3.5:latest replaces mimo-v2.6 (mimo turned conversation into builds; plain-chat probe + A/B). A/B (qwen, 64K): phased 13/19 in 8.3 min, router 12/19, one 11/19; mimo best 11/19 in 25 min. 882 tests | v0.7.0 (1e811cc), pushed |

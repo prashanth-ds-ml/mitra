@@ -9,7 +9,7 @@ from tests.test_phased import _msgs
 from tests.test_trust_d077 import Spy
 
 
-def test_questions_about_mitra_and_outside_tech_are_not_answered_from_the_files():
+def test_questions_about_codemitra_and_outside_tech_are_not_answered_from_the_files():
     for prompt in (C.PHASED_PROMPT, C.ONE_PROMPT):
         assert C.SELF_AND_TECH in prompt
     assert "answer yourself from \"About you\"" in C.SELF_AND_TECH

@@ -47,7 +47,7 @@ def fake_quota(monkeypatch):
     return q
 
 
-def test_start_pushes_a_private_gpu_notebook_and_switches_mitra_when_ready(monkeypatch, fake_quota):
+def test_start_pushes_a_private_gpu_notebook_and_switches_codemitra_when_ready(monkeypatch, fake_quota):
     api = FakeApi(["MITRA|started|model=mimo-v2.6:9b|context=262144", "MITRA|installing",
                    "MITRA|loaded|model=mimo-v2.6:9b|gb=14.5|context=262144|where=fully on GPU",
                    "MITRA|ready|url=https://a-b.trycloudflare.com|model=mimo-v2.6:9b"])

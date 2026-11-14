@@ -1,4 +1,4 @@
-# Case study: Mitra
+# Case study: CodeMitra
 
 One page for outside readers (recruiters, clients, engineers). Written at M4 (v1.0); updated only when results change
 materially. Details live in [PROGRESS_LOG.md](PROGRESS_LOG.md) and [EVALS.md](EVALS.md).

@@ -28,12 +28,12 @@ def test_a_web_tool_named_in_the_decide_step_picks_the_look_up_phase(tmp_path):
     assert set(m.offered[1]) == {"web_search", "fetch_url"}
 
 
-def test_mitra_knows_what_it_already_can_do():
+def test_codemitra_knows_what_it_already_can_do():
     """E-103: "do you know about you?" -> "no fixed identity"; it proposed features it already has."""
     for prompt in (C.PHASED_PROMPT, C.ONE_PROMPT):
-        assert C.ABOUT_MITRA in prompt
+        assert C.ABOUT_CODEMITRA in prompt
     for fact in ("Kaggle", "run the tests", "MCP servers", "skills", "codemitra improve", "say which ones you already have"):
-        assert fact in C.ABOUT_MITRA
+        assert fact in C.ABOUT_CODEMITRA
 
 
 def test_being_corrected_for_not_following_is_a_signal():

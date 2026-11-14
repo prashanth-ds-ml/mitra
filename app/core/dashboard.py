@@ -13,12 +13,12 @@ from pathlib import Path
 from app.core import analyze as A
 from app.core import harness as H
 
-MITRA_ROOT = Path(__file__).resolve().parents[2]
+CODEMITRA_ROOT = Path(__file__).resolve().parents[2]
 
 
 def default_roots() -> list[Path]:
     """Where to look for records: the current folder and the folder holding the CodeMitra repo (playground lives there)."""
-    cwd, home = Path.cwd().resolve(), MITRA_ROOT.parent
+    cwd, home = Path.cwd().resolve(), CODEMITRA_ROOT.parent
     if cwd == home or home in cwd.parents:
         return [home]
     return [home, cwd]

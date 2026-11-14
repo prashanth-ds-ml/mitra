@@ -1,10 +1,10 @@
-# M2 plan: terminal assistant (`mitra`)
+# M2 plan: terminal assistant (`codemitra`)
 
 **Written:** 2026-11-05 · **Starts:** after M1 (the core loop) and on the user's go · Checklist items are in
 [PLAN.md](PLAN.md#m2-terminal-assistant-mitra); this page is the design behind them.
 
 ## Goal
-Run `mitra` in any project folder and work with it in plain words, on local models only: it explains code, finds it,
+Run `codemitra` in any project folder and work with it in plain words, on local models only: it explains code, finds it,
 edits it with a diff you approve, runs tests and commands, fixes failures, and connects to MCP servers. It must stay
 usable on qwen3.5:4b, so the fixed prompt stays under ~3K tokens and everything else loads on demand.
 
@@ -49,8 +49,8 @@ across projects, notifications.
   reported.
 
 ### Config
-- Standard `mcpServers` JSON (same shape as Claude Code, Cursor and server READMEs) in `.mitra/mcp.json` (project) and
-  `~/.mitra/mcp.json` (user). `/mcp import` reads an existing Claude Code config.
+- Standard `mcpServers` JSON (same shape as Claude Code, Cursor and server READMEs) in `.codemitra/mcp.json` (project) and
+  `~/.codemitra/mcp.json` (user). `/mcp import` reads an existing Claude Code config.
 - Secrets come from env vars or a profile name (e.g. `AWS_PROFILE`), never written into the prompt, logs or training data.
 - Per server: `enabled`, `timeout_s`, `allow` (tools on), `ask` (tools that need approval), and a short description per
   tool written by us (one line, plain words) instead of the server's long text.
@@ -107,7 +107,7 @@ Target: the M2 app is well under half of today's code, and every kept part has t
 11. Release v0.2 + post
 
 ## Done when
-- I can run `mitra` in Research Desk or the playground and finish small tasks without leaving the terminal.
+- I can run `codemitra` in Research Desk or the playground and finish small tasks without leaving the terminal.
 - Fixed prompt under ~3K tokens (CI), every command and MCP call logged with a timeout.
 - `/mcp test` passes for Git, Context7 and AWS Documentation on Windows.
 - A week of real use is logged, with problems and fixes recorded.

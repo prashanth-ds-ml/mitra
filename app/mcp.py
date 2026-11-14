@@ -128,7 +128,7 @@ def _cache_path() -> pathlib.Path:
 
 
 def claude_config_paths(workspace: str | os.PathLike) -> list[pathlib.Path]:
-    override = os.environ.get("MITRA_CLAUDE_CONFIG")
+    override = os.environ.get("CODEMITRA_CLAUDE_CONFIG")
     user_file = pathlib.Path(override) if override else pathlib.Path.home() / ".claude.json"
     return [user_file, pathlib.Path(workspace) / ".mcp.json"]
 
@@ -259,7 +259,7 @@ def trust_project(workspace: str | os.PathLike) -> None:
 def discover(workspace: str | os.PathLike | None = None) -> list[ServerSpec]:
     """All configured servers: defaults, then the user file, then the project file (merged per server)."""
     merged: dict[str, tuple[dict[str, Any], str]] = {}
-    if not os.environ.get("MITRA_MCP_NO_DEFAULTS"):
+    if not os.environ.get("CODEMITRA_MCP_NO_DEFAULTS"):
         for name, entry in DEFAULT_SERVERS.items():
             merged[name] = (dict(entry), "default")
     for name, entry in _read_servers_file(user_config_path()).items():

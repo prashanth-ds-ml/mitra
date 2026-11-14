@@ -30,7 +30,7 @@ def test_the_template_has_the_runnable_shape():
     assert n == 2 and why == ""  # placeholders aside, the template itself parses as a runnable plan
 
 
-def test_writing_a_plan_tells_mitra_whether_it_runs(tmp_path):
+def test_writing_a_plan_tells_codemitra_whether_it_runs(tmp_path):
     ws = T.Workspace(tmp_path, read_only=())
     bad = T.write_file(ws, "plan.md", "# Plan\n## Task 1\nDone when: it works\n")
     assert "not runnable with /run yet" in bad and "### T1" in bad

@@ -160,7 +160,7 @@ def test_load_exposes_default_plugin_dirs(tmp_path):
     assert cfg["plugin_dirs"] == ["plugins", ".codemitra/plugins"]
 
 
-def test_mcp_servers_are_not_in_mitra_toml_config(tmp_path):
+def test_mcp_servers_are_not_in_codemitra_toml_config(tmp_path):
     cfg = config.load(cwd=str(tmp_path))
 
     assert "mcp_servers" not in cfg  # MCP lives in .codemitra/mcp.json now (D-028)

@@ -162,14 +162,14 @@ def reminder(files: list[Path], now: float | None = None) -> str:
 
 # ── the digest ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-def _turn_text(t: dict, you_chars: int, mitra_chars: int) -> str:
+def _turn_text(t: dict, you_chars: int, codemitra_chars: int) -> str:
     when = time.strftime("%m-%d %H:%M", time.localtime(t["t"]))
     head = f"[{when} · {t['project']} · {t['phase'] or t['path'] or '-'} · {t['backend'] or '-'} · {t['seconds']:.0f}s"
     if t["tools"]:
         head += " · tools: " + ", ".join(dict.fromkeys(t["tools"]))
     head += "]"
     lines = [head, f"YOU: {' '.join(t['you'].split())[:you_chars]}",
-             f"MITRA: {' '.join(t['mitra'].split())[:mitra_chars]}"]
+             f"CODEMITRA: {' '.join(t['mitra'].split())[:codemitra_chars]}"]
     if t["flags"]:
         lines.append("FLAGS: " + "; ".join(t["flags"]))
     return "\n".join(lines)

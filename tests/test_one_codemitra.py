@@ -59,7 +59,7 @@ def test_context_notes_keeps_what_you_wrote_not_the_topic_list():
     assert memory.context_notes("## Notes\n<!-- Add anything -->\n") is None and memory.context_notes(None) is None
 
 
-def test_the_score_runs_one_mitra_through_converse(tmp_path):
+def test_the_score_runs_one_codemitra_through_converse(tmp_path):
     from app.core import store
     m = Model(AIMessage(content="Hi Prashanth! What are we working on today?"))
     r = S.Runner(llm=m, harness=C.H.Harness(), num_ctx=8192, records=store.root() / "score-runs" / "one",
@@ -70,7 +70,7 @@ def test_the_score_runs_one_mitra_through_converse(tmp_path):
     assert r.system().content.startswith("You are CodeMitra, the user's thinking partner")
 
 
-def test_one_mitra_in_the_real_chat_loop(harness, capsys):  # noqa: F811
+def test_one_codemitra_in_the_real_chat_loop(harness, capsys):  # noqa: F811
     state, ws = harness
     (ws / "codemitra.toml").write_text('architecture = "one"\n', encoding="utf-8")
     Inputs.script = ["hi mitra", "build a score system for the game with a high score file and a menu",

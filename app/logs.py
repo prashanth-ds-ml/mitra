@@ -14,7 +14,7 @@ def setup_logging(workspace: str | None = None) -> logging.Logger:
     log_path = log_dir / "codemitra.log"
 
     logger = logging.getLogger(_LOGGER_NAME)
-    configured_path = getattr(logger, "_mitra_log_path", None)
+    configured_path = getattr(logger, "_codemitra_log_path", None)
     if configured_path == str(log_path):
         return logger
 
@@ -26,5 +26,5 @@ def setup_logging(workspace: str | None = None) -> logging.Logger:
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     logger.addHandler(handler)
 
-    logger._mitra_log_path = str(log_path)  # type: ignore[attr-defined]
+    logger._codemitra_log_path = str(log_path)  # type: ignore[attr-defined]
     return logger

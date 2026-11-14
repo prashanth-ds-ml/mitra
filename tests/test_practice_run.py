@@ -89,7 +89,7 @@ def test_the_phase_names_are_never_named_to_the_user():
     assert "never name them to the user" in C.PHASED_PROMPT
 
 
-def test_mitra_practice_typed_in_the_chat_gets_the_terminal_hint():
+def test_codemitra_practice_typed_in_the_chat_gets_the_terminal_hint():
     assert intent.terminal_command("codemitra practice")
     assert intent.terminal_command("codemitra practice --download")
 

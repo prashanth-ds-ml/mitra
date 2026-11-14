@@ -7,7 +7,7 @@ from rich.text import Text
 # Ensure project root is importable
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from misc.ascii import generate_mitra_banner_art, generate_title_art
+from misc.ascii import generate_codemitra_banner_art, generate_title_art
 
 
 class TestGenerateTitleArt:
@@ -25,13 +25,13 @@ class TestGenerateTitleArt:
         assert len(art.plain.splitlines()) == 8
 
 
-class TestGenerateMitraBannerArt:
+class TestGenerateCodeMitraBannerArt:
     def test_returns_rich_text(self):
-        art = generate_mitra_banner_art()
+        art = generate_codemitra_banner_art()
         assert isinstance(art, Text)
 
-    def test_contains_mitra_wordmark(self):
-        art = generate_mitra_banner_art()
+    def test_contains_codemitra_wordmark(self):
+        art = generate_codemitra_banner_art()
         rendered = art.plain
         assert "______" in rendered
         assert "▓▓▓▓▓▓" in rendered

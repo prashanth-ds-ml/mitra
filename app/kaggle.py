@@ -46,7 +46,7 @@ class KaggleError(Exception):
 
 def _home() -> Path:
     from app import config
-    return config._mitra_home()
+    return config._codemitra_home()
 
 
 def _state_file() -> Path:

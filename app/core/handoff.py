@@ -65,9 +65,9 @@ def transcript(messages: list, limit_chars: int = 12_000) -> str:
         elif kind == "AIMessage":
             calls = [c.get("name", "?") for c in (getattr(m, "tool_calls", None) or [])]
             if text.strip():
-                lines.append(f"MITRA: {text[:1500]}")
+                lines.append(f"CODEMITRA: {text[:1500]}")
             if calls:
-                lines.append(f"MITRA used: {', '.join(calls)}")
+                lines.append(f"CODEMITRA used: {', '.join(calls)}")
         elif kind == "ToolMessage":
             lines.append(f"RESULT: {text[:300]}")
     out = "\n".join(lines)

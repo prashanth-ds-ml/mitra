@@ -201,7 +201,7 @@ def status_text(kind: str, model: str, num_ctx: int, h: HealthState) -> tuple[st
 
 def _prefs_file() -> Path:
     from app import config
-    return config._mitra_home() / "backend.json"
+    return config._codemitra_home() / "backend.json"
 
 
 def prefs() -> dict:

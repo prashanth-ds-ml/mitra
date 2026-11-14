@@ -1,48 +1,48 @@
-# Scope: Mitra
+# Scope: CodeMitra
 
 **v2 agreed:** 2026-11-05 (goal reframed, D-017) · **v1:** 2026-10-24, kept in [archive/SCOPE-v1-2026-10-24.md](archive/SCOPE-v1-2026-10-24.md) ·
 **Starting code:** [prashanth-ds-ml/local-codex](https://github.com/prashanth-ds-ml/local-codex)
 
 ## The goal
 A proper coding assistant for my own projects that runs on my local models: I chat with it in the terminal and it reads,
-edits and tests code (like Claude Code, but built for small models). Mitra's thinking, planning and building all run on
+edits and tests code (like Claude Code, but built for small models). CodeMitra's thinking, planning and building all run on
 local models (D-025); for bigger features it writes its own plan and builds it unattended on my GPU while I do other
-work. Claude Code is only the fallback when Mitra is stuck. The aim is to build more and more complex features locally
-and spend far fewer Claude subscription tokens. Practice and test projects live in a separate repo, `mitra-playground`
+work. Claude Code is only the fallback when CodeMitra is stuck. The aim is to build more and more complex features locally
+and spend far fewer Claude subscription tokens. Practice and test projects live in a separate repo, `codemitra-playground`
 (D-027).
-Later, Mitra's own work becomes the data for a personal coding model fine-tuned to what I build.
+Later, CodeMitra's own work becomes the data for a personal coding model fine-tuned to what I build.
 
 ## Why a new agent
 Today's coding agents (Claude Code, Codex, OpenCode, Aider, Deep Agents) connect to Ollama, but they are built for
 frontier models: a large fixed prompt (measured 2026-10-26 with clean configs: 2.7K-12.2K tokens; reports with user
 plugins and MCP servers cite 20-33K), many tools, strict tool-call formats and no retry on a malformed call. On a small
-model on a laptop GPU they break. Small models also struggle to design a complex system, so Mitra plans in small tested
+model on a laptop GPU they break. Small models also struggle to design a complex system, so CodeMitra plans in small tested
 steps, uses the 9B with thinking on for planning, and climbs a difficulty ladder of practice projects to find (and push)
 its limit.
 
 ## The questions
 1. Given a feature split into small tested tasks, how many does a local model finish unattended?
-2. How far up the playground ladder (snake game -> portfolio site -> API + database -> AI app -> full system) can Mitra
+2. How far up the playground ladder (snake game -> portfolio site -> API + database -> AI app -> full system) can CodeMitra
    go with local models only, and what share of my real tasks can I hand it?
-3. Does Mitra get better with use (lessons, Harness² tuning, later a fine-tune)?
+3. Does CodeMitra get better with use (lessons, Harness² tuning, later a fine-tune)?
 
 The answers are published either way.
 
 ## How it works
-**Everyday work:** run `mitra` in a project and ask in plain words ("add a test for X", "why does Y fail?"). It finds
+**Everyday work:** run `codemitra` in a project and ask in plain words ("add a test for X", "why does Y fail?"). It finds
 the code, shows each diff, asks before edits and commands, and runs the tests.
 
 **Bigger features:**
-1. **Plan (Mitra, local 9B with thinking).** I describe a feature. Mitra writes a plan: design, then small tasks, each with the files,
+1. **Plan (CodeMitra, local 9B with thinking).** I describe a feature. CodeMitra writes a plan: design, then small tasks, each with the files,
    the expected behaviour and the test that proves it is done.
-2. **Build (Mitra, unattended).** Mitra works through the tasks on a feature branch, one commit per task. It uses its own
+2. **Build (CodeMitra, unattended).** CodeMitra works through the tasks on a feature branch, one commit per task. It uses its own
    tools plus MCP tools (Serena for code navigation, Context7 for library docs). A task is done only when its test passes.
 3. **Stuck → needs help.** A task that keeps failing gets a short brief (failing output, `file:line`, what was tried) and
-   Mitra moves on.
+   CodeMitra moves on.
 4. **Report.** When I come back: done, failed, diffs, time.
-5. **Review (me; Claude Code only as fallback).** I check the diffs; stuck tasks I split for Mitra or hand to
+5. **Review (me; Claude Code only as fallback).** I check the diffs; stuck tasks I split for CodeMitra or hand to
    Claude Code.
-6. **Lessons.** Review comments and failure analysis become lessons in Mitra's skills file, kept only if they make more tuning tasks pass.
+6. **Lessons.** Review comments and failure analysis become lessons in CodeMitra's skills file, kept only if they make more tuning tasks pass.
 7. **Data.** Every run is saved with who wrote each part, for the fine-tune later.
 
 ## In scope
@@ -50,29 +50,29 @@ the code, shows each diff, asks before edits and commands, and runs the tests.
 |---|---|
 | Benchmark | Single tasks (planted bugs, small features) on the demo service + a public-benchmark slice, and **feature tasks** (a plan + tests) from the demo service and my own projects; visible and hidden tests; tuning and held-out halves |
 | Baselines | Stock agents on the same model, context and machine (M0) |
-| `mitra solve` | One task: prompt + tools under ~3K tokens, 5 built-in tools, tolerant tool-call parsing, fresh rounds, rollback |
-| Terminal assistant | `mitra`: chat in the terminal, diffs shown and approved, slash commands, resumable sessions; reuses local-codex's terminal app (D-023) |
-| Plan + runner | Plan format Mitra writes (`/plan`, local); `mitra run` works through it unattended on a branch, with a RAM guard and a report |
+| `codemitra solve` | One task: prompt + tools under ~3K tokens, 5 built-in tools, tolerant tool-call parsing, fresh rounds, rollback |
+| Terminal assistant | `codemitra`: chat in the terminal, diffs shown and approved, slash commands, resumable sessions; reuses local-codex's terminal app (D-023) |
+| Plan + runner | Plan format CodeMitra writes (`/plan`, local); `codemitra run` works through it unattended on a branch, with a RAM guard and a report |
 | MCP | General MCP client (stdio + HTTP, standard `mcpServers` config, approvals for write tools) in M2 with Git, Context7, AWS Documentation; tool registry + Serena, GitHub, SQLite/Postgres, Docker, AWS, Research Desk server and an ops sandbox in M4 (D-028) |
 | Model settings | Context 32K / 64K / 128K (with Ollama KV-cache `q8_0`), thinking off / on with a budget; picked by measurement |
 | Harness² tuning | Per-model prompt and skill tuning on the tuning half, reported on the held-out half |
 | Review + lessons | Batch review by me (Claude Code only as fallback); lessons capped at ~1K tokens, kept only if they help |
 | Meter | Share of tasks and features done fully locally, Claude tokens spent on fallbacks, local tokens, wall time; GPU Wh as a side note |
-| Playground | Separate repo `mitra-playground`: a ladder of practice projects (level 07 = ops sandbox for MCP), each with a plan and tests; AI apps there may call OpenRouter / NVIDIA APIs at runtime (D-026, D-027) |
-| Training log + fine-tune | Mitra-only passing runs + licensed public data → QLoRA fine-tune of the small model, kept only if it wins on held-out tasks |
+| Playground | Separate repo `codemitra-playground`: a ladder of practice projects (level 07 = ops sandbox for MCP), each with a plan and tests; AI apps there may call OpenRouter / NVIDIA APIs at runtime (D-026, D-027) |
+| Training log + fine-tune | CodeMitra-only passing runs + licensed public data → QLoRA fine-tune of the small model, kept only if it wins on held-out tasks |
 
 ## Training data rules (D-022)
-- Only Mitra's own passing code and steps, plus public coding data with a clear licence. **No Claude fixes or responses.**
-- A task description written by Claude is kept as the input only; the model trains on Mitra's code and steps.
-- Every run records who wrote each part (Mitra, Claude, me). A task Claude fixed is left out.
+- Only CodeMitra's own passing code and steps, plus public coding data with a clear licence. **No Claude fixes or responses.**
+- A task description written by Claude is kept as the input only; the model trains on CodeMitra's code and steps.
+- Every run records who wrote each part (CodeMitra, Claude, me). A task Claude fixed is left out.
 - OpenRouter / NVIDIA model outputs (from the playground apps) are not training data.
 - `.env` files, keys and personal data are scrubbed before anything is saved for training.
 - Fine-tune only after a few hundred passing runs, and keep it only if it beats base model + lessons on held-out tasks.
 
 ## Kill rule
-- M0: if stock agents already pass most tasks on the small model, the best one becomes the engine behind Mitra's
+- M0: if stock agents already pass most tasks on the small model, the best one becomes the engine behind CodeMitra's
   terminal app, plan runner, review and lessons.
-- M4: if Mitra's loop does not clearly beat stock agents, same.
+- M4: if CodeMitra's loop does not clearly beat stock agents, same.
 
 ## Ideas to test (D-011)
 New ideas land here first, with a one-line impact guess. They move into PLAN.md only after we agree.
@@ -81,7 +81,7 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
 - **I-5 Bigger mixture-of-experts model overnight** (partly on CPU, 8 GB GPU + 24 GB RAM). Impact: may handle harder
   tasks; slow and RAM-tight. Test after the baselines.
 - **I-6 Dashboard: sessions, tools, self-improvement, training data** ([DASHBOARD_PLAN.md](DASHBOARD_PLAN.md)).
-  Impact: shows whether Mitra really improves and starts saving full traces for the fine-tune (PLAN M1 "every run
+  Impact: shows whether CodeMitra really improves and starts saving full traces for the fine-tune (PLAN M1 "every run
   saved"); central never-delete store + 6 small steps, static page auto-rebuilt, no new dependency. Built
   2026-11-07 (D-041), in PLAN.md.
 - **I-7 Session gains: write in parts, check before run, /good /bad, adaptive thinking**
@@ -94,29 +94,29 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   without; kept only if faster or more tests pass. Agreed as the order 2026-11-07.
 - **I-9 Handoff report + "start fresh" pop-up** ([HANDOFF_VAULT_PLAN.md](HANDOFF_VAULT_PLAN.md)). Impact: no
   more summaries of summaries; a long session continues in a clean, small context from a fact-based report.
-- **I-10 Obsidian vault as the center of Mitra's memory and context** (same plan, D-043). Impact: projects,
+- **I-10 Obsidian vault as the center of CodeMitra's memory and context** (same plan, D-043). Impact: projects,
   sessions, compaction summaries, handoffs, plans and lessons in one linked vault (`MitraVault`), with recall /
-  remember tools; `.mitra/` is hidden from Obsidian today. Code stays in the projects. Plan agreed, build pending go.
+  remember tools; `.codemitra/` is hidden from Obsidian today. Code stays in the projects. Plan agreed, build pending go.
 - **I-11 Tools that fix what we saw** (2026-11-07): `check_code` (lint before run: most of run_command's 19/20
   failures were undefined names / unbound locals), `run_tests(path / -k)`, `start_program` / `stop_program`,
   `setup_env` (uv venv), `http_request` (localhost), `sql` (project SQLite), `screenshot` (Playwright + qwen3.5
   vision); tool sets by project type (bigtool idea: core always, game / web / db sets on demand) and BM25 for
   `mcp_find` (keyword today; no embeddings: a second model would push the 9B out of memory). In PLAN "Next up".
-- **I-12 Mitra plans and builds games, sites, DB designs and web apps by itself** (2026-11-07): `/plan` with a test
+- **I-12 CodeMitra plans and builds games, sites, DB designs and web apps by itself** (2026-11-07): `/plan` with a test
   per task, red-then-green plan check, unattended runner, one ladder level per kind (new DB-design level) with
   hidden tests, overnight self-improvement on them; real projects of a kind only after its level passes. Honest
   limit: bigger web apps will finish only partly at first ("needs help" briefs). In PLAN "Next up".
 - **I-13 Experience recall** (2026-11-07): for a task like one solved before (tests passed or 👍, not corrected), a
   short "how it was solved" note goes into the prompt; learning from examples without training, via the vault.
   Impact: better first attempts on repeat kinds of work; costs prompt tokens. See SELF_IMPROVEMENT.md section 9.
-- **I-14 Data from other users (a friend first)** (brainstorm 2026-11-07): his Mitra records locally as yours does;
-  `mitra share-data` exports a file (he picks projects and dates, secrets scrubbed again, summary shown first);
-  `mitra import-data` puts it in your store under `data/runs/<contributor>/`; dashboard filter by contributor.
+- **I-14 Data from other users (a friend first)** (brainstorm 2026-11-07): his CodeMitra records locally as yours does;
+  `codemitra share-data` exports a file (he picks projects and dates, secrets scrubbed again, summary shown first);
+  `codemitra import-data` puts it in your store under `data/runs/<contributor>/`; dashboard filter by contributor.
   Explicit opt-in, incl. whether it may be used for training (his code is in the traces). No automatic sync for
   now (needs a server and breaks "nothing leaves the machine"). Item 0 helps: version + machine on every turn.
 - **I-15 Shared knowledge base** (brainstorm 2026-11-07): a git repo of general lessons (benchmark-passed rules,
   Windows/tooling know-how, plan templates per kind, generalized recall notes; never code, paths or project facts),
-  pulled into `MitraVault/Mitra/shared/` and read by `recall`; new entries as pull requests you review and that
+  pulled into `MitraVault/CodeMitra/shared/` and read by `recall`; new entries as pull requests you review and that
   must pass the benchmark (same gate as the harness), undo per rule. After the vault (B) and a few proven rules.
 - **I-16 Overnight mode: PRD → running app on localhost, unattended** ([OVERNIGHT_MODE.md](OVERNIGHT_MODE.md),
   brainstorm 2026-11-07): `/prd`, full access inside the project only (branch, commit per task, project venv, no push,
@@ -132,14 +132,14 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   skipped).
 - **I-19 Pipelines with LangGraph + bigtool** ([PIPELINES.md](PIPELINES.md), plan 2026-11-08): the outer pipeline
   (build-from-PRD, fix, review, improve, experiment) as LangGraph graphs with code-decided edges, SQLite checkpoints
-  (resume a night after a crash) and an approval interrupt; Mitra's inner tool loop kept as a node; bigtool registry
+  (resume a night after a crash) and an approval interrupt; CodeMitra's inner tool loop kept as a node; bigtool registry
   with BM25 retrieval (no embeddings) for MCP tools and later tool sets. Decided by experiment 12.
 - **I-20 Experiments registry + dashboard section** ([EXPERIMENTS.md](EXPERIMENTS.md), plan 2026-11-08): one result
-  file per experiment run (question, setup, numbers, verdict, decision), written by `mitra night`, a new
-  `mitra judge`, the screen and level runs; an Experiments section with comparisons and "what chose this default".
+  file per experiment run (question, setup, numbers, verdict, decision), written by `codemitra night`, a new
+  `codemitra judge`, the screen and level runs; an Experiments section with comparisons and "what chose this default".
 
 - **I-21 `/free`: make room for the model — BUILT 2026-11-10 (D-059)** (user, 2026-11-10; RAM was 3.7 GB free, mimo 128K needs ~5.2 GB):
-  shows need vs free, a tick list of programs (grouped, never-close list and Mitra's own terminal excluded, biggest
+  shows need vs free, a tick list of programs (grouped, never-close list and CodeMitra's own terminal excluded, biggest
   pre-ticked by `fit.pick_to_close`), closes the ticked ones politely (like ✕; force only on a second yes), offers
   to unload other Ollama models and the smaller options, then re-checks. Offered at start (⚠/✗), before `/run`,
   in `/doctor`. Builds on `app/fit.py`. Impact: every session while RAM is tight; small. Waiting: name + when.
@@ -153,20 +153,20 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
 - **I-24 Modal as a second free GPU — CHOSEN for a later phase (user 2026-11-10, D-063)** (research 2026-11-10): $30/month credits refill (~180 T4 h), started
   from code, serves a port itself (no tunnel), official Ollama example. Lightning AI possible (one-time
   credits). Colab free: no (its FAQ bans bypassing the notebook UI and remote proxies); HF ZeroGPU: no.
-- **I-25 Kaggle AI credits: a Kaggle Community Benchmark of Mitra's coding tasks** (research 2026-11-10):
+- **I-25 Kaggle AI credits: a Kaggle Community Benchmark of CodeMitra's coding tasks** (research 2026-11-10):
   the credits are $10/day ($100/month) of Kaggle Benchmarks Model Proxy spend for frontier models
-  (Claude, Gemini, DeepSeek, ...), meant for benchmarks. Legit use: publish Mitra's tasks as a benchmark and
-  score frontier vs small open models, with an LLM judge. NOT as Mitra's chat backend (scoped to benchmark
+  (Claude, Gemini, DeepSeek, ...), meant for benchmarks. Legit use: publish CodeMitra's tasks as a benchmark and
+  score frontier vs small open models, with an LLM judge. NOT as CodeMitra's chat backend (scoped to benchmark
   development; risky for the account).
-- **I-26 A Claude Code-style screen: the input box and status line stay on screen while Mitra works** (user,
-  2026-11-11: "the bottom lines disappear when we start a discussion"). Today the box exists only while Mitra waits
+- **I-26 A Claude Code-style screen: the input box and status line stay on screen while CodeMitra works** (user,
+  2026-11-11: "the bottom lines disappear when we start a discussion"). Today the box exists only while CodeMitra waits
   (prompt_toolkit), the answer streams through Rich; v0.6.4 adds a working footer (machine + speed) instead. The
   real thing = one prompt_toolkit application for the whole session, output drawn above it, type-ahead visible.
   Several days; risks menus, esc to stop, paste folding and Windows quirks. Impact score before it is planned.
 
 - **I-27 Keep passing tests passing ("test anchors", AlphaCodium paper 2024)** (brainstorm 2026-11-11): before a
   fix, note which tests pass; a fix that breaks one of them is rolled back, never accepted. Candidate for step 5 (the
-  small-change path: no false "done"). Cost: one test run per fix. A harness switch, so `mitra improve` can A/B it.
+  small-change path: no false "done"). Cost: one test run per fix. A harness switch, so `codemitra improve` can A/B it.
 - **I-28 Restate the task in bullets before coding** (AlphaCodium "problem reflection"): goal, inputs, outputs,
   rules, edge cases as bullets, then code. One cheap call at the start of the change / plan phase; the paper's main
   failure is the model ignoring small details. Candidate for step 5, judged on the `small` score. A harness switch.
@@ -177,11 +177,11 @@ New ideas land here first, with a one-line impact guess. They move into PLAN.md 
   small fix prompt: adding the run trace, the last K failed tries or the last diff gave no gain (keep it out).
 
 ## Later (not milestones)
-Data pack, Mitra as an MCP server, debug-brief experiment, escalation ladder,
-`mitra doctor`, usage audit.
+Data pack, CodeMitra as an MCP server, debug-brief experiment, escalation ladder,
+`codemitra doctor`, usage audit.
 
 ## Out of scope
-Client or company offer (for now), web chat UI, IDE plugin (maybe after v1.0), API key for a frontier model inside Mitra, PDF app, email writing, project scaffolding, web agent.
+Client or company offer (for now), web chat UI, IDE plugin (maybe after v1.0), API key for a frontier model inside CodeMitra, PDF app, email writing, project scaffolding, web agent.
 
 ## Honest limits
 - Small models are weak at designing complex systems; local planning is the riskiest part. Expect about half the
@@ -189,7 +189,7 @@ Client or company offer (for now), web chat UI, IDE plugin (maybe after v1.0), A
 - Long context helps small models less than it seems (they lose the middle); thinking costs time (8K thinking tokens
   ≈ 1.5 min per step on the 4B, ≈ 7 min on the 9B).
 - RAM: the 9B realistically runs only when the laptop is idle (overnight).
-- Projects with few tests get less out of Mitra: the test is the safety net.
+- Projects with few tests get less out of CodeMitra: the test is the safety net.
 - A fine-tune may not beat base model + good harness; the held-out test decides.
 - Our own benchmark will be questioned: publish every config and include a public-benchmark slice.
 

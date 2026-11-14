@@ -29,7 +29,7 @@ from app.core import harness as H
 from app.core import tools as T
 from app.core.loop import solve
 
-MITRA_ROOT = Path(__file__).resolve().parents[2]
+CODEMITRA_ROOT = Path(__file__).resolve().parents[2]
 MAX_COST_GROWTH = 1.2
 PROPOSE_TIMEOUT_S = 600
 
@@ -170,7 +170,7 @@ def machine_problems(models: list[str], *, sizes: dict[str, float], loaded: list
 
 
 def load_bench():
-    spec = importlib.util.spec_from_file_location("mitra_bench", MITRA_ROOT / "bench" / "bench.py")
+    spec = importlib.util.spec_from_file_location("mitra_bench", CODEMITRA_ROOT / "bench" / "bench.py")
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod  # dataclasses in bench.py look their module up here
     spec.loader.exec_module(mod)

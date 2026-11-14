@@ -181,7 +181,7 @@ def test_a_run_appends_one_row_with_versions_and_cases(tmp_path):
     assert S.summary(row["score"]).startswith("sorting ") and " · writing 1/3" in S.summary(row["score"])
 
 
-def test_mitra_score_command_sorting_and_history(tmp_path, monkeypatch):
+def test_codemitra_score_command_sorting_and_history(tmp_path, monkeypatch):
     monkeypatch.setattr(S, "RESULTS", tmp_path / "scores.jsonl")
     cli = CliRunner()
     first = cli.invoke(main.cli, ["score", "--only", "sorting"])

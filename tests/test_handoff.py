@@ -47,7 +47,7 @@ def test_last_sessions_turns_are_read_from_the_record(tmp_path):
 def test_summary_uses_the_transcript_and_survives_a_failure():
     class Echo:
         def invoke(self, prompt):
-            assert "USER: make it faster" in prompt[1].content and "MITRA used: edit_file" in prompt[1].content
+            assert "USER: make it faster" in prompt[1].content and "CODEMITRA used: edit_file" in prompt[1].content
             return AIMessage(content="- sped up the loop")
 
     history = [SystemMessage(content="s"), HumanMessage(content="make it faster"),

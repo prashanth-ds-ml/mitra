@@ -134,7 +134,7 @@ def test_memory_check_and_free_skip_this_machine(monkeypatch):
     remote.clear()
 
 
-def test_mitra_solve_uses_the_configured_address(monkeypatch, tmp_path):
+def test_codemitra_solve_uses_the_configured_address(monkeypatch, tmp_path):
     """Night runs (`codemitra solve`) always used localhost; they now follow codemitra.toml / the remote."""
     from app.core import cli
     seen = {}

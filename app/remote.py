@@ -23,7 +23,7 @@ DEFAULT_CTX = 262_144
 
 def _file() -> Path:
     from app import config
-    return config._mitra_home() / "remote.json"
+    return config._codemitra_home() / "remote.json"
 
 
 def active() -> dict | None:

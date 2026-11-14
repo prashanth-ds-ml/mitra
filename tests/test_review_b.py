@@ -38,7 +38,7 @@ def test_e053_report_never_claims_a_rollback_at_the_time_limit(tmp_path):
     assert "git stash failed" in rep("left: You do not have the initial commit yet")
 
 
-def test_e053_cut_off_work_is_stashed_and_mitra_logs_stay(tmp_path):
+def test_e053_cut_off_work_is_stashed_and_codemitra_logs_stay(tmp_path):
     ws = _repo(tmp_path)
     (ws / "game.py").write_text("x = 2  # half done\n", encoding="utf-8")
     (ws / "new.py").write_text("y = 1\n", encoding="utf-8")

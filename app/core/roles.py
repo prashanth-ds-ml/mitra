@@ -127,7 +127,7 @@ def describe(r: dict) -> str:
 
 
 def _file() -> Path:
-    return config._mitra_home() / "roles.json"
+    return config._codemitra_home() / "roles.json"
 
 
 def load_choices() -> dict[str, str]:
