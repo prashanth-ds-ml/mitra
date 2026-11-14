@@ -22,3 +22,23 @@ One image, ~200 words, no hype words.
 | 5 | v1.0 | Article: method, results, honest limits | planned | - | - |
 
 ## Drafts
+
+### v0.8.0 · draft (2026-11-14) · "I pasted a game spec and my assistant asked me 'should I start?' six times"
+
+I pasted a full game spec into CodeMitra, my coding assistant for small local models, and said "yes".
+It answered "Should I create all the initial files now?". I said yes six more times. Same question, word for word.
+
+What happened: before acting, the 9B model decides "talk or work?". It kept choosing "talk", and once its question
+sat in the history, it copied it. The fix is not a better prompt: when the assistant offered work and you say yes,
+the harness starts that work; a repeated answer is not accepted.
+
+The next session (22 turns building the game) found six more faults: "fix it" stuck in read-only mode, another
+project's tests reporting green, "fixed" when nothing changed. Each is now a test built from the real turn.
+
+Lesson: my first fix passed 7 tests and never fired live, because real answers end in **bold** questions.
+Build a fix's tests from the model's real output, then replay the session that found it.
+
+Also new: the assistant reads your next message as feedback ("why don't you…" = it went wrong), so every turn is
+labelled without asking. And it is called CodeMitra again.
+
+v0.8.0: github.com/prashanth-ds-ml/codemitra · next: friends' sessions as the test set.
