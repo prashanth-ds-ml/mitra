@@ -1,6 +1,6 @@
-"""`mitra dashboard`: the dashboard on localhost (D-042). Standard library only, 127.0.0.1 only, read-only.
+"""`codemitra dashboard`: the dashboard on localhost (D-042). Standard library only, 127.0.0.1 only, read-only.
 
-The page is the same as `~/.mitra/dashboard.html`, plus a Refresh button. A normal load is served from cache while
+The page is the same as `~/.codemitra/dashboard.html`, plus a Refresh button. A normal load is served from cache while
 the store has not changed; the button (`/?refresh=1`) always rebuilds, merging any old records into the store first.
 """
 from __future__ import annotations
@@ -42,7 +42,7 @@ class Pages:
             sig = store_signature()
             if force or not self.html or sig != self.sig:
                 page, _ = D.page_html(self.roots)  # merges old records, so take the signature after it
-                self.html = page.replace("<h1>Mitra dashboard</h1>", f"{_BUTTON}<h1>Mitra dashboard</h1>", 1)
+                self.html = page.replace("<h1>CodeMitra dashboard</h1>", f"{_BUTTON}<h1>CodeMitra dashboard</h1>", 1)
                 self.sig, self.builds = store_signature(), self.builds + 1
             return self.html
 
@@ -63,7 +63,7 @@ def make_server(port: int = PORT, roots: list[Path] | None = None) -> ThreadingH
         def do_GET(self):  # noqa: N802 (http.server API)
             path, _, query = self.path.partition("?")
             if path == "/health":
-                return self._send(200, "mitra dashboard", "text/plain; charset=utf-8")
+                return self._send(200, "codemitra dashboard", "text/plain; charset=utf-8")
             if path != "/":
                 return self._send(404, "not found", "text/plain; charset=utf-8")
             try:
@@ -89,6 +89,6 @@ def make_server(port: int = PORT, roots: list[Path] | None = None) -> ThreadingH
 def running(port: int = PORT) -> bool:
     try:
         with urllib.request.urlopen(f"http://{HOST}:{port}/health", timeout=0.5) as r:
-            return r.read().startswith(b"mitra dashboard")
+            return r.read().startswith(b"codemitra dashboard")
     except OSError:
         return False

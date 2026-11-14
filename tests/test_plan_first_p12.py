@@ -9,7 +9,7 @@ from app.core import tools as T
 # ── P1 ────────────────────────────────────────────────────────────────────────
 
 def _records(ws, rows, name="chat-20261110.jsonl"):
-    runs = ws / ".mitra" / "runs"
+    runs = ws / ".codemitra" / "runs"
     runs.mkdir(parents=True, exist_ok=True)
     (runs / name).write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
 
@@ -34,8 +34,8 @@ def test_the_brief_shows_recent_work_not_chit_chat(tmp_path):
 
 
 def test_the_brief_includes_plan_night_report_and_git(tmp_path):
-    (tmp_path / ".mitra").mkdir()
-    (tmp_path / ".mitra" / "resume.md").write_text("# Plan: brick breaker\n- T1 ✓ paddle\n- T2 ✗ ball: next\n",
+    (tmp_path / ".codemitra").mkdir()
+    (tmp_path / ".codemitra" / "resume.md").write_text("# Plan: brick breaker\n- T1 ✓ paddle\n- T2 ✗ ball: next\n",
                                                    encoding="utf-8")
     (tmp_path / "game").mkdir()
     (tmp_path / "game" / "NIGHT_REPORT.md").write_text("# Night report\n\n## Tasks: 2/5 passed\n", encoding="utf-8")

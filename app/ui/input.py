@@ -33,7 +33,7 @@ from prompt_toolkit.keys import Keys
 
 from app.ui.theme import prompt_style
 
-# Mitra's session modes, in shift+tab order, with the names the user sees.
+# CodeMitra's session modes, in shift+tab order, with the names the user sees.
 MODES = ("approve", "auto", "plan")
 MODE_LABELS = {"approve": "ask", "auto": "auto-edit", "plan": "plan", "read-only": "plan"}
 
@@ -42,7 +42,7 @@ PASTE_FOLD_LINES = 12
 PASTE_FOLD_CHARS = 1500
 _PASTE_TOKEN = re.compile(r"\[pasted text #(\d+): \d+ lines\]")
 
-_SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".mitra", ".pytest_cache", "dist", "build",
+_SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".codemitra", ".pytest_cache", "dist", "build",
               ".mypy_cache", ".ruff_cache", ".idea", ".vscode", ".tox", ".next", "target"}
 
 
@@ -215,7 +215,7 @@ def expand_pastes(state: UiState, text: str) -> str:
 # ── the input box ────────────────────────────────────────────────────────────
 
 def history_path(workspace: str) -> pathlib.Path:
-    home = pathlib.Path(os.environ.get("MITRA_HOME") or pathlib.Path.home() / ".mitra")
+    home = pathlib.Path(os.environ.get("CODEMITRA_HOME") or pathlib.Path.home() / ".codemitra")
     key = hashlib.sha1(str(pathlib.Path(workspace).resolve()).lower().encode("utf-8")).hexdigest()[:12]
     return home / "history" / f"{key}.txt"
 

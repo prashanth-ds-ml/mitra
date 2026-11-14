@@ -49,7 +49,7 @@ class KeyWatcher:
 
     def __enter__(self) -> "KeyWatcher":
         if self._getch is not None and self._kbhit is not None and sys.stdin is not None and _is_console():
-            self._thread = threading.Thread(target=self._run, name="mitra-keys", daemon=True)
+            self._thread = threading.Thread(target=self._run, name="codemitra-keys", daemon=True)
             self._thread.start()
         return self
 

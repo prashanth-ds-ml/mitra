@@ -1,12 +1,12 @@
 """The coding practice set (D-078 Phase 2, step 5; must-have 10): small Python and SQL tasks with hidden checks, so
-Mitra can be measured (and later learn) on hundreds of tasks instead of 23 cases.
+CodeMitra can be measured (and later learn) on hundreds of tasks instead of 23 cases.
 
-    python  -> Mitra writes solution.py (and its own tests); the hidden tests (MBPP+ / HumanEval+ style) run against it
+    python  -> CodeMitra writes solution.py (and its own tests); the hidden tests (MBPP+ / HumanEval+ style) run against it
                in a separate process with a time limit
-    sql     -> Mitra writes query.sql for a SQLite database; it and the reference query run on a read-only connection
+    sql     -> CodeMitra writes query.sql for a SQLite database; it and the reference query run on a read-only connection
                and their result rows are compared (in order only when the reference sorts)
 
-The hidden checks and their output never reach Mitra: they go to the records and the report only. Each task's split
+The hidden checks and their output never reach CodeMitra: they go to the records and the report only. Each task's split
 (learn / held_out) is fixed by a hash of its id, so it never changes between runs. MongoDB comes later (our own tasks).
 """
 from __future__ import annotations
@@ -35,7 +35,7 @@ class Task:
     kind: str               # "python" or "sql"
     source: str             # dataset name, for the credit and the report
     licence: str
-    prompt: str             # what Mitra is given: the question and the examples
+    prompt: str             # what CodeMitra is given: the question and the examples
     test: str = ""          # python: the hidden test code
     call: str = ""          # python: the line that runs it, e.g. "check(add)"
     db: str = ""            # sql: path to the .sqlite file
@@ -50,7 +50,7 @@ class Task:
 @dataclass
 class Check:
     passed: bool
-    detail: str = ""        # why it failed (records and report only; never shown to Mitra)
+    detail: str = ""        # why it failed (records and report only; never shown to CodeMitra)
     seconds: float = 0.0
 
 
@@ -70,7 +70,7 @@ def _tail(text: str) -> str:
 def check_python(solution: str, test: str, call: str = "", timeout_s: float = PY_TIMEOUT_S) -> Check:
     """Run the hidden `test` (plus `call`) against `solution` in a fresh Python process in a temporary folder."""
     t0 = time.monotonic()
-    with tempfile.TemporaryDirectory(prefix="mitra-practice-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="codemitra-practice-") as tmp:
         d = Path(tmp)
         (d / "solution.py").write_text(solution, encoding="utf-8")
         runner = ("import sys\nsys.path.insert(0, " + repr(str(d)) + ")\nfrom solution import *\n\n"
@@ -137,7 +137,7 @@ def _rows(rows: list[tuple]) -> list[tuple]:
 
 
 def check_sql(db: str | Path, sql: str, gold: str, timeout_s: float = SQL_TIMEOUT_S) -> Check:
-    """Mitra's query passes when it returns the same rows as the reference: as a multiset, or in the same order when
+    """CodeMitra's query passes when it returns the same rows as the reference: as a multiset, or in the same order when
     the reference has ORDER BY. Column order counts (the question says what to show)."""
     t0 = time.monotonic()
     try:
@@ -146,7 +146,7 @@ def check_sql(db: str | Path, sql: str, gold: str, timeout_s: float = SQL_TIMEOU
         return Check(False, f"the reference query failed: {exc}", 0.0)
     try:
         got = _rows(run_sql(db, sql, timeout_s))
-    except Exception as exc:  # noqa: BLE001 - Mitra's query does not run: a failed task with the reason
+    except Exception as exc:  # noqa: BLE001 - CodeMitra's query does not run: a failed task with the reason
         return Check(False, f"query error: {exc}", round(time.monotonic() - t0, 2))
     seconds = round(time.monotonic() - t0, 2)
     same = got == want if _ORDER_BY.search(clean_sql(gold)) else Counter(got) == Counter(want)
@@ -156,7 +156,7 @@ def check_sql(db: str | Path, sql: str, gold: str, timeout_s: float = SQL_TIMEOU
                  seconds)
 
 
-# ── the datasets (step 5a): downloaded once, kept in ~/.mitra/practice, so practice also works offline ────────────
+# ── the datasets (step 5a): downloaded once, kept in ~/.codemitra/practice, so practice also works offline ────────────
 
 SOURCES = {
     "mbpp": {"url": "https://github.com/evalplus/mbppplus_release/releases/download/v0.2.0/MbppPlus.jsonl.gz",
@@ -186,7 +186,7 @@ def _pick(ids: list[str], n: int) -> set[str]:
 
 
 def evalplus_test(row: dict) -> tuple[str, str]:
-    """(hidden test code, call) for an EvalPlus row: the reference solution (renamed) and Mitra's function run on the
+    """(hidden test code, call) for an EvalPlus row: the reference solution (renamed) and CodeMitra's function run on the
     same inputs, results compared (a float tolerance; as sets when the task's own example compares sets)."""
     entry = row["entry_point"]
     ref_src = re.sub(rf"\b{re.escape(entry)}\b", "_mitra_ref", reference(row))
@@ -271,7 +271,7 @@ def sql_tasks(examples: list[dict], db_dir: Path) -> list[Task]:
 def _fetch(url: str, dest: Path, timeout_s: float = DOWNLOAD_TIMEOUT_S) -> Path:
     import urllib.request
     dest.parent.mkdir(parents=True, exist_ok=True)
-    req = urllib.request.Request(url, headers={"User-Agent": "Mitra"})
+    req = urllib.request.Request(url, headers={"User-Agent": "CodeMitra"})
     with urllib.request.urlopen(req, timeout=timeout_s) as resp, dest.open("wb") as f:
         while chunk := resp.read(1 << 20):
             f.write(chunk)
@@ -347,7 +347,7 @@ def load(dest: Path | None = None, kind: str = "", split: str = "") -> list[Task
     return [t for t in tasks if (not kind or t.kind == kind) and (not split or t.split == split)]
 
 
-# ── running (step 5b): Mitra solves each task in a fresh folder, then the hidden check decides ────────────────────
+# ── running (step 5b): CodeMitra solves each task in a fresh folder, then the hidden check decides ────────────────────
 
 TASK_TIMEOUT_S = 600
 
@@ -358,8 +358,8 @@ class Result:
     kind: str
     split: str
     passed: bool
-    detail: str = ""        # the hidden check's reason (never shown to Mitra)
-    own_tests: bool = False  # Mitra wrote its own test file
+    detail: str = ""        # the hidden check's reason (never shown to CodeMitra)
+    own_tests: bool = False  # CodeMitra wrote its own test file
     own_ok: bool | None = None  # its last test run in the turn passed (None: never ran)
     seconds: float = 0.0
     steps: int = 0
@@ -382,7 +382,7 @@ def prepare(task: Task, ws: Path) -> None:
 
 
 def grade(task: Task, ws: Path) -> Check:
-    """The hidden check on what Mitra left in the folder. SQL runs on the original database (Mitra's copy may have
+    """The hidden check on what CodeMitra left in the folder. SQL runs on the original database (CodeMitra's copy may have
     been changed)."""
     if task.kind == "python":
         f = ws / "solution.py"
@@ -396,13 +396,13 @@ def grade(task: Task, ws: Path) -> Check:
 
 
 def solve(task: Task, runner, timeout_s: float = TASK_TIMEOUT_S) -> Result:
-    """One task: a fresh folder, Mitra's own chat loop (the score's runner: edits allowed, no web), the hidden check."""
+    """One task: a fresh folder, CodeMitra's own chat loop (the score's runner: edits allowed, no web), the hidden check."""
     from langchain_core.messages import HumanMessage
 
     from app.core import score as S
 
     t0 = time.monotonic()
-    with tempfile.TemporaryDirectory(prefix="mitra-practice-", ignore_cleanup_errors=True) as tmp:
+    with tempfile.TemporaryDirectory(prefix="codemitra-practice-", ignore_cleanup_errors=True) as tmp:
         ws = Path(tmp) / "task"
         prepare(task, ws)
         s = runner.session(ws, task.id.replace("/", "_"))

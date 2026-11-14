@@ -1,4 +1,4 @@
-"""D-068 step 3: the measuring set and `mitra score`. The checks are automatic; every reference passes its checks,
+"""D-068 step 3: the measuring set and `codemitra score`. The checks are automatic; every reference passes its checks,
 every start state fails; a run appends one row to results/scores.jsonl and keeps each case's record for the coach."""
 import json
 import tomllib
@@ -40,8 +40,8 @@ def test_writing_checks_facts_signature_length_and_wrong_sign_offs():
     ref = w1["reference"]
     assert S.check_writing(w1, ref) == ""
     assert S.check_writing(w1, ref.replace("Regards,\nPrashanth", "Thanks,\nPrashanth")).startswith("signature")
-    assert S.check_writing(w1, ref.replace("Regards,\nPrashanth", "Thanks,\nMitra")).startswith("should not")
-    assert S.check_writing(w1, ref.replace("`mitra kaggle start`", "start it")) == "missing: kaggle start"
+    assert S.check_writing(w1, ref.replace("Regards,\nPrashanth", "Thanks,\nCodeMitra")).startswith("should not")
+    assert S.check_writing(w1, ref.replace("`codemitra kaggle start`", "start it")) == "missing: kaggle start"
     assert S.check_writing(w1, ref.replace("Hi team,", "Hi team, " + "word " * 200)).startswith("too long")
     assert S.check_writing(w1, "") == "empty answer"
 
@@ -96,7 +96,7 @@ def test_a_hung_model_fails_its_case_and_the_run_goes_on(tmp_path, monkeypatch):
     before = set(threading.enumerate())
     out = S.run_writing(_runner(Hangs(), tmp_path), only={"W1_team_mail", "W2_leave_mail"})
     gate.set()
-    for t in set(threading.enumerate()) - before:  # the hung cases finish here, inside this test's MITRA_HOME
+    for t in set(threading.enumerate()) - before:  # the hung cases finish here, inside this test's CODEMITRA_HOME
         t.join(5)                                    # (a late write after the test leaked into the real store)
     assert [(c.id, c.passed) for c in out] == [("W1_team_mail", False), ("W2_leave_mail", False)]
     assert all(c.why.startswith("TimeoutError: timed out after") for c in out)

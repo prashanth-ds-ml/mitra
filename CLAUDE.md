@@ -1,4 +1,4 @@
-# Mitra: rules for working in this repo
+# CodeMitra: rules for working in this repo
 
 Portfolio project 05. A local coding assistant for my own projects, built for small models: it thinks, plans and builds
 with local models only, in the terminal or unattended; Claude Code is only a fallback (D-017, D-023, D-025). Built in public,

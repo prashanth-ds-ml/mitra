@@ -1,4 +1,4 @@
-"""Mitra's terminal interface (D-031): Phosphor theme, live reply streaming, one-line tool steps, status line."""
+"""CodeMitra's terminal interface (D-031): Phosphor theme, live reply streaming, one-line tool steps, status line."""
 from app.ui.render import (
     action_for,
     agent_steps,

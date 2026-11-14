@@ -43,7 +43,7 @@ def _write_call(path, content, cid="c1"):
 
 
 def _record(tmp_path):
-    return next((tmp_path / ".mitra" / "runs").glob("chat-*.jsonl"))
+    return next((tmp_path / ".codemitra" / "runs").glob("chat-*.jsonl"))
 
 
 # ── recording ────────────────────────────────────────────────────────────────
@@ -118,7 +118,7 @@ def test_ollama_timings_in_seconds():
 
 
 def test_trace_carries_timings_and_failed_and_wrap_up_calls(tmp_path):
-    rec = L.Recorder(tmp_path / "p" / ".mitra" / "runs" / "r.jsonl")
+    rec = L.Recorder(tmp_path / "p" / ".codemitra" / "runs" / "r.jsonl")
     reply = AIMessage(content="x", response_metadata={"prompt_eval_duration": 2_000_000_000, "load_duration": 3_000_000_000})
     rec.trace([SystemMessage(content="s"), HumanMessage(content="u")], reply)
     rec.trace([SystemMessage(content="s"), HumanMessage(content="u")], None, purpose="failed", error="XML syntax error")
@@ -204,7 +204,7 @@ def test_breakdown_by_kind_detects_a_game_from_its_files(tmp_path):
     proj.mkdir()
     (proj / "main.py").write_text("import pygame\n", encoding="utf-8")
     S.note_project(proj)
-    rec = L.Recorder(proj / ".mitra" / "runs" / "chat-1.jsonl")
+    rec = L.Recorder(proj / ".codemitra" / "runs" / "chat-1.jsonl")
     rec.write("turn_start", turn=1, user="go", model="qwen3.5:4b")
     rec.write("turn_end", turn=1, outcome="answered")
     sess = I.sessions(S.stored_files())
@@ -214,7 +214,7 @@ def test_breakdown_by_kind_detects_a_game_from_its_files(tmp_path):
 
 def test_training_rules_for_good_bad_and_corrected_turns(tmp_path):
     def traced(root, outcome, verdict="", fix=False):
-        rec = L.Recorder(root / ".mitra" / "runs" / "chat-1.jsonl")
+        rec = L.Recorder(root / ".codemitra" / "runs" / "chat-1.jsonl")
         rec.write("turn_start", turn=1, user="u")
         rec.trace([SystemMessage(content="s"), HumanMessage(content="u")], AIMessage(content="a"), turn=1)
         rec.write("turn_end", turn=1, outcome=outcome)
@@ -238,14 +238,14 @@ def test_training_rules_for_good_bad_and_corrected_turns(tmp_path):
 
 def test_page_shows_trends_versions_judgment_crashes_and_filter(tmp_path):
     proj = tmp_path / "proj"
-    rec = L.Recorder(proj / ".mitra" / "runs" / "chat-1.jsonl")
+    rec = L.Recorder(proj / ".codemitra" / "runs" / "chat-1.jsonl")
     for r in _day_rows(1_700_000_000, fix=True, verdict="bad", crash=True):
         kind = r.pop("kind")
         r.pop("t")
         rec.write(kind, **r)
     out, _ = D.build(roots=[tmp_path], out=tmp_path / "d.html")
     page = out.read_text(encoding="utf-8")
-    for needed in ("<h2>Trends</h2>", "Mitra version · harness", "by kind of task", "by project",
+    for needed in ("<h2>Trends</h2>", "CodeMitra version · harness", "by kind of task", "by project",
                    "by model", "Your corrections, declines and marks", "Crashes", "ResponseError: XML",
                    "you fixed g.py", "👎 n", "id='pf'", "first try", "time to green", "prompt s (median)", "reloads",
                    "usable for training", "Self-improvement"):

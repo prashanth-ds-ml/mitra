@@ -42,7 +42,7 @@ def test_a_cut_off_tool_call_is_retried_with_a_note(tmp_path):
     note = model.seen[1][-1]
     assert isinstance(note, HumanMessage) and "smaller parts" in note.content and "XML syntax error" in note.content
     assert shown and shown[0][0] == "retry" and shown[0][3] is False
-    rows = [json.loads(x) for f in (tmp_path / ".mitra" / "runs").glob("chat-*.jsonl")
+    rows = [json.loads(x) for f in (tmp_path / ".codemitra" / "runs").glob("chat-*.jsonl")
             for x in f.read_text(encoding="utf-8").splitlines()]
     assert any(r["kind"] == "bad_tool_call" for r in rows)
 

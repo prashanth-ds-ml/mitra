@@ -1,4 +1,4 @@
-"""D-078 #2 (must-have 5): after a step that changes code, Mitra runs the project's tests itself and the model sees
+"""D-078 #2 (must-have 5): after a step that changes code, CodeMitra runs the project's tests itself and the model sees
 the result; on failure it gets the failures and a round count, and after `auto_test_rounds` failing rounds it is told
 to stop and say what still fails. A project without tests: "untested, say so"."""
 import json

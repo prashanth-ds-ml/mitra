@@ -21,7 +21,7 @@ def ws(tmp_path):
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_calc.py").write_text(PASSING_TEST, encoding="utf-8")
     w = T.Workspace(tmp_path, test_command="python -m pytest -q tests")
-    w.spill_dir = tmp_path / ".mitra" / "out"
+    w.spill_dir = tmp_path / ".codemitra" / "out"
     return w
 
 

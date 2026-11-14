@@ -1,4 +1,4 @@
-"""Mitra benchmark: build task workspaces, grade them, validate the task set.
+"""CodeMitra benchmark: build task workspaces, grade them, validate the task set.
 
 A task is `bench/tasks/<id>_<slug>/`:
   task.toml   id, title, kind (bug|feature), split (tune|heldout), prompt, [[break]] find/replace edits
@@ -153,7 +153,7 @@ def run_pytest(workspace: Path, *args: str, timeout: int = GRADE_TIMEOUT_S,
 def grade(task: Task, workspace: Path, python: str | None = None) -> Grade:
     """Pass = protected tests unchanged and visible + hidden tests all pass, in a separate copy."""
     tampered = _tampered(task, workspace)
-    with tempfile.TemporaryDirectory(prefix=f"mitra-grade-{task.id}-") as tmp:
+    with tempfile.TemporaryDirectory(prefix=f"codemitra-grade-{task.id}-") as tmp:
         copy = Path(tmp) / "ws"
         shutil.copytree(workspace, copy, ignore=IGNORE)
         for test in task.hidden:
@@ -172,7 +172,7 @@ def grade(task: Task, workspace: Path, python: str | None = None) -> Grade:
 def validate(task: Task) -> list[str]:
     """Problems with a task; empty means the task is sound."""
     problems = []
-    with tempfile.TemporaryDirectory(prefix=f"mitra-validate-{task.id}-") as tmp:
+    with tempfile.TemporaryDirectory(prefix=f"codemitra-validate-{task.id}-") as tmp:
         start, solved = Path(tmp) / "start", Path(tmp) / "solved"
         prepare(task, start)
         prepare_solved(task, solved)

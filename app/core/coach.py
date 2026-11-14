@@ -1,14 +1,14 @@
-"""`mitra coach` (self-improvement layer 2, D-075): Claude reviews Mitra's own records and writes a coach report.
+"""`codemitra coach` (self-improvement layer 2, D-075): Claude reviews CodeMitra's own records and writes a coach report.
 
     digest  -> from the run records since the last review (no model): every turn in short (what you said, what
-               Mitra answered, path, phase, machine, time, tools) with the turns that need a look first (your /bad,
+               CodeMitra answered, path, phase, machine, time, tools) with the turns that need a look first (your /bad,
                corrections, empty or slow answers, tool errors, answers about the code or the web without looking)
     review  -> `claude -p` (your Claude Code, no tools) reads the digest and writes the report: findings, rules to
                test, code fixes, new score cases
-    queue   -> the report's rules go to layer 1's queue (improve_chat): `mitra score` decides each one, as for
-               Mitra's own rules; nothing from Claude enters Mitra untested (D-022)
+    queue   -> the report's rules go to layer 1's queue (improve_chat): `codemitra score` decides each one, as for
+               CodeMitra's own rules; nothing from Claude enters CodeMitra untested (D-022)
 
-Report: ~/.mitra/coach/<date>.md (with the digest beside it). The chat header reminds you after REMIND_DAYS days or
+Report: ~/.codemitra/coach/<date>.md (with the digest beside it). The chat header reminds you after REMIND_DAYS days or
 REMIND_TURNS new turns.
 """
 from __future__ import annotations
@@ -29,9 +29,9 @@ CLAUDE_TIMEOUT_S = 900
 SLOW_S = 60
 WORK_PHASES = ("look_at_code", "look_up", "make_change", "propose_plan")
 
-COACH_PROMPT = """You are the coach of Mitra, a local coding assistant that runs small models (qwen3.5 9B) on the
-user's laptop or a Kaggle GPU. Below is a digest of Mitra's recorded conversations since the last review. Find where
-Mitra did worse than a good assistant would: wrong or invented answers, answering from memory when it should have
+COACH_PROMPT = """You are the coach of CodeMitra, a local coding assistant that runs small models (qwen3.5 9B) on the
+user's laptop or a Kaggle GPU. Below is a digest of CodeMitra's recorded conversations since the last review. Find where
+CodeMitra did worse than a good assistant would: wrong or invented answers, answering from memory when it should have
 read the code or searched the web, ignoring what the user asked, too long answers, slow or empty
 turns, tool errors, missed signals. Quote the turn for each finding.
 
@@ -43,9 +43,9 @@ Short general instructions that would fix a finding by prompt alone, in a fenced
 object per line: {"text": "<under 200 characters, general: never names a file, project or person>", "why": "<finding
 number and one line>"}. Only rules a small model can follow; none when a finding needs code.
 ## Code fixes
-What needs a code change in Mitra (a missing phase, tool, check or setting), one line each with the finding number.
+What needs a code change in CodeMitra (a missing phase, tool, check or setting), one line each with the finding number.
 ## New score cases
-Messages worth adding to `mitra score` so the problem stays measured: the message, what a good answer does.
+Messages worth adding to `codemitra score` so the problem stays measured: the message, what a good answer does.
 Be concrete and short. Do not invent turns that are not in the digest."""
 
 
@@ -88,7 +88,7 @@ def _rows(path: Path) -> list[dict]:
 def _project(f: Path) -> str:
     """The store keeps records in runs/<project>-<6 hex>/: 'mitra-try-54b64f' -> 'mitra-try'."""
     name = f.parent.name
-    if name in (".mitra", "runs"):  # a record still in its project: <project>/.mitra/runs/chat-*.jsonl
+    if name in (".codemitra", "runs"):  # a record still in its project: <project>/.codemitra/runs/chat-*.jsonl
         name = f.parent.parent.parent.name if name == "runs" else f.parent.parent.name
     return re.sub(r"-[0-9a-f]{6}$", "", name)
 
@@ -156,7 +156,7 @@ def reminder(files: list[Path], now: float | None = None) -> str:
     days = (now - since) / 86400 if since else None
     if n >= REMIND_TURNS or (days is not None and days >= REMIND_DAYS and n >= 1):
         when = f"last review {days:.0f} days ago" if days is not None else "no review yet"
-        return f"coach: {when}, {n} new turns · `mitra coach`"
+        return f"coach: {when}, {n} new turns · `codemitra coach`"
     return ""
 
 
@@ -179,12 +179,12 @@ def digest(turns: list[dict], *, score_row: dict | None = None, harness: H.Harne
            max_chars: int = DIGEST_MAX_CHARS) -> str:
     """Flagged turns in full first, then every turn in short, within `max_chars`."""
     h = harness or H.load()
-    parts = [f"# Mitra records: {len(turns)} turns"
+    parts = [f"# CodeMitra records: {len(turns)} turns"
              + (f" from {time.strftime('%Y-%m-%d', time.localtime(turns[0]['t']))}" if turns else ""),
              f"Learned rules now (harness v{h.version}): " + (json.dumps(h.rules) if h.rules else "none")]
     if score_row:
         failed = [f"{c['id']}: {c.get('why', '')}" for c in score_row.get("cases", []) if not c.get("passed")]
-        parts.append(f"Last `mitra score` ({score_row.get('date', '')}): "
+        parts.append(f"Last `codemitra score` ({score_row.get('date', '')}): "
                      + " · ".join(f"{k} {p}/{n}" for k, (p, n) in score_row.get("score", {}).items())
                      + ("\nFailed: " + "; ".join(failed[:15]) if failed else ""))
     flagged = [t for t in turns if t["flags"]]
@@ -274,5 +274,5 @@ def coach(files: list[Path], *, score_row: dict | None = None, ask=run_claude, n
     queued = IC.queue_rules(rules, source="coach")
     _save_state({"last_t": max(t["t"] for t in turns), "last_report": str(path), "date": stamp})
     say(f"Report: {path}")
-    say(f"{len(rules)} rule(s) suggested, {queued} queued for `mitra improve --chat` (the score decides each one)")
+    say(f"{len(rules)} rule(s) suggested, {queued} queued for `codemitra improve --chat` (the score decides each one)")
     return {"result": "done", "report": str(path), "turns": len(turns), "rules": len(rules), "queued": queued}

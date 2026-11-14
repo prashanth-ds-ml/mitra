@@ -1,15 +1,15 @@
-"""`mitra improve --chat` (Phase B, first part; SELF_IMPROVEMENT.md section 12): learn one conversation rule from
-what went wrong, and keep it only if `mitra score` says so.
+"""`codemitra improve --chat` (Phase B, first part; SELF_IMPROVEMENT.md section 12): learn one conversation rule from
+what went wrong, and keep it only if `codemitra score` says so.
 
     evidence -> the failed cases of the last score on this model and architecture, and your signals in the run
-                records (/bad with its note, rephrase, interrupt, undo), each with what you said and what Mitra said
+                records (/bad with its note, rephrase, interrupt, undo), each with what you said and what CodeMitra said
     propose  -> the chat model proposes ONE general rule (JSON, read by improve.parse_change; rules only)
     judge    -> the model categories of the quick score (behaviour, writing, explain, ideas), once with the current
                 harness and once with the candidate: same model, same machine, same context
     decide   -> keep only if the candidate passes at least `min_gain` more cases and no category drops; a kept rule
-                becomes the next harness version (`mitra harness revert <v>` undoes it)
+                becomes the next harness version (`codemitra harness revert <v>` undoes it)
 
-Every attempt is logged in ~/.mitra/harness/attempts.jsonl (kind "chat"); the judge's score rows go to that round's
+Every attempt is logged in ~/.codemitra/harness/attempts.jsonl (kind "chat"); the judge's score rows go to that round's
 folder, not results/scores.jsonl. Local models only (D-025); nothing from Claude goes into the harness (D-022).
 """
 from __future__ import annotations
@@ -92,7 +92,7 @@ def _rows(path: Path) -> list[dict]:
 
 
 def conversation_signals(files: list[Path], limit: int = MAX_SIGNALS) -> list[dict]:
-    """Your /bad marks and quiet signals, newest first, each with the turn it was about: what you said, what Mitra
+    """Your /bad marks and quiet signals, newest first, each with the turn it was about: what you said, what CodeMitra
     answered, your note, and (for a rephrase) what you said next."""
     from app.core import cases as cases_mod
     held_out = cases_mod.held_out_texts()  # D-078 step 6: turns kept as "real" cases are never evidence
@@ -323,7 +323,7 @@ def auto_running() -> bool:
 
 
 def start_auto(workspace: Path, *, remote: bool = False, popen=None) -> Path:
-    """Start `mitra improve --chat` in the background (it outlives the chat); returns its log file."""
+    """Start `codemitra improve --chat` in the background (it outlives the chat); returns its log file."""
     import subprocess
     import sys
 
@@ -356,14 +356,14 @@ def improve_chat(*, proposer, make_runner: Callable[[H.Harness, Path], S.Runner]
              "evidence": {"score": (score_row or {}).get("date", ""), "failed_cases": len(failures),
                           "signals": len(signals)}}
     queued = next_queued(current)
-    if queued:  # D-075: a rule the coach suggested is tested first, exactly like Mitra's own
+    if queued:  # D-075: a rule the coach suggested is tested first, exactly like CodeMitra's own
         change, why = I.Change("rule", queued.get("why", ""), text=queued["text"]), ""
         entry.update(source=queued.get("source", "coach"), proposer=queued.get("source", "coach"))
         drop_queued(queued["text"])
         say(f"Testing a queued rule from the {entry['source']}: {queued['text']}")
     elif not failures and not signals:
         entry.update(result="skipped", reason="no failed cases and no signals: nothing to learn from")
-        say("Nothing to learn from: no failed score cases and no /bad or rephrase signals. Run `mitra score --quick` "
+        say("Nothing to learn from: no failed score cases and no /bad or rephrase signals. Run `codemitra score --quick` "
             "first, or mark wrong answers with /bad <why> in the chat.")
         return entry
     else:
@@ -405,11 +405,11 @@ def improve_chat(*, proposer, make_runner: Callable[[H.Harness, Path], S.Runner]
     entry.update(base=base["score"], candidate=cand["score"], result="kept" if keep else "dropped", reason=reason,
                  records=str(runs))
     if keep:
-        H.save(cand_h, f"{change.describe()} ({reason}; mitra improve --chat)")
+        H.save(cand_h, f"{change.describe()} ({reason}; codemitra improve --chat)")
         entry["new_version"] = current.version + 1
     I.log_attempt(entry)
     say(f"{'Kept' if keep else 'Dropped'}: {reason}")
     if keep:
-        say(f"  undo: mitra harness revert {current.version}")
+        say(f"  undo: codemitra harness revert {current.version}")
     entry["next_row"] = cand if keep else base
     return entry

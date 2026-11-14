@@ -35,7 +35,7 @@ def chat_session():
 
 
 def test_patterns_are_found_in_a_chat_record(tmp_path):
-    _write(tmp_path / "proj" / ".mitra" / "runs" / "chat-20261106.jsonl", chat_session())
+    _write(tmp_path / "proj" / ".codemitra" / "runs" / "chat-20261106.jsonl", chat_session())
     files = A.find_run_files([tmp_path])
     assert len(files) == 1
     rep = A.analyze(files)
@@ -52,7 +52,7 @@ def test_patterns_are_found_in_a_chat_record(tmp_path):
 
 
 def test_failing_tests_while_building_are_not_tool_errors(tmp_path):
-    _write(tmp_path / ".mitra" / "runs" / "1" / "run.jsonl", [
+    _write(tmp_path / ".codemitra" / "runs" / "1" / "run.jsonl", [
         {"kind": "start", "harness_version": 2},
         {"kind": "tool", "name": "run_tests", "args": {}, "ok": False, "output": "FAILED: 1 failed"},
         {"kind": "tests", "passed": True},
@@ -63,8 +63,8 @@ def test_failing_tests_while_building_are_not_tool_errors(tmp_path):
 
 
 def test_records_inside_skipped_folders_are_ignored_and_bad_lines_dont_crash(tmp_path):
-    _write(tmp_path / "node_modules" / ".mitra" / "runs" / "x.jsonl", chat_session())
-    bad = tmp_path / ".mitra" / "runs" / "bad.jsonl"
+    _write(tmp_path / "node_modules" / ".codemitra" / "runs" / "x.jsonl", chat_session())
+    bad = tmp_path / ".codemitra" / "runs" / "bad.jsonl"
     bad.parent.mkdir(parents=True)
     bad.write_text("{not json\n", encoding="utf-8")
     files = A.find_run_files([tmp_path])
@@ -73,7 +73,7 @@ def test_records_inside_skipped_folders_are_ignored_and_bad_lines_dont_crash(tmp
 
 
 def test_dashboard_page_shows_results_patterns_and_escapes(tmp_path, monkeypatch):
-    monkeypatch.setenv("MITRA_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("CODEMITRA_HOME", str(tmp_path / "home"))
     res = tmp_path / "playground" / "results" / "01-snake"
     res.mkdir(parents=True)
     (res / "r.json").write_text(json.dumps({
@@ -82,17 +82,17 @@ def test_dashboard_page_shows_results_patterns_and_escapes(tmp_path, monkeypatch
         encoding="utf-8")
     rows = chat_session()
     rows[1]["output"] = "⚠ <script>x</script> not valid"
-    _write(tmp_path / "playground" / ".mitra" / "runs" / "chat.jsonl", rows)
+    _write(tmp_path / "playground" / ".codemitra" / "runs" / "chat.jsonl", rows)
     out, rep = D.build([tmp_path])
     page = out.read_text(encoding="utf-8")
     assert out.parent == tmp_path / "home"
     assert "71/72" in page and "not passed" in page and "repeated_failing_command" in page
     assert "<script>x" not in page and "&lt;script&gt;" in page
-    assert "<title>Mitra Dashboard</title>" in page
+    assert "<title>CodeMitra Dashboard</title>" in page
 
 
 def test_overlapping_roots_count_each_record_once_and_examples_name_the_project(tmp_path):
-    _write(tmp_path / "games" / "snake" / ".mitra" / "runs" / "chat-1.jsonl", chat_session())
+    _write(tmp_path / "games" / "snake" / ".codemitra" / "runs" / "chat-1.jsonl", chat_session())
     files = A.find_run_files([tmp_path, tmp_path / "games"])
     assert len(files) == 1
     rep = A.analyze(files)
@@ -101,7 +101,7 @@ def test_overlapping_roots_count_each_record_once_and_examples_name_the_project(
 
 
 def test_pytest_through_run_command_is_a_test_run_not_a_tool_error(tmp_path):
-    _write(tmp_path / ".mitra" / "runs" / "c.jsonl", [
+    _write(tmp_path / ".codemitra" / "runs" / "c.jsonl", [
         {"kind": "turn_start", "turn": 1},
         {"kind": "tool", "turn": 1, "name": "run_command", "args": {"command": "python -m pytest -q"}, "ok": False,
          "output": "1 failed"},
@@ -117,8 +117,8 @@ def test_analyze_can_keep_only_records_of_one_harness_version(tmp_path):
     old[0].pop("harness_version")
     new = [dict(r) for r in chat_session()]
     new[0]["harness_version"] = 1
-    _write(tmp_path / "a" / ".mitra" / "runs" / "old.jsonl", old)
-    _write(tmp_path / "b" / ".mitra" / "runs" / "new.jsonl", new)
+    _write(tmp_path / "a" / ".codemitra" / "runs" / "old.jsonl", old)
+    _write(tmp_path / "b" / ".codemitra" / "runs" / "new.jsonl", new)
     files = A.find_run_files([tmp_path])
     assert [A.file_version(f) for f in files] == [0, 1]
     assert A.analyze(files, harness_version=1).files == 1
@@ -127,16 +127,16 @@ def test_analyze_can_keep_only_records_of_one_harness_version(tmp_path):
 
 
 def test_run_files_include_the_improve_benchmark_records(tmp_path, monkeypatch):
-    monkeypatch.setenv("MITRA_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("CODEMITRA_HOME", str(tmp_path / "home"))
     _write(tmp_path / "home" / "harness" / "runs" / "20261106" / "candidate" / "T01.jsonl", [{"kind": "start"}])
-    _write(tmp_path / "proj" / ".mitra" / "runs" / "chat.jsonl", [{"kind": "turn_start", "turn": 1}])
+    _write(tmp_path / "proj" / ".codemitra" / "runs" / "chat.jsonl", [{"kind": "turn_start", "turn": 1}])
     names = [p.name for p in D.run_files([tmp_path / "proj"])]
     assert sorted(names) == ["T01.jsonl", "chat.jsonl"]
 
 
 def test_interrupted_turns_are_counted_with_or_without_an_end_record(tmp_path):
     """Live session 2026-11-06: turns 6 and 7 were stopped with esc and left no turn_end; nothing counted them."""
-    _write(tmp_path / ".mitra" / "runs" / "chat.jsonl", [
+    _write(tmp_path / ".codemitra" / "runs" / "chat.jsonl", [
         {"kind": "turn_start", "turn": 1}, {"kind": "model", "turn": 1},           # old record: no end
         {"kind": "turn_start", "turn": 2},
         {"kind": "turn_end", "turn": 2, "interrupted": True, "steps": 11, "text": ""},  # new record
@@ -169,7 +169,7 @@ def test_chat_records_a_turn_that_is_interrupted(tmp_path):
     session = C.ChatSession(workspace=tmp_path, llm=Model(), hooks=hooks)
     with pytest.raises(KeyboardInterrupt):
         session.turn([SystemMessage(content="s"), HumanMessage(content="go")])
-    rows = [json.loads(x) for f in (tmp_path / ".mitra" / "runs").glob("chat-*.jsonl")
+    rows = [json.loads(x) for f in (tmp_path / ".codemitra" / "runs").glob("chat-*.jsonl")
             for x in f.read_text(encoding="utf-8").splitlines()]
     end = [r for r in rows if r["kind"] == "turn_end"]
     assert len(end) == 1 and end[0]["interrupted"] and "KeyboardInterrupt" in end[0]["reason"]

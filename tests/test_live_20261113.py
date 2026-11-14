@@ -1,4 +1,4 @@
-"""E-125 (live 2026-11-13, mitra-try): the user pasted a Neon Chomp PRD. Mitra answered with a build outline and
+"""E-125 (live 2026-11-13, mitra-try): the user pasted a Neon Chomp PRD. CodeMitra answered with a build outline and
 "Should I create all the initial files now?"; the user said yes six times and every decide call asked the same
 question again, word for word. Nothing was built."""
 import json

@@ -2,7 +2,7 @@
 
 Design goals:
   - Streams stdout/stderr in real time so the user sees progress (tests, builds, servers)
-  - Hard timeout with subprocess kill so a runaway process never hangs Mitra
+  - Hard timeout with subprocess kill so a runaway process never hangs CodeMitra
   - Whitelisted executables (same _DEFAULT_COMMANDS as filesystem agent)
   - User sees a coloured "Shell Agent" panel with command, exit code, and truncated output
   - The main LLM gets the exit code + tail of output so it can react to failures
@@ -232,7 +232,7 @@ def _check_path_in_workspace(path: pathlib.Path) -> str | None:
     ]
     if not roots:
         # E-003: fail closed. Without a workspace there is nothing to keep commands inside.
-        return "no workspace is set, so Mitra does not run commands"
+        return "no workspace is set, so CodeMitra does not run commands"
     resolved = path.resolve()
     for root in roots:
         try:
@@ -355,8 +355,8 @@ def _run_chain(parts: list[str], cwd: str, timeout, console) -> ShellResult:
 def _model_command_args(command: str, cwd: str) -> list[str]:
     """Split a model's command; `python` means the project's Python (E-028).
 
-    On Windows a child process looks for `python` next to the parent's exe first, so inside the installed `mitra`
-    command a bare `python` found Mitra's private Python ("No module named pytest", 2026-11-06 session).
+    On Windows a child process looks for `python` next to the parent's exe first, so inside the installed `codemitra`
+    command a bare `python` found CodeMitra's private Python ("No module named pytest", 2026-11-06 session).
     """
     args = _split_command(command)
     if args and args[0].lower() in ("python", "python3", "py", "python.exe"):

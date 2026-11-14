@@ -1,15 +1,15 @@
-"""`mitra kaggle start | stop | status` (D-061): use your Kaggle GPU hours from Mitra, without opening Kaggle.
+"""`codemitra kaggle start | stop | status` (D-061): use your Kaggle GPU hours from CodeMitra, without opening Kaggle.
 
 start: checks your weekly GPU quota, uploads a PRIVATE notebook (remote/kaggle/, GPU T4 x2, internet on) with this
        session's random token in it, follows its live log (lines `MITRA|stage|key=value`), and when it says `ready`
-       points Mitra at it (`app.remote`, every workspace). Typically 4-8 minutes (install, model download, load).
+       points CodeMitra at it (`app.remote`, every workspace). Typically 4-8 minutes (install, model download, load).
 stop:  asks the notebook to shut down (POST /<token>/mitra/stop), so the Kaggle run ends and stops using hours;
-       Mitra goes back to this machine. The notebook also stops by itself after `idle_min` unused minutes, and the
+       CodeMitra goes back to this machine. The notebook also stops by itself after `idle_min` unused minutes, and the
        run has a hard time limit (`max_hours`), so a forgotten session cannot eat the week.
 status: the run's state, whether it answers, and Kaggle's own count of your GPU hours (used / total / reset).
 
 Works for any Kaggle account: credentials from ~/.kaggle/kaggle.json (Kaggle → Settings → API → Create New Token) or
-KAGGLE_USERNAME / KAGGLE_KEY. Needs the `kaggle` package (a Mitra dependency).
+KAGGLE_USERNAME / KAGGLE_KEY. Needs the `kaggle` package (a CodeMitra dependency).
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from queue import Empty, Queue
 
-SLUG = "mitra-gpu-server"
+SLUG = "codemitra-gpu-server"
 ACCELERATOR = "NvidiaTeslaT4"   # Kaggle's "GPU T4 x2"
 API_TIMEOUT_S = 60
 STAGE_RE = re.compile(r"MITRA\|([a-z_]+)((?:\|[a-z_]+=[^|\r\n\"\\]*)*)")
@@ -83,14 +83,14 @@ def client():
     try:
         from kaggle.api.kaggle_api_extended import KaggleApi
     except ImportError as exc:  # missing, or one of its own packages missing (E-065: six)
-        raise KaggleError(f"The `kaggle` package cannot load ({exc}). With Mitra closed, reinstall Mitra: "
-                          "`uv tool install --reinstall -e <mitra folder>` (forward slashes in Git Bash).") from exc
+        raise KaggleError(f"The `kaggle` package cannot load ({exc}). With CodeMitra closed, reinstall CodeMitra: "
+                          "`uv tool install --reinstall -e <codemitra folder>` (forward slashes in Git Bash).") from exc
     except (SystemExit, OSError) as exc:  # older kaggle versions authenticate on import
         raise KaggleError(_CREDS_HELP) from exc
     api = KaggleApi()
     import contextlib
     import io
-    quiet = io.StringIO()  # the library prints its own 15-line sign-in help (twice): ours is shorter and Mitra's
+    quiet = io.StringIO()  # the library prints its own 15-line sign-in help (twice): ours is shorter and CodeMitra's
     try:
         with contextlib.redirect_stdout(quiet), contextlib.redirect_stderr(quiet):
             _timed(api.authenticate)
@@ -101,7 +101,7 @@ def client():
 
 
 _CREDS_HELP = ("No Kaggle API key found. On kaggle.com: your picture → Settings → API → Generate New Token, copy it and "
-               "run `mitra kaggle setup <token>` (if your browser downloaded kaggle.json instead: `mitra kaggle setup`). "
+               "run `codemitra kaggle setup <token>` (if your browser downloaded kaggle.json instead: `codemitra kaggle setup`). "
                "Also verify your phone in Settings (notebooks need it for GPUs and internet).")
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_.\-]{20,}$")
 
@@ -128,7 +128,7 @@ def find_download() -> Path | None:
 
 
 def setup(source: str = "", *, echo=print, api_factory=None) -> bool:
-    """`mitra kaggle setup [path]`: put the downloaded API key where Kaggle looks, check it, show the hours.
+    """`codemitra kaggle setup [path]`: put the downloaded API key where Kaggle looks, check it, show the hours.
     Any Kaggle account; the key stays on this machine."""
     import shutil
     target = key_path()
@@ -145,7 +145,7 @@ def setup(source: str = "", *, echo=print, api_factory=None) -> bool:
         src = None
     elif source and not src.exists():
         echo(f"✗ `{source}` is neither a file nor a Kaggle token. On kaggle.com: Settings → API → Generate New "
-             "Token, copy it, then `mitra kaggle setup <token>`.")
+             "Token, copy it, then `codemitra kaggle setup <token>`.")
         return False
     elif src is None and not target.exists() and not token_path().exists():
         src = find_download()
@@ -167,8 +167,8 @@ def setup(source: str = "", *, echo=print, api_factory=None) -> bool:
         echo(f"✓ API key for {data['username']} saved to {target}")
     elif not target.exists() and not token_path().exists():
         echo("On kaggle.com: your picture → Settings → API → Generate New Token, copy it, then "
-             "`mitra kaggle setup <token>`. (A downloaded kaggle.json works too: `mitra kaggle setup` finds it in "
-             "Downloads, or `mitra kaggle setup <path>`.)")
+             "`codemitra kaggle setup <token>`. (A downloaded kaggle.json works too: `codemitra kaggle setup` finds it in "
+             "Downloads, or `codemitra kaggle setup <path>`.)")
         return False
     try:
         api = (api_factory or client)()
@@ -179,7 +179,7 @@ def setup(source: str = "", *, echo=print, api_factory=None) -> bool:
     echo(f"✓ signed in to Kaggle as {username(api)} · " + quota_line(q))
     if not q.get("total_h"):
         echo("⚠ no GPU hours shown: verify your phone on kaggle.com → Settings (GPU and internet need it)")
-    echo("Next: `mitra kaggle start` (4-8 minutes), then `mitra` in any project folder. `mitra kaggle stop` when done.")
+    echo("Next: `codemitra kaggle start` (4-8 minutes), then `codemitra` in any project folder. `codemitra kaggle stop` when done.")
     return True
 
 
@@ -278,7 +278,7 @@ def _log_lines(api, ref: str, q: Queue, stop: threading.Event) -> None:
 
 def start(model: str, ctx: int = 262_144, *, idle_min: int = 30, max_hours: float = 11.5, wait_min: float = 20,
           echo=print, api=None, sleep=time.sleep) -> dict:
-    """Upload and run the notebook, follow it until ready, point Mitra at it. Returns the remote settings."""
+    """Upload and run the notebook, follow it until ready, point CodeMitra at it. Returns the remote settings."""
     from app import remote
     api = api or client()
     user = username(api)
@@ -289,7 +289,7 @@ def start(model: str, ctx: int = 262_144, *, idle_min: int = 30, max_hours: floa
         if status in ("QUEUED", "RUNNING"):
             r = remote.active()
             if r and r.get("name") == "kaggle":
-                echo("☁ already running: Mitra uses it (`mitra kaggle stop` ends it).")
+                echo("☁ already running: CodeMitra uses it (`codemitra kaggle stop` ends it).")
                 return r
             echo(f"⏳ a run is already {status.lower()}: following it")
             return _follow(api, ref, state, ctx, wait_min, echo, sleep)
@@ -366,18 +366,18 @@ def _follow(api, ref: str, state: dict, ctx: int, wait_min: float, echo, sleep) 
                     data = remote.set_remote(url, ctx, "kaggle")
                     state.update(started=time.time(), public=fields["url"])
                     save_state(state)
-                    echo(f"  ☁ ready: every Mitra window now uses Kaggle ({state.get('model')} at {ctx // 1024}K)")
+                    echo(f"  ☁ ready: every CodeMitra window now uses Kaggle ({state.get('model')} at {ctx // 1024}K)")
                     return data
                 elif stage in STAGE_TEXT:
                     echo(f"  · {STAGE_TEXT[stage]}")
         stop.set()
         sleep(5)
-    raise KaggleError(f"Not ready after {wait_min:.0f} minutes. `mitra kaggle status` shows it; the log: "
+    raise KaggleError(f"Not ready after {wait_min:.0f} minutes. `codemitra kaggle status` shows it; the log: "
                       f"{state.get('url')}")
 
 
 def stop(*, echo=print, api=None, sleep=time.sleep, wait_s: float = 90) -> None:
-    """Ask the notebook to shut down; Mitra goes back to this machine; show the hours."""
+    """Ask the notebook to shut down; CodeMitra goes back to this machine; show the hours."""
     import urllib.request
 
     from app import remote
@@ -398,7 +398,7 @@ def stop(*, echo=print, api=None, sleep=time.sleep, wait_s: float = 90) -> None:
                  f"{state.get('idle_min', 30)} min unused")
     if remote.active() and remote.active().get("name") == "kaggle":
         remote.clear()
-    echo("  ✓ Mitra is back on this machine's Ollama")
+    echo("  ✓ CodeMitra is back on this machine's Ollama")
     if asked:
         echo("  asked the Kaggle notebook to stop …")
     try:
@@ -412,7 +412,7 @@ def stop(*, echo=print, api=None, sleep=time.sleep, wait_s: float = 90) -> None:
                     break
                 sleep(5)
             else:
-                echo(f"  ⏳ still shutting down; check with `mitra kaggle status` ({state.get('url')})")
+                echo(f"  ⏳ still shutting down; check with `codemitra kaggle status` ({state.get('url')})")
         echo("  " + quota_line(quota(api)))
     except KaggleError as exc:
         echo(f"  ({exc})")
@@ -431,16 +431,16 @@ def status(*, echo=print, api=None) -> None:
             echo(f"Kaggle run: {run.lower()}{' · ' + failure if failure else ''} · {state.get('model', '?')} at "
                  f"{int(state.get('ctx') or 0) // 1024}K · {state.get('url', '')}")
         else:
-            echo("Kaggle run: none started from Mitra yet (`mitra kaggle start`)")
+            echo("Kaggle run: none started from CodeMitra yet (`codemitra kaggle start`)")
         echo(quota_line(quota(api)))
     except KaggleError as exc:
         echo(f"Kaggle: {exc}")
     if r:
         models, err = remote.probe(r["url"], timeout=15)
-        echo(f"Mitra uses: ☁ {r.get('name')} · {remote.shown(r['url'])} · " +
+        echo(f"CodeMitra uses: ☁ {r.get('name')} · {remote.shown(r['url'])} · " +
              (f"✗ not answering ({err})" if err else "✓ answering"))
     else:
-        echo("Mitra uses: this machine's Ollama")
+        echo("CodeMitra uses: this machine's Ollama")
 
 
 def has_key() -> bool:
@@ -450,7 +450,7 @@ def has_key() -> bool:
 
 
 def readiness(api_factory=None) -> dict:
-    """Can Mitra use Kaggle right now? {key, ok, user, left_h, total_h, refresh, problem} (D-064).
+    """Can CodeMitra use Kaggle right now? {key, ok, user, left_h, total_h, refresh, problem} (D-064).
     problem is one plain line with the fix, or ""."""
     out = {"key": has_key(), "ok": False, "user": "", "left_h": None, "total_h": None, "refresh": None, "problem": ""}
     if not out["key"]:
@@ -469,7 +469,7 @@ def readiness(api_factory=None) -> dict:
     out.update(left_h=q["left_h"], total_h=q["total_h"], refresh=q["refresh"])
     if not q["total_h"]:
         out["problem"] = ("Kaggle shows 0 GPU hours: verify your phone on kaggle.com → Settings (GPUs need it), "
-                          "then restart Mitra")
+                          "then restart CodeMitra")
     elif q["left_h"] < 0.25:
         when = q["refresh"].astimezone().strftime("%a %H:%M") if q.get("refresh") else "next week"
         out["problem"] = f"Kaggle GPU hours are used up this week (resets {when}): this machine until then"

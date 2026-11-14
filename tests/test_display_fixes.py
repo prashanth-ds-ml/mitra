@@ -125,7 +125,7 @@ def test_make_dir_creates_folders_inside_the_workspace(tmp_path):
 
 def test_written_files_that_do_not_parse_get_a_warning(tmp_path):
     ws = T.Workspace(tmp_path)
-    out = T.write_file(ws, "level.toml", "## Grid\n- rows = 5\n")                 # what Mitra wrote
+    out = T.write_file(ws, "level.toml", "## Grid\n- rows = 5\n")                 # what CodeMitra wrote
     assert "not valid TOML" in out
     assert "not valid Python" in T.write_file(ws, "game.py", "def f(:\n")
     assert "not valid JSON" in T.write_file(ws, "c.json", "{a: 1}")

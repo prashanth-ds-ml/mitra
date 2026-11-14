@@ -1,6 +1,6 @@
 """Web search that works without an API key (E-024).
 
-General search pages (DuckDuckGo, Bing, Mojeek) block or garble automated requests from this machine, so Mitra asks
+General search pages (DuckDuckGo, Bing, Mojeek) block or garble automated requests from this machine, so CodeMitra asks
 open APIs that allow it, in parallel, and labels each result with its source:
 
     Wikipedia (topics, background) · Hugging Face (models, datasets) · GitHub (code, libraries) ·
@@ -18,7 +18,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
-USER_AGENT = "Mitra/0.1 (local coding assistant; https://github.com/prashanth-ds-ml/mitra)"
+USER_AGENT = "CodeMitra/0.1 (local coding assistant; https://github.com/prashanth-ds-ml/codemitra)"
 SOURCE_TIMEOUT = 8  # seconds per source; they run in parallel
 
 
@@ -176,7 +176,7 @@ def format_results(query: str, results: list[Result], errors: dict[str, str]) ->
     if not results:
         detail = "; ".join(f"{k}: {v}" for k, v in errors.items()) or "no results"
         return (f"✗ Web search failed: no source returned results for '{query}' ({detail}). "
-                "Mitra may be offline.") if errors else f"No web results found for '{query}'."
+                "CodeMitra may be offline.") if errors else f"No web results found for '{query}'."
     used = list(dict.fromkeys(r.source for r in results))
     lines = [f"# Web results for '{query}'", f"Sources: {', '.join(used)}. Use fetch_url on a result to read it."]
     for i, r in enumerate(results, 1):

@@ -14,9 +14,9 @@ def _rows(path):
 
 
 def test_a_growing_history_is_stored_as_deltas_and_rebuilt_exactly(tmp_path):
-    rec = L.Recorder(tmp_path / "p" / ".mitra" / "runs" / "chat-1.jsonl")
+    rec = L.Recorder(tmp_path / "p" / ".codemitra" / "runs" / "chat-1.jsonl")
     tools = [{"name": "read_file", "description": "Read a file."}]
-    msgs = [SystemMessage(content="You are Mitra." * 200), HumanMessage(content="read a.py")]
+    msgs = [SystemMessage(content="You are CodeMitra." * 200), HumanMessage(content="read a.py")]
     r1 = AIMessage(content="", tool_calls=[{"name": "read_file", "args": {"path": "a.py"}, "id": "c1"}],
                    additional_kwargs={"reasoning_content": "I should read the file first."})
     rec.trace(list(msgs), r1, tools=tools, model="qwen3.5:latest", num_ctx=262144, step=1)
@@ -29,7 +29,7 @@ def test_a_growing_history_is_stored_as_deltas_and_rebuilt_exactly(tmp_path):
     assert rows[2]["base"] == 1 and len(rows[2]["new"]) == 1  # only the tool result is new (reply is in history)
     calls = L.rebuild_calls(rows)
     assert [m["role"] for m in calls[1]["messages"]] == ["system", "user", "assistant", "tool"]
-    assert calls[1]["messages"][0]["content"] == "You are Mitra." * 200
+    assert calls[1]["messages"][0]["content"] == "You are CodeMitra." * 200
     assert calls[1]["messages"][3]["content"] == "x = 1\n" * 1000  # nothing cut
     assert calls[0]["reply"]["thinking"] == "I should read the file first."
     assert calls[1]["reply"]["content"] == "a.py sets x to 1." and calls[1]["tools"] == tools
@@ -37,7 +37,7 @@ def test_a_growing_history_is_stored_as_deltas_and_rebuilt_exactly(tmp_path):
 
 
 def test_a_rewritten_history_is_stored_in_full(tmp_path):
-    rec = L.Recorder(tmp_path / "p" / ".mitra" / "runs" / "r.jsonl")
+    rec = L.Recorder(tmp_path / "p" / ".codemitra" / "runs" / "r.jsonl")
     rec.trace([SystemMessage(content="s"), HumanMessage(content="one")], AIMessage(content="1"))
     rec.trace([SystemMessage(content="s"), HumanMessage(content="summary of before")], AIMessage(content="2"))
     rows = [r for r in _rows(rec.trace_path) if r["kind"] == "call"]
@@ -46,7 +46,7 @@ def test_a_rewritten_history_is_stored_in_full(tmp_path):
 
 
 def test_secrets_never_reach_a_trace(tmp_path):
-    rec = L.Recorder(tmp_path / "p" / ".mitra" / "runs" / "r.jsonl")
+    rec = L.Recorder(tmp_path / "p" / ".codemitra" / "runs" / "r.jsonl")
     secret = "ghp_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
     rec.trace([SystemMessage(content="s"), HumanMessage(content=f"token is {secret}")], AIMessage(content="ok"))
     assert secret not in rec.trace_path.read_text(encoding="utf-8")
@@ -54,7 +54,7 @@ def test_secrets_never_reach_a_trace(tmp_path):
 
 def test_traces_are_mirrored_but_not_counted_as_run_records(tmp_path):
     from app.core import analyze as A
-    rec = L.Recorder(tmp_path / "p" / ".mitra" / "runs" / "r.jsonl")
+    rec = L.Recorder(tmp_path / "p" / ".codemitra" / "runs" / "r.jsonl")
     rec.write("start", task="t")
     rec.trace([SystemMessage(content="s"), HumanMessage(content="u")], AIMessage(content="a"))
     assert S.stored_files("traces") and len(S.stored_files()) == 1
@@ -62,13 +62,13 @@ def test_traces_are_mirrored_but_not_counted_as_run_records(tmp_path):
 
 
 def test_traces_off_writes_none(tmp_path):
-    rec = L.Recorder(tmp_path / "p" / ".mitra" / "runs" / "r.jsonl", traces=False)
+    rec = L.Recorder(tmp_path / "p" / ".codemitra" / "runs" / "r.jsonl", traces=False)
     rec.trace([HumanMessage(content="u")], AIMessage(content="a"))
-    assert rec.trace_path is None and not (tmp_path / "p" / ".mitra" / "runs" / "traces").exists()
+    assert rec.trace_path is None and not (tmp_path / "p" / ".codemitra" / "runs" / "traces").exists()
 
 
 def test_a_failing_trace_never_breaks_the_run(tmp_path):
-    rec = L.Recorder(tmp_path / "p" / ".mitra" / "runs" / "r.jsonl")
+    rec = L.Recorder(tmp_path / "p" / ".codemitra" / "runs" / "r.jsonl")
     rec.trace([object()], object())  # garbage in: swallowed
 
 
@@ -100,7 +100,7 @@ def test_a_chat_turn_writes_a_trace_and_an_outcome(tmp_path):
                     AIMessage(content="x is 1.")])
     session = _session(tmp_path, model)
     session.turn([SystemMessage(content="sys"), HumanMessage(content="what is x")])
-    runs = tmp_path / ".mitra" / "runs"
+    runs = tmp_path / ".codemitra" / "runs"
     trace = next((runs / "traces").glob("chat-*.jsonl"))
     calls = L.rebuild_calls(_rows(trace))
     assert len(calls) == 2 and calls[0]["model"] == "qwen3.5:4b" and calls[0]["turn"] == 1

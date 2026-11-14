@@ -154,7 +154,7 @@ def test_the_budget_is_a_harness_limit():
 
 def test_a_code_question_goes_to_the_explainer_end_to_end(harness, monkeypatch):  # noqa: F811
     state, ws = harness
-    (ws / "mitra.toml").write_text('architecture = "router"\n', encoding="utf-8")  # D-071: router paths
+    (ws / "codemitra.toml").write_text('architecture = "router"\n', encoding="utf-8")  # D-071: router paths
     (ws / "game.py").write_text("def step(s):\n    return s\n", encoding="utf-8")
     made = []
     orig = main.get_local_llm
@@ -167,7 +167,7 @@ def test_a_code_question_goes_to_the_explainer_end_to_end(harness, monkeypatch):
     monkeypatch.setattr(main, "get_local_llm", tracking)
     Inputs.script = ["explain the game logic", "fix the failing test in test_x.py", "exit"]
     main._chat()
-    rows = [json.loads(x) for f in (ws / ".mitra" / "runs").glob("chat-*.jsonl")
+    rows = [json.loads(x) for f in (ws / ".codemitra" / "runs").glob("chat-*.jsonl")
             for x in f.read_text(encoding="utf-8").splitlines() if x.strip()]
     starts = [(r["path"], r["request_kind"]) for r in rows if r["kind"] == "turn_start"]
     assert starts == [("explain", "question"), ("loop", "small")]

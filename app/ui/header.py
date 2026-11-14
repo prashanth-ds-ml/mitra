@@ -12,7 +12,7 @@ _PLACEMENT = {"gpu": ("GPU", "m.ok"), "split": ("GPU+CPU", "m.info"), "cpu": ("C
 
 
 def title_line() -> Text:
-    t = Text("✻ Mitra", style="m.accent.b")
+    t = Text("✻ CodeMitra", style="m.accent.b")
     t.append("  local coding assistant · runs on your machine", style="m.dim")
     return t
 
@@ -71,7 +71,7 @@ def header(*, model: str, folder: str, context: int | None = None, placement: st
         rows.add_row("learning", Text(learning, style="m.dim"))
     if dashboard:
         rows.add_row("dashboard", Text(dashboard, style="m.dim"))
-    title = Text("✻ Mitra", style="m.accent.b")
+    title = Text("✻ CodeMitra", style="m.accent.b")
     if version:
         title.append(f" {version}", style="m.dim")
     return Panel(Group(rows), title=title, title_align="left", box=ROUNDED, border_style="m.accent",
@@ -80,7 +80,7 @@ def header(*, model: str, folder: str, context: int | None = None, placement: st
 
 def tips() -> Text:
     t = Text("  ", style="m.dim")
-    for i, (key, what) in enumerate((("/", "commands"), ("!", "shell"), ("/good /bad", "teach Mitra"),
+    for i, (key, what) in enumerate((("/", "commands"), ("!", "shell"), ("/good /bad", "teach CodeMitra"),
                                      ("/role", "switch role"), ("ctrl+c", "stop"), ("exit", "quit"))):
         if i:
             t.append("  ·  ", style="m.faint")

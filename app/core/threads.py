@@ -1,11 +1,11 @@
 """Conversation memory as threads (D-071, BUILD_ORDER step 3b).
 
-Root cause R4 (2026-11-11): Mitra kept only the first line of each request, so "do you remember our discussion?"
+Root cause R4 (2026-11-11): CodeMitra kept only the first line of each request, so "do you remember our discussion?"
 got a list of titles and ideas were filed under the wrong project. A thread keeps what was said, decided and left
 open in one discussion, written by the model from the chat records when a session ends (or at the next start if
-Mitra was closed without `exit`).
+CodeMitra was closed without `exit`).
 
-Store: ~/.mitra/threads/<slug>.md, one file per thread, global (an idea is not tied to a folder; `project` says
+Store: ~/.codemitra/threads/<slug>.md, one file per thread, global (an idea is not tied to a folder; `project` says
 where it came up). Loaded per turn: a short index of recent threads, and the full text of the threads your message
 is about (shared words with the title and the summary).
 """
@@ -24,9 +24,9 @@ CONVO_MAX_CHARS = 7000
 _STOP = set("""a an the and or but if then so to of in on at for with from by about into over is are was were be been
 being it its this that these those i you we he she they me my our your their what which who how why when where can
 could would should will shall do does did done have has had not no yes ok okay lets let's just like want need think
-mitra please also more some any very really get got make made go going""".split())
+mitra codemitra please also more some any very really get got make made go going""".split())
 
-SUMMARIZE_PROMPT = """You keep the memory of conversations between a user and their assistant, Mitra, as threads.
+SUMMARIZE_PROMPT = """You keep the memory of conversations between a user and their assistant, CodeMitra, as threads.
 A thread is one discussion worth remembering later: an idea, a plan, a decision, a preference, an open question.
 Not a thread: greetings, small talk, a finished small task, a mail that was drafted and sent.
 
@@ -184,7 +184,7 @@ def summarize(llm, record: Path, project: str, root: Path | None = None) -> list
     turns = pending_turns(record, root)
     if not turns:
         return []
-    convo = "\n".join(f"User: {t['user'][:800]}\nMitra: {t['answer'][:900]}" for t in turns)[-CONVO_MAX_CHARS:]
+    convo = "\n".join(f"User: {t['user'][:800]}\nCodeMitra: {t['answer'][:900]}" for t in turns)[-CONVO_MAX_CHARS:]
     near = [t for t in load(root) if _words(t["title"] + " " + t["said"]) & _words(convo)][:6]
     existing = "\n".join(f"- {t['slug']}: {t['title']} ({t['project']}): said: {t['said'][:200]} | decided: "
                          f"{t['decided'][:120]} | open: {t['open'][:120]}" for t in near) or "(none)"

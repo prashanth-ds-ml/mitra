@@ -1,10 +1,10 @@
 """Central append-only store for every run record and trace (dashboard step 0, D-041).
 
-Records are written to the project's `.mitra/runs/` (as before) and mirrored here, so deleting a project or its
-`.mitra/` loses nothing. Mitra never deletes or rewrites a stored file; it only appends.
+Records are written to the project's `.codemitra/runs/` (as before) and mirrored here, so deleting a project or its
+`.codemitra/` loses nothing. CodeMitra never deletes or rewrites a stored file; it only appends.
 
-    ~/.mitra/data/runs/<project-slug>/<same path as under .mitra/runs>
-    ~/.mitra/data/projects.json     every folder Mitra ran in
+    ~/.codemitra/data/runs/<project-slug>/<same path as under .codemitra/runs>
+    ~/.codemitra/data/projects.json     every folder CodeMitra ran in
 """
 from __future__ import annotations
 
@@ -68,8 +68,8 @@ def mirror_path(record: Path) -> Path | None:
     if _within(record, home):
         return store / HOME_SLUG / record.relative_to(home)
     parts = record.parts
-    if ".mitra" in parts[1:]:
-        i = len(parts) - 1 - parts[::-1].index(".mitra")  # the innermost .mitra
+    if ".codemitra" in parts[1:]:
+        i = len(parts) - 1 - parts[::-1].index(".codemitra")  # the innermost .codemitra
         project = Path(*parts[:i])
         rest = parts[i + 1:]
         if rest and rest[0] == "runs":
@@ -86,11 +86,11 @@ def project_of(stored: Path) -> str:
         rel = stored.relative_to(store).parts
         return project_name(rel[0]) if rel else "?"
     parts = stored.parts
-    return parts[parts.index(".mitra") - 1] if ".mitra" in parts[1:] else stored.parent.name
+    return parts[parts.index(".codemitra") - 1] if ".codemitra" in parts[1:] else stored.parent.name
 
 
 def note_project(project: Path) -> None:
-    """Remember a folder Mitra ran in (first and last seen). Never raises."""
+    """Remember a folder CodeMitra ran in (first and last seen). Never raises."""
     try:
         p = str(Path(project).resolve())
         f = projects_file()
@@ -147,7 +147,7 @@ def merge(source: Path) -> int:
 
 
 def import_all(roots: list[Path]) -> dict:
-    """Copy every record found under `roots`, the known projects and ~/.mitra into the store."""
+    """Copy every record found under `roots`, the known projects and ~/.codemitra into the store."""
     from app.core import analyze as A
 
     search = [Path(r) for r in roots] + known_projects()

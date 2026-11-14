@@ -63,7 +63,7 @@ def parse_choice(text: str) -> tuple[str, int]:
 
 
 def candidates(preferred: str, preferred_ctx: int, installed: set[str], configured=None) -> list[tuple[str, int]]:
-    """Laptop models to try, best first: mitra.toml `laptop_models`, else the preferred model at its laptop context,
+    """Laptop models to try, best first: codemitra.toml `laptop_models`, else the preferred model at its laptop context,
     at 64K, then the 4B at 64K and 32K. Only installed models (an empty `installed` = unknown: keep all)."""
     if configured:
         out = [parse_choice(c) for c in configured]
@@ -166,7 +166,7 @@ class Health:
                 if self._stop.wait(self.interval):
                     break
 
-        self._thread = threading.Thread(target=loop, daemon=True, name="mitra-health")
+        self._thread = threading.Thread(target=loop, daemon=True, name="codemitra-health")
         self._thread.start()
 
     def stop(self) -> None:
@@ -232,7 +232,7 @@ class Session:
 # ── D-064: does the user want Kaggle, and when ───────────────────────────────
 
 USE_VALUES = ("now", "when-needed", "never")
-USE_TEXT = {"now": "starts in the background when Mitra starts",
+USE_TEXT = {"now": "starts in the background when CodeMitra starts",
             "when-needed": "starts in the background on your first write work",
             "never": "not used: this machine only"}
 

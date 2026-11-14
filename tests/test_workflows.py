@@ -1,4 +1,4 @@
-"""Workflow-style regression tests for Mitra."""
+"""Workflow-style regression tests for CodeMitra."""
 
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage

@@ -1,5 +1,5 @@
-"""D-075: the two self-improvement layers. Layer 1: `mitra improve --chat` starts by itself at exit when 3+ new
-signals or a queued rule wait. Layer 2: `mitra coach` sends a digest of the records to Claude (claude -p) and queues
+"""D-075: the two self-improvement layers. Layer 1: `codemitra improve --chat` starts by itself at exit when 3+ new
+signals or a queued rule wait. Layer 2: `codemitra coach` sends a digest of the records to Claude (claude -p) and queues
 the report's rules for layer 1. No model, no Claude: scripted."""
 import json
 import time
@@ -97,7 +97,7 @@ def test_the_reminder_comes_after_a_week_or_40_turns(tmp_path):
     files = [_session(tmp_path)]
     assert CO.reminder(files) == ""                                         # 4 turns, never reviewed
     many = _record(tmp_path / "s2" / "chat-1.jsonl", [(f"question {i}", "answer", []) for i in range(40)])
-    assert CO.reminder([many]) == "coach: no review yet, 40 new turns · `mitra coach`"
+    assert CO.reminder([many]) == "coach: no review yet, 40 new turns · `codemitra coach`"
     CO._save_state({"last_t": time.time() - 8 * 86400})
     assert CO.reminder(files).startswith("coach: last review 8 days ago, 4 new turns")
 

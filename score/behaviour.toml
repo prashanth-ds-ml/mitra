@@ -1,9 +1,9 @@
-# The measuring set (D-068 step 3b, D-071): how Mitra behaves in a conversation, whatever the architecture.
+# The measuring set (D-068 step 3b, D-071): how CodeMitra behaves in a conversation, whatever the architecture.
 # Every case is typed in the snake project (score/projects/snake), as you would in one of yours.
 # expect = "talk": answer without tools, short, no report headings; ask_back: ends by asking you something.
 # expect = "look": reads the code (at least one read) and answers with the right file and facts.
 # expect = "change": changes the code; `check` (python, run in the project) must pass afterwards.
-# history: earlier turns of the same conversation ([you, Mitra], ...). reference: an answer that passes (validated).
+# history: earlier turns of the same conversation ([you, CodeMitra], ...). reference: an answer that passes (validated).
 project = "snake"
 
 [[case]]
@@ -114,7 +114,7 @@ text = "do you know about you..? what can you already do?"
 expect = "talk"
 max_words = 200
 facts = ['(?i)kaggle', '(?i)test', '(?i)plan']
-reference = """I'm Mitra, your own coding assistant on small local models, on this laptop or a Kaggle GPU. I can talk
+reference = """I'm CodeMitra, your own coding assistant on small local models, on this laptop or a Kaggle GPU. I can talk
 things through, read and explain code, make changes and run the tests, plan bigger work and build it task by task,
 search the web, use MCP servers like git and context7, draft mails in your voice and remember our conversations.
 What should we work on?"""
@@ -138,7 +138,7 @@ facts = ['(?i)\b(my pick|i.d pick|i pick|i.d add|i.ll add|my (choice|turn))', '(
 reference = """Added: 2. writing tests for your code. My pick for 3: running those tests after every change, because a
 test only helps if it runs every time. Your turn!"""
 
-# E-125 (live 2026-11-13): after Mitra offered to make a change, "yes" was answered six times with the same question.
+# E-125 (live 2026-11-13): after CodeMitra offered to make a change, "yes" was answered six times with the same question.
 # The history holds the offer twice (it already repeated once), the state the live session was stuck in.
 [[case]]
 id = "B15_yes_after_offer"

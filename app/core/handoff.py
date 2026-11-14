@@ -1,6 +1,6 @@
-"""The "Kaggle ended" report (D-062 B3): what was done, from Mitra's own records + a short summary by the laptop model.
+"""The "Kaggle ended" report (D-062 B3): what was done, from CodeMitra's own records + a short summary by the laptop model.
 
-Written to `<project>/.mitra/reports/kaggle-ended-<time>.md` and shown in the chat; then Mitra stops and waits.
+Written to `<project>/.codemitra/reports/kaggle-ended-<time>.md` and shown in the chat; then CodeMitra stops and waits.
 Facts never come from the model: requests, outcomes, changed files, last tests, night progress and Kaggle time are
 read from the session (or, at start-up, from the last session's records). The model only writes the summary.
 """
@@ -40,7 +40,7 @@ def turns_from_record(record: Path) -> list[dict]:
 
 
 def latest_record(workspace: Path) -> Path | None:
-    runs = Path(workspace) / ".mitra" / "runs"
+    runs = Path(workspace) / ".codemitra" / "runs"
     found = sorted(runs.glob("chat-*.jsonl"), key=lambda p: p.stat().st_mtime) if runs.is_dir() else []
     return found[-1] if found else None
 
@@ -53,7 +53,7 @@ def _rel(path: str, root: Path) -> str:
 
 
 def transcript(messages: list, limit_chars: int = 12_000) -> str:
-    """The conversation as plain text for the summary: user, Mitra, and tool calls by name (newest kept)."""
+    """The conversation as plain text for the summary: user, CodeMitra, and tool calls by name (newest kept)."""
     lines = []
     for m in messages:
         kind = type(m).__name__
@@ -115,7 +115,7 @@ def _turn_line(t: dict) -> str:
 def build(*, reason: str, workspace: Path, turns: list[dict], laptop: str, summary: str | None = "",
           last_tests: str = "", night: dict | None = None, kaggle: dict | None = None, now: float | None = None,
           max_turns: int | None = None) -> str:
-    """`summary`: None = no summary was tried (Kaggle ended while Mitra was closed: the conversation is gone);
+    """`summary`: None = no summary was tried (Kaggle ended while CodeMitra was closed: the conversation is gone);
     "" = it was tried and failed. `max_turns`: the last N turns only (the screen); None = all (the saved file)."""
     now = now or time.time()
     when = time.strftime("%Y-%m-%d %H:%M", time.localtime(now))
@@ -152,14 +152,14 @@ def build(*, reason: str, workspace: Path, turns: list[dict], laptop: str, summa
         lines += ["", "## Summary (by the laptop model)", "", summary or "(the laptop model could not write a "
                                                                          "summary; the facts above are complete)"]
     lines += ["", "## Next", "",
-              "Mitra stopped here and waits for you: carry on on the laptop by sending a message, or "
+              "CodeMitra stopped here and waits for you: carry on on the laptop by sending a message, or "
               "`/kaggle start` for the GPU again."]
     return "\n".join(lines) + "\n"
 
 
 def startup_line(turns: list[dict], workspace: Path, session_min: int | None, report: Path) -> str:
-    """E-107: Kaggle ended while Mitra was closed: one line at start-up, the full report stays in its file.
-    '☁ Kaggle ended while Mitra was closed · last session 111 min, 30 turns, no files changed · report: …'"""
+    """E-107: Kaggle ended while CodeMitra was closed: one line at start-up, the full report stays in its file.
+    '☁ Kaggle ended while CodeMitra was closed · last session 111 min, 30 turns, no files changed · report: …'"""
     files = sorted({_rel(f, workspace) for t in turns for f in t.get("files", [])})
     parts = [f"last session {session_min} min" if session_min is not None else "last session",
              f"{len(turns)} turn{'s' if len(turns) != 1 else ''}"]
@@ -172,12 +172,12 @@ def startup_line(turns: list[dict], workspace: Path, session_min: int | None, re
         where = report.parent.relative_to(workspace).as_posix() + "/"
     except ValueError:
         where = str(report.parent)
-    return f"☁ Kaggle ended while Mitra was closed · {', '.join(parts)} · report in {where}"
+    return f"☁ Kaggle ended while CodeMitra was closed · {', '.join(parts)} · report in {where}"
 
 
 def write(workspace: Path, text: str, now: float | None = None) -> Path:
     stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(now or time.time()))
-    out = Path(workspace) / ".mitra" / "reports" / f"kaggle-ended-{stamp}.md"
+    out = Path(workspace) / ".codemitra" / "reports" / f"kaggle-ended-{stamp}.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(text, encoding="utf-8")
     return out

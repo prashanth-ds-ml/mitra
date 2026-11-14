@@ -1,7 +1,7 @@
-"""`mitra solve`: run the core loop on one task or a whole plan, headless (M1).
+"""`codemitra solve`: run the core loop on one task or a whole plan, headless (M1).
 
-    mitra solve "add a score counter" --test "python -m pytest -q"
-    mitra solve --plan plan.md --test "python -m pytest -q tests"      # one plan task at a time
+    codemitra solve "add a score counter" --test "python -m pytest -q"
+    codemitra solve --plan plan.md --test "python -m pytest -q tests"      # one plan task at a time
     add --json for a machine-readable result; exit code 0 = tests pass, 1 = not
 """
 from __future__ import annotations
@@ -21,7 +21,7 @@ from app.llm import get_local_llm, thinking_setting
 
 
 class EventPrinter:
-    """Shows the loop in the Mitra style: one line per tool, results under it."""
+    """Shows the loop in the CodeMitra style: one line per tool, results under it."""
 
     def __init__(self, console: Console):
         self.c = console
@@ -64,20 +64,20 @@ def cmd_solve(task: str = "", *, test: str = "python -m pytest -q", plan: str = 
     from app import remote
     remote.check_alive(cfg, echo=lambda s: console.print(s))  # a dead Kaggle address: build on this machine (E-067)
     from app.core import roles
-    model = model or roles.resolve("builder", cfg)[0]  # mitra solve = the builder role (D-051)
+    model = model or roles.resolve("builder", cfg)[0]  # codemitra solve = the builder role (D-051)
     num_ctx = roles.context_for(model, cfg)              # its maximum context for now (D-052)
-    # tests/ is read-only so the builder cannot cheat; a tests-first plan has Mitra write its own tests (night run)
+    # tests/ is read-only so the builder cannot cheat; a tests-first plan has CodeMitra write its own tests (night run)
     ws = Workspace(Path(workspace), test_command=test, **({"read_only": ()} if write_tests else {}))
     from app.core import store
-    store.note_project(ws.root)  # the dashboard reads every folder Mitra ran in (D-041)
+    store.note_project(ws.root)  # the dashboard reads every folder CodeMitra ran in (D-041)
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    runs = ws.root / ".mitra" / "runs" / stamp
+    runs = ws.root / ".codemitra" / "runs" / stamp
     ws.spill_dir = runs / "output"
     llm = get_local_llm(model, num_ctx=num_ctx, reasoning=thinking_setting(cfg.get("thinking")),
-                        base_url=cfg.get("ollama_local_base_url"))  # mitra.toml or a remote (D-060); was always local
+                        base_url=cfg.get("ollama_local_base_url"))  # codemitra.toml or a remote (D-060); was always local
     printer = None if as_json else EventPrinter(console)
     if not as_json:
-        console.print(Text(f"✻ Mitra solve · {model} · {num_ctx // 1024}K context · {ws.root}", style="m.dim"))
+        console.print(Text(f"✻ CodeMitra solve · {model} · {num_ctx // 1024}K context · {ws.root}", style="m.dim"))
 
     if plan:
         plan_text = Path(plan).read_text(encoding="utf-8")

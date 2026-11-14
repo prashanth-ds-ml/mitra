@@ -1,5 +1,5 @@
 """Facts recorded with every turn so before/after comparisons are fair (item 0, SELF_IMPROVEMENT.md section 4):
-which Mitra code ran, and the machine's state. Read once per process where it is costly; never raises."""
+which CodeMitra code ran, and the machine's state. Read once per process where it is costly; never raises."""
 from __future__ import annotations
 
 import subprocess
@@ -11,7 +11,7 @@ MITRA_ROOT = Path(__file__).resolve().parents[2]
 
 @lru_cache(maxsize=1)
 def code_version() -> str:
-    """Short git commit of the Mitra repo, `-dirty` with uncommitted changes to tracked files; `unknown` without git."""
+    """Short git commit of the CodeMitra repo, `-dirty` with uncommitted changes to tracked files; `unknown` without git."""
     try:
         head = subprocess.run(["git", "-C", str(MITRA_ROOT), "rev-parse", "--short", "HEAD"],
                               capture_output=True, text=True, timeout=5)

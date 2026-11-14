@@ -30,7 +30,7 @@ cli = typer.Typer(invoke_without_command=True, add_completion=False)
 
 
 def _utf8_streams(streams=None) -> None:
-    """E-062: output redirected to a file or pipe on Windows is cp1252, so `mitra night ... > night.log` crashed on
+    """E-062: output redirected to a file or pipe on Windows is cp1252, so `codemitra night ... > night.log` crashed on
     the first ✗ / ✓ before anything ran. Such streams are switched to UTF-8 (unknown characters replaced)."""
     for stream in streams if streams is not None else (sys.stdout, sys.stderr):
         enc = (getattr(stream, "encoding", "") or "").lower().replace("-", "").replace("_", "")
@@ -48,7 +48,7 @@ console = ui.apply(Console())
 
 
 def _say(markdown_text: str) -> None:
-    """Mitra's reply to a command: plain markdown in the Phosphor theme, no box (D-031)."""
+    """CodeMitra's reply to a command: plain markdown in the Phosphor theme, no box (D-031)."""
     console.print()
     console.print(Markdown(markdown_text or ""))
 
@@ -62,7 +62,7 @@ def show_banner():
 _MITRA_MD_TEMPLATE = """\
 # Project Rules
 
-<!-- Mitra will follow these rules in every response. -->
+<!-- CodeMitra will follow these rules in every response. -->
 
 ## General
 - Always write clean, readable, well-structured code
@@ -109,12 +109,12 @@ auto_compact_threshold = 0       # 0 = compact at 80% of num_ctx (E-046); a numb
 num_ctx = 0                      # 0 = per model: 4B 128K, 9B 256K (measured, D-036, D-039); /context changes it
 ollama_local_base_url = "http://localhost:11434"
 ollama_cloud_base_url = "https://ollama.com"
-allowed_roots = []           # extra folders Mitra may inspect/edit beyond the workspace
-disabled_tools = []          # tool names Mitra may not use
+allowed_roots = []           # extra folders CodeMitra may inspect/edit beyond the workspace
+disabled_tools = []          # tool names CodeMitra may not use
 disabled_commands = []       # shell executables to block (e.g. ["python", "git"])
-instruction_files = ["AGENTS.md", "CLAUDE.md", ".mitra/instructions.md", ".github/copilot-instructions.md"]
-skill_dirs = ["skills", ".mitra/skills"]
-# MCP servers live in .mitra/mcp.json (project) and ~/.mitra/mcp.json (you); see /mcp
+instruction_files = ["AGENTS.md", "CLAUDE.md", ".codemitra/instructions.md", ".github/copilot-instructions.md"]
+skill_dirs = ["skills", ".codemitra/skills"]
+# MCP servers live in .codemitra/mcp.json (project) and ~/.codemitra/mcp.json (you); see /mcp
 """
 
 _DEFAULT_CLOUD_CODEGEN_MODEL = "kimi-k2.5:cloud"
@@ -125,34 +125,34 @@ def _run_init() -> None:
     cwd = pathlib.Path.cwd()
     created = []
 
-    rules_path = cwd / "MITRA.md"
+    rules_path = cwd / "CODEMITRA.md"
     if rules_path.exists():
-        console.print("[m.dim]MITRA.md already exists — skipped.[/m.dim]")
+        console.print("[m.dim]CODEMITRA.md already exists — skipped.[/m.dim]")
     else:
         rules_path.write_text(_MITRA_MD_TEMPLATE, encoding="utf-8")
-        created.append("MITRA.md")
+        created.append("CODEMITRA.md")
 
-    toml_path = cwd / "mitra.toml"
+    toml_path = cwd / "codemitra.toml"
     if toml_path.exists():
-        console.print("[m.dim]mitra.toml already exists — skipped.[/m.dim]")
+        console.print("[m.dim]codemitra.toml already exists — skipped.[/m.dim]")
     else:
         toml_path.write_text(_MITRA_TOML_TEMPLATE, encoding="utf-8")
-        created.append("mitra.toml")
+        created.append("codemitra.toml")
 
     if created:
         console.print(f"[m.ok]✓ Created:[/m.ok] {', '.join(created)}")
-        console.print("[dim]Edit MITRA.md to add your project rules.[/dim]")
+        console.print("[dim]Edit CODEMITRA.md to add your project rules.[/dim]")
     else:
         console.print("[dim]Nothing to create — already initialised.[/dim]")
 
     # Always scaffold the Obsidian memory vault (skips existing files)
     vault_files = memory.init_memory(str(cwd))
     if vault_files:
-        console.print(f"\n[m.ok]✓ Memory vault:[/m.ok] .mitra/")
+        console.print(f"\n[m.ok]✓ Memory vault:[/m.ok] .codemitra/")
         for f in vault_files:
             console.print(f"  [dim cyan]  {f}[/dim cyan]")
         console.print(
-            "\n[dim]Tip: Open [bold].mitra/[/bold] as an Obsidian vault for "
+            "\n[dim]Tip: Open [bold].codemitra/[/bold] as an Obsidian vault for "
             "graph view, search, and history.[/dim]"
         )
     else:
@@ -162,7 +162,7 @@ def _run_init() -> None:
 @cli.command("init")
 @cli.command("/init", hidden=True)
 def cmd_init():
-    """Initialise Mitra in the current project directory."""
+    """Initialise CodeMitra in the current project directory."""
     _run_init()
 
 
@@ -180,7 +180,7 @@ def _print_phase0_status(cwd: str | None = None) -> None:
 
     logger.info("status command workspace=%s ollama_ok=%s", workspace, ollama_ok)
 
-    table = Table(title="Mitra Status")
+    table = Table(title="CodeMitra Status")
     table.add_column("Item", style="cyan", no_wrap=True)
     table.add_column("Value", style="white")
     table.add_row("Workspace", str(workspace))
@@ -243,13 +243,13 @@ def _print_phase0_models(cwd: str | None = None, show_all: bool = False) -> None
         console.print(ui.tool_line("Local models", ok=False, detail=ollama_message if not ollama_ok else "none installed (ollama pull qwen3.5:4b)"))
         return
 
-    table = Table(title="Local Models" + ("" if show_all else " (compatible with Mitra)"))
+    table = Table(title="Local Models" + ("" if show_all else " (compatible with CodeMitra)"))
     table.add_column("Model", style="cyan")
     table.add_column("Size", style="white")
     table.add_column("Placement", style="white")
     table.add_column("Recommended", style="white")
     if show_all:
-        table.add_column("Mitra", style="white")
+        table.add_column("CodeMitra", style="white")
     for item in inventory:
         row = [item.name, item.size_text or "-", item.placement, "yes" if item.recommended else "no"]
         if show_all:
@@ -260,7 +260,7 @@ def _print_phase0_models(cwd: str | None = None, show_all: bool = False) -> None
     if not show_all:
         hidden = len(config.get_local_model_inventory(include_incompatible=True)) - len(inventory)
         if hidden:
-            console.print(f"[dim]{hidden} more installed model(s) cannot run Mitra; `mitra models --all` shows why.[/dim]")
+            console.print(f"[dim]{hidden} more installed model(s) cannot run CodeMitra; `codemitra models --all` shows why.[/dim]")
 
 
 def cmd_status(cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection.")) -> None:
@@ -275,9 +275,9 @@ def cmd_config(cwd: str | None = typer.Option(None, "--cwd", help="Start path fo
 
 def cmd_models(
     cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection."),
-    show_all: bool = typer.Option(False, "--all", help="Also list models Mitra cannot use, and why."),
+    show_all: bool = typer.Option(False, "--all", help="Also list models CodeMitra cannot use, and why."),
 ) -> None:
-    """List the local models Mitra can use (qwen3.5, 4B or larger; --all shows the others and why)."""
+    """List the local models CodeMitra can use (qwen3.5, 4B or larger; --all shows the others and why)."""
     _print_phase0_models(cwd, show_all=show_all)
 
 
@@ -300,7 +300,7 @@ def cmd_mcp(
 
 
 def cmd_logs(target: str = typer.Argument("summary"), cwd: str | None = typer.Option(None, "--cwd", help="Start path for project root detection.")) -> None:
-    """Inspect saved `.mitra` logs and traces."""
+    """Inspect saved `.codemitra` logs and traces."""
     _cfg, workspace = _phase5_workspace(cwd)
     reply = _build_logs_reply(workspace, target)
     _say(reply)
@@ -322,7 +322,7 @@ def cmd_solve(
     max_steps: int = typer.Option(0, "--max-steps", help="Model calls per task before stopping (0 = the harness "
                                   "setting, 40 by default)."),
     as_json: bool = typer.Option(False, "--json", help="Print a JSON result instead of progress."),
-    write_tests: bool = typer.Option(False, "--write-tests", help="Let Mitra write tests/ (tests-first plans)."),
+    write_tests: bool = typer.Option(False, "--write-tests", help="Let CodeMitra write tests/ (tests-first plans)."),
 ) -> None:
     """Work on a task until its tests pass (the core loop, M1). Exit 0 = tests pass."""
     from app.core.cli import cmd_solve as _solve
@@ -336,7 +336,7 @@ def cmd_night(
     workspace: str = typer.Option(".", "--workspace", "-w", help="Project folder."),
     hours: float = typer.Option(4.0, "--hours", help="Stop after this many hours."),
     model: str = typer.Option("", "--model", help="Model (default: the builder role)."),
-    read_only_tests: bool = typer.Option(False, "--read-only-tests", help="Mitra may not write tests/."),
+    read_only_tests: bool = typer.Option(False, "--read-only-tests", help="CodeMitra may not write tests/."),
 ) -> None:
     """Build a plan unattended (overnight): keeps Windows awake, stops at the time limit, writes NIGHT_REPORT.md."""
     from app.core import night
@@ -359,7 +359,7 @@ def cmd_remote(
 
     if action == "set":
         if not url:
-            console.print("Usage: mitra remote set <url from the notebook> [--ctx 262144]")
+            console.print("Usage: codemitra remote set <url from the notebook> [--ctx 262144]")
             raise typer.Exit(2)
         target = remote.clean_url(url)
         models, err = remote.probe(target)
@@ -370,14 +370,14 @@ def cmd_remote(
         data = remote.set_remote(target, ctx, name)
         names = ", ".join(str(m.get("name")) for m in models) or "none yet"
         console.print(f"☁ remote set: {name} · {remote.shown(data['url'])} · {ctx // 1024}K context · models: {names}\n"
-                      "  Start (or restart) Mitra: every model call now goes there. `mitra remote off` to go back.")
+                      "  Start (or restart) CodeMitra: every model call now goes there. `codemitra remote off` to go back.")
         return
     if action == "off":
         console.print("✓ back to this machine's Ollama" if remote.clear() else "No remote was set.")
         return
     r = remote.active()
     if not r:
-        console.print("No remote: Mitra uses this machine's Ollama. `mitra remote set <url>` uses a Kaggle GPU.")
+        console.print("No remote: CodeMitra uses this machine's Ollama. `codemitra remote set <url>` uses a Kaggle GPU.")
         return
     models, err = remote.probe(r["url"], timeout=10)
     state = f"✗ not reachable ({err})" if err else "✓ reachable · models: " + (
@@ -401,23 +401,23 @@ def cmd_kaggle(
     idle: int = typer.Option(30, "--idle", help="Stop by itself after this many minutes unused."),
     hours: float = typer.Option(11.5, "--hours", help="Hard time limit for the run."),
 ) -> None:
-    """Use your Kaggle GPU hours from Mitra: start a private GPU notebook, stop it, see hours left (D-061)."""
+    """Use your Kaggle GPU hours from CodeMitra: start a private GPU notebook, stop it, see hours left (D-061)."""
     from app import kaggle
 
     try:
         if action == "setup":
             if not kaggle.setup(path, echo=console.print):
                 raise typer.Exit(1)
-        elif action == "use":  # D-064: when Mitra uses Kaggle
+        elif action == "use":  # D-064: when CodeMitra uses Kaggle
             from app import backend
             if path not in backend.USE_VALUES:
-                console.print("Usage: mitra kaggle use now|when-needed|never")
+                console.print("Usage: codemitra kaggle use now|when-needed|never")
                 raise typer.Exit(2)
             backend.save_prefs(kaggle_use=path, onboarded=True)
             console.print(f"☁ Kaggle {backend.USE_TEXT[path]}")
         elif action == "start":
             kaggle.start(model or _kaggle_model(), ctx, idle_min=idle, max_hours=hours, echo=console.print)
-            console.print("  Start Mitra (or restart it): it now runs on Kaggle. `mitra kaggle stop` when done.")
+            console.print("  Start CodeMitra (or restart it): it now runs on Kaggle. `codemitra kaggle stop` when done.")
         elif action == "stop":
             kaggle.stop(echo=console.print)
         else:
@@ -440,7 +440,7 @@ def cmd_harness(
     action: str = typer.Argument("show", help="show | revert"),
     version: int = typer.Argument(0, help="With revert: the version to go back to."),
 ) -> None:
-    """Show what Mitra has learned (rules, tool texts, limits) and its history; revert to an earlier version."""
+    """Show what CodeMitra has learned (rules, tool texts, limits) and its history; revert to an earlier version."""
     from app.core import harness as H
 
     active = H.active_path()
@@ -448,7 +448,7 @@ def cmd_harness(
     if action == "revert":
         match = [p for p in history if p.stem.endswith(f"-v{version}")]
         if not match:
-            console.print(f"[m.err]No saved version {version}. `mitra harness` lists them.[/m.err]")
+            console.print(f"[m.err]No saved version {version}. `codemitra harness` lists them.[/m.err]")
             raise typer.Exit(1)
         old = H.load(match[-1])
         current = H.load()
@@ -480,7 +480,7 @@ def cmd_report(
     html_page: bool = typer.Option(False, "--html", help="Also write the dashboard page and print its path."),
     as_json: bool = typer.Option(False, "--json", help="Print the report as JSON."),
     export_training: str = typer.Option("", "--export-training",
-                                        help="Write the usable turns (tests passed, all Mitra) to this JSONL file."),
+                                        help="Write the usable turns (tests passed, all CodeMitra) to this JSONL file."),
 ) -> None:
     """What goes wrong in recorded runs (patterns with counts), and a local dashboard page with --html."""
     from app.core import analyze as A
@@ -511,8 +511,8 @@ SESSION_RATING_MIN_TURNS = 3  # D-079: the 1-5 question at exit only after a rea
 
 
 def _score_model(model: str, remote: bool, ctx: int, arch: str):
-    """The model a score run uses -> (llm, model name, num_ctx, backend). Shared by `mitra score` and
-    `mitra improve --chat`, so the judge runs exactly as a score does."""
+    """The model a score run uses -> (llm, model name, num_ctx, backend). Shared by `codemitra score` and
+    `codemitra improve --chat`, so the judge runs exactly as a score does."""
     from app.core import roles as roles_mod
     from app.core import score as S
     from app.llm import model_supports_thinking
@@ -533,7 +533,7 @@ def _score_model(model: str, remote: bool, ctx: int, arch: str):
         from app import remote as remote_mod
         info = remote_mod.active()
         if not info:
-            console.print(Text("no remote GPU in use: start one with `mitra kaggle start`", style="m.err"))
+            console.print(Text("no remote GPU in use: start one with `codemitra kaggle start`", style="m.err"))
             raise typer.Exit(1)
         base_url, num_ctx, backend = info["url"], int(info.get("num_ctx") or num_ctx), "remote"
     think = False if model_supports_thinking(model_name) else None
@@ -548,7 +548,7 @@ def cmd_score(
     remote: bool = typer.Option(False, "--remote", help="Run on the remote GPU in use (Kaggle) instead of the laptop."),
     ctx: int = typer.Option(0, "--ctx", help="Context size for this run (0 = your setting). Both sides of an A/B "
                             "use the same; 32768 is the fastest on an 8 GB GPU."),
-    arch: str = typer.Option("phased", "--arch", help="How Mitra handles a message: router (today's paths) or one "
+    arch: str = typer.Option("phased", "--arch", help="How CodeMitra handles a message: router (today's paths) or one "
                              "(one conversational loop, D-071)."),
     check: bool = typer.Option(False, "--validate", help="Only check the set: every reference passes, every start "
                                "state fails. No model."),
@@ -636,7 +636,7 @@ def cmd_dashboard(
     console.print(Text("Building the page from the store ...", style="m.dim"))
     srv.pages.get()
     url = f"http://127.0.0.1:{port}/"
-    console.print(Text(f"✻ Mitra dashboard: {url}  (Refresh button on the page · ctrl+c stops)", style="m.tool"))
+    console.print(Text(f"✻ CodeMitra dashboard: {url}  (Refresh button on the page · ctrl+c stops)", style="m.tool"))
     if not no_open:
         import webbrowser
         webbrowser.open(url)
@@ -660,10 +660,10 @@ def cmd_improve(
     max_steps: int = typer.Option(30, "--max-steps", help="Model calls per benchmark task."),
     force: bool = typer.Option(False, "--force", help="Run even if the free-RAM check fails."),
     chat: bool = typer.Option(False, "--chat", help="Learn a conversation rule from failed score cases and your "
-                              "/bad and rephrase signals; `mitra score` (behaviour, writing, explain, ideas) decides."),
+                              "/bad and rephrase signals; `codemitra score` (behaviour, writing, explain, ideas) decides."),
     rounds: int = typer.Option(1, "--rounds", help="With --chat: rounds in a row (~20 min each on the laptop)."),
     min_gain: int = typer.Option(0, "--min-gain", help="With --chat: cases the rule must add (0 = the default, 2)."),
-    arch: str = typer.Option("phased", "--arch", help="With --chat: the architecture scored (as `mitra score`)."),
+    arch: str = typer.Option("phased", "--arch", help="With --chat: the architecture scored (as `codemitra score`)."),
     remote: bool = typer.Option(False, "--remote", help="With --chat: run on the remote GPU in use (Kaggle)."),
     ctx: int = typer.Option(0, "--ctx", help="With --chat: context size (0 = your setting)."),
 ) -> None:
@@ -724,7 +724,7 @@ def cmd_improve(
 
 
 def _improve_chat(model: str, arch: str, remote: bool, ctx: int, rounds: int, min_gain: int, dry_run: bool) -> None:
-    """`mitra improve --chat`: rounds of propose a rule -> score both -> keep or drop (improve_chat.py)."""
+    """`codemitra improve --chat`: rounds of propose a rule -> score both -> keep or drop (improve_chat.py)."""
     from app.core import dashboard as D
     from app.core import harness as H
     from app.core import improve_chat as IC
@@ -758,7 +758,7 @@ def _improve_chat(model: str, arch: str, remote: bool, ctx: int, rounds: int, mi
             break
         row = entry.get("next_row")
     kept = results.count("kept")
-    console.print(Text(f"\n  {kept} rule(s) kept of {len(results)} round(s) · `mitra harness` shows the rules",
+    console.print(Text(f"\n  {kept} rule(s) kept of {len(results)} round(s) · `codemitra harness` shows the rules",
                        style="m.accent.b"))
     raise typer.Exit(0 if all(r in ("kept", "dropped", "dry_run", "skipped") for r in results) else 1)
 
@@ -796,7 +796,7 @@ def _version() -> str:
     from importlib.metadata import PackageNotFoundError, version
 
     try:
-        return version("mitra")
+        return version("codemitra")
     except PackageNotFoundError:
         return "dev"
 
@@ -806,9 +806,13 @@ def main(
     ctx: typer.Context,
     show_version: bool = typer.Option(False, "--version", "-V", help="Show the version and exit."),
 ):
-    """Mitra: a local coding assistant on Ollama. Run `mitra` in a project folder to start the chat."""
+    """CodeMitra: a local coding assistant on Ollama. Run `codemitra` in a project folder to start the chat."""
+    if not os.environ.get("CODEMITRA_NO_MIGRATE"):  # D-080: Mitra's folders move to CodeMitra's names, once
+        from app import migrate
+        for _note in migrate.run():
+            console.print(Text(f"  ✻ CodeMitra (was Mitra): {_note}", style="m.faint"))
     if show_version:
-        console.print(f"mitra {_version()}")
+        console.print(f"codemitra {_version()}")
         raise typer.Exit(0)
     if ctx.invoked_subcommand is not None:
         return
@@ -817,9 +821,9 @@ def main(
     except Exception as exc:  # E-066: no real terminal (piped input, an IDE output pane): one line, not a traceback
         if type(exc).__name__ != "NoConsoleScreenBufferError":
             raise
-        console.print("✗ Mitra's chat needs a terminal window: Windows Terminal, PowerShell, cmd or Git Bash. "
+        console.print("✗ CodeMitra's chat needs a terminal window: Windows Terminal, PowerShell, cmd or Git Bash. "
                       "It cannot draw its input box when input is piped or in an output pane. "
-                      "Commands like `mitra kaggle status` work anywhere.")
+                      "Commands like `codemitra kaggle status` work anywhere.")
         raise typer.Exit(1)
 
 
@@ -853,9 +857,9 @@ def _friendly_error(exc: Exception) -> str:
 
 
 def _log_error(workspace: str, exc: Exception) -> None:
-    """Append full traceback to .mitra/errors.log."""
+    """Append full traceback to .codemitra/errors.log."""
     try:
-        log_dir = pathlib.Path(workspace) / ".mitra"
+        log_dir = pathlib.Path(workspace) / ".codemitra"
         log_dir.mkdir(exist_ok=True)
         log_path = log_dir / "errors.log"
         from datetime import datetime
@@ -885,10 +889,10 @@ _KEY_HELP = [
 # Shown by /help and in the `/` menu as you type (D-035).
 _COMMAND_HELP = [
         ("/help",          "Show this help"),
-        ("/init",          "Create MITRA.md + mitra.toml in this folder"),
+        ("/init",          "Create CODEMITRA.md + codemitra.toml in this folder"),
         ("/status",        "Workspace, model, mode and session status"),
         ("/doctor",        "Machine and setup check: RAM, GPU, Ollama, permissions, MCP"),
-        ("/free",          "Make RAM room for the model: tick programs, Mitra closes them"),
+        ("/free",          "Make RAM room for the model: tick programs, CodeMitra closes them"),
         ("/kaggle [start|stop|use|setup]", "Kaggle GPU: status and hours · start/stop · use now|when-needed|never"),
         ("/report",        "Rebuild the dashboard (sessions, tools, improvement, training data) and open it"),
         ("/role [name]",   "Show roles, or switch role: model, tools and MCP servers at once"),
@@ -897,7 +901,7 @@ _COMMAND_HELP = [
         ("/night",         "The latest night run: running?, progress, report"),
         ("/plan <task>",   "Plan a change first (small checked steps; Go / Change / Save) · /do <task> skips planning"),
         ("/plan template", "Write a runnable plan template here · /plan check [file] checks a plan"),
-        ("/good [note]",   "Mark the last turn good (your verdict teaches Mitra)"),
+        ("/good [note]",   "Mark the last turn good (your verdict teaches CodeMitra)"),
         ("/bad [why]",     "Mark the last turn bad, ideally with why"),
         ("/model",         "Show the active models (/model list: installed Ollama models)"),
         ("/context",       "Context use and when it compacts · /context 128k|256k|auto changes the size"),
@@ -906,18 +910,18 @@ _COMMAND_HELP = [
         ("! <command>",    "Run a shell command in the workspace (e.g. ! pytest -q)"),
         ("/test [cmd]",    "Run the tests (default: pytest)"),
         ("/fix <cmd>",     "Run a command, and edit + retry until it passes (bounded)"),
-        ("/diff",          "Show the git diff or Mitra's last change set"),
-        ("/undo [all]",    "Undo Mitra's last change (all: every change this session)"),
-        ("/copy",          "Copy Mitra's last answer (e.g. a drafted mail) to the clipboard"),
+        ("/diff",          "Show the git diff or CodeMitra's last change set"),
+        ("/undo [all]",    "Undo CodeMitra's last change (all: every change this session)"),
+        ("/copy",          "Copy CodeMitra's last answer (e.g. a drafted mail) to the clipboard"),
         ("/commit [msg]",  "Commit staged changes (--generate drafts the message); never pushes"),
         ("/review [staged]", "Review the current or staged diff for real problems"),
         ("/mcp",           "MCP servers: list, test, tools, on/off, trust, import, call"),
         ("/skills",        "List skills (/skills show <name>)"),
-        ("/logs [name]",   "Inspect .mitra logs"),
+        ("/logs [name]",   "Inspect .codemitra logs"),
         ("/resume",        "Saved session summary and recent activity"),
         ("/compact",       "Compress the conversation to free context"),
         ("/clear",         "Clear the conversation (saved files are kept)"),
-        ("exit / quit",    "Exit Mitra"),
+        ("exit / quit",    "Exit CodeMitra"),
 ]
 _LAST_SHELL_COMMAND: str | None = None
 
@@ -966,7 +970,7 @@ def _build_permissions_reply(cfg: dict, session_mode: str) -> str:
         f"- **Disabled file tools:** {tools_text}\n"
         f"- **Disabled shell commands:** {commands_text}\n"
         "- **Shell trust:** approved commands can be trusted per directory and then auto-approved on repeat.\n\n"
-        "Use `/mode` to change the session behavior. Edit `mitra.toml` to change allowed roots or disabled tools and commands."
+        "Use `/mode` to change the session behavior. Edit `codemitra.toml` to change allowed roots or disabled tools and commands."
     )
 
 
@@ -1018,10 +1022,10 @@ def _build_skills_reply(
 
     if not skills:
         return (
-            "No Mitra skills found yet.\n\n"
-            "Add skills under `skills/<name>/SKILL.md` or `.mitra/skills/<name>/SKILL.md`."
+            "No CodeMitra skills found yet.\n\n"
+            "Add skills under `skills/<name>/SKILL.md` or `.codemitra/skills/<name>/SKILL.md`."
         )
-    lines = ["## Mitra skills", ""]
+    lines = ["## CodeMitra skills", ""]
     for skill in skills:
         lines.append(f"- **{skill.name}** — `{skill.path}`")
         lines.append(f"  {skill.description}")
@@ -1138,9 +1142,9 @@ def _mode_summary(mode: str) -> str:
 
 
 def _ps_path(relative) -> str:
-    """A workspace-relative path as Mitra prints it in PowerShell hints: `.\\src\\app.py` on every OS (E-005).
+    """A workspace-relative path as CodeMitra prints it in PowerShell hints: `.\\src\\app.py` on every OS (E-005).
 
-    Mitra's run hints are PowerShell commands; before this, Linux gave mixed `.\\src/app.py`."""
+    CodeMitra's run hints are PowerShell commands; before this, Linux gave mixed `.\\src/app.py`."""
     rel = str(relative).replace("/", "\\").lstrip("\\")
     if rel.startswith(".\\"):
         return rel
@@ -1230,11 +1234,11 @@ def _find_run_targets(workspace: str) -> list[str]:
     ]
     candidates.extend(
         path for path in sorted(root.glob("*/cli.py"))
-        if path.parts[-2] not in {".venv", ".mitra", "__pycache__"}
+        if path.parts[-2] not in {".venv", ".codemitra", "__pycache__"}
     )
     candidates.extend(
         path for path in sorted(root.glob("*/__main__.py"))
-        if path.parts[-2] not in {".venv", ".mitra", "__pycache__"}
+        if path.parts[-2] not in {".venv", ".codemitra", "__pycache__"}
     )
     candidates.extend(sorted(root.glob("src/*/cli.py")))
     candidates.extend(sorted(root.glob("src/*/__main__.py")))
@@ -1251,7 +1255,7 @@ def _workspace_snapshot(workspace: str) -> tuple[list[str], list[str]]:
     dirs: list[str] = []
     files: list[str] = []
     for entry in sorted(root.iterdir(), key=lambda e: (e.is_file(), e.name.lower())):
-        if entry.name.startswith(".") and entry.name not in {".venv", ".mitra"}:
+        if entry.name.startswith(".") and entry.name not in {".venv", ".codemitra"}:
             continue
         if entry.is_dir():
             dirs.append(entry.name)
@@ -1416,9 +1420,9 @@ def _build_status_reply(
 
 
 def _build_logs_reply(workspace: str, target: str = "summary") -> str:
-    vault = pathlib.Path(workspace) / ".mitra"
+    vault = pathlib.Path(workspace) / ".codemitra"
     if not vault.exists():
-        return "No `.mitra/` workspace logs exist yet. Run `agent init` or start a session first."
+        return "No `.codemitra/` workspace logs exist yet. Run `agent init` or start a session first."
 
     target_name = (target or "summary").strip().lower()
     files = {
@@ -1531,7 +1535,7 @@ def _build_model_inventory_reply(
 
     lines.append("Use `/model remove <name>` to delete a local model and free space.")
     lines.append("Use `/resources` for live CPU/RAM/GPU usage, or `/make-space` to stop reclaimable local AI and GPU processes.")
-    lines.append("Override GPU layer count with `gpu_layers` in `mitra.toml` (`0` = CPU, `-1` = full GPU, `auto` = let Ollama decide).")
+    lines.append("Override GPU layer count with `gpu_layers` in `codemitra.toml` (`0` = CPU, `-1` = full GPU, `auto` = let Ollama decide).")
     return "\n".join(lines)
 
 
@@ -1565,7 +1569,7 @@ def _build_resources_reply() -> str:
             lines.append(f"- `{proc.name}` pid `{proc.pid}`{memory}")
         lines.append("")
     else:
-        lines.append("No Ollama/local AI processes detected beyond this Mitra session.")
+        lines.append("No Ollama/local AI processes detected beyond this CodeMitra session.")
         lines.append("")
     if gpu_processes:
         lines.append("### User-owned GPU processes from nvidia-smi")
@@ -1625,9 +1629,9 @@ def _handle_model_command(
         target = parts[2].strip()
         names = {m.name for m in config.get_local_model_inventory()}
         if target not in names:
-            return f"`{target}` is not one of Mitra's models. `/model list` shows them."
+            return f"`{target}` is not one of CodeMitra's models. `/model list` shows them."
         config.save_last_model(target)
-        return f"Mitra will start with `{target}` next time. Type `exit` and start Mitra again to switch now."
+        return f"CodeMitra will start with `{target}` next time. Type `exit` and start CodeMitra again to switch now."
 
     return "Usage: `/model`, `/model list`, `/model use <name>`, or `/model remove <name>`."
 
@@ -1860,7 +1864,7 @@ def _build_change_set_diff_reply(workspace: str) -> str | None:
     if not entries:
         return None
 
-    lines = ["## Last Mitra change set", ""]
+    lines = ["## Last CodeMitra change set", ""]
     for entry in entries:
         lines.append(_render_change_entry_diff(entry, workspace))
         lines.append("")
@@ -1891,7 +1895,7 @@ def _build_change_set_review_input(workspace: str) -> str | None:
     if not entries:
         return None
 
-    lines = ["Last Mitra change set", ""]
+    lines = ["Last CodeMitra change set", ""]
     for entry in entries:
         kind = entry.get("kind")
         if kind == "move_file":
@@ -2000,7 +2004,7 @@ def _get_review_material(workspace: str, target: str = "working") -> tuple[str, 
 
     change_set_input = _build_change_set_review_input(workspace)
     if change_set_input:
-        return ("last Mitra change set", change_set_input)
+        return ("last CodeMitra change set", change_set_input)
 
     return None
 
@@ -2082,7 +2086,7 @@ def _choose_approval_option(
 ) -> str | None:
     """Show what needs approval as a tool line + detail, then an inline arrow-key menu (D-031)."""
     lines = (prompt or "").rstrip().splitlines()
-    question = "What should Mitra do?"
+    question = "What should CodeMitra do?"
     while lines and not lines[-1].strip():
         lines.pop()
     if lines and (lines[-1].strip().endswith("?") or lines[-1].strip().startswith("Choose ")):
@@ -2128,7 +2132,7 @@ def _shell_command_name(command: str) -> str:
 
 
 def _rebuild_dashboard(quiet: bool = False):
-    """Rebuild ~/.mitra/dashboard.html from the central store. Never raises (an exit must not fail on it)."""
+    """Rebuild ~/.codemitra/dashboard.html from the central store. Never raises (an exit must not fail on it)."""
     from app.core import dashboard as D
     try:
         out, _ = D.build()
@@ -2141,7 +2145,7 @@ def _rebuild_dashboard(quiet: bool = False):
 
 
 def _header_extras(cfg: dict, harness) -> tuple[str, str, str]:
-    """Header rows: role models at a glance, what Mitra has learned and records, the dashboard link."""
+    """Header rows: role models at a glance, what CodeMitra has learned and records, the dashboard link."""
     roles_line = learning = dash = ""
     try:
         from app.core import roles as R
@@ -2154,19 +2158,19 @@ def _header_extras(cfg: dict, harness) -> tuple[str, str, str]:
         from app.core import runinfo
         traces = "traces on" if cfg.get("save_traces", True) else "traces off"
         learning = (f"harness v{harness.version} · {len(harness.rules)} learned rule{'s' if len(harness.rules) != 1 else ''}"
-                    f" · {traces} · Mitra {runinfo.code_version()}")
+                    f" · {traces} · CodeMitra {runinfo.code_version()}")
     except Exception:
         pass
     try:
         from app.core import server as dash_server
-        dash = dash_server.URL if dash_server.running() else "mitra dashboard (not running)"
+        dash = dash_server.URL if dash_server.running() else "codemitra dashboard (not running)"
     except Exception:
         pass
     return roles_line, learning, dash
 
 
 def _learning_notices(harness) -> None:
-    """D-075, at start: what Mitra learned since you last saw it (with the undo), a round still running in the
+    """D-075, at start: what CodeMitra learned since you last saw it (with the undo), a round still running in the
     background, and the coach reminder. Quiet when there is nothing to say."""
     from app.core import coach as coach_mod
     from app.core import harness as H
@@ -2180,7 +2184,7 @@ def _learning_notices(harness) -> None:
     try:
         if seen is not None and harness.version > seen:
             console.print(Text(f"  ✻ learned since last time: {harness.note or 'harness v' + str(harness.version)}"
-                               f" · `mitra harness` shows it · `mitra harness revert {seen}` undoes it",
+                               f" · `codemitra harness` shows it · `codemitra harness revert {seen}` undoes it",
                                style="m.tool"))
         seen_file.parent.mkdir(parents=True, exist_ok=True)
         seen_file.write_text(json.dumps({"version": harness.version}), encoding="utf-8")
@@ -2197,8 +2201,8 @@ def _learning_notices(harness) -> None:
 def cmd_coach(
     dry_run: bool = typer.Option(False, "--dry-run", help="Only write the digest (no Claude call)."),
 ) -> None:
-    """Layer 2 (D-075): Claude reviews Mitra's recorded conversations since the last review and writes a coach
-    report; its rules are queued for `mitra improve --chat`, where the score decides each one."""
+    """Layer 2 (D-075): Claude reviews CodeMitra's recorded conversations since the last review and writes a coach
+    report; its rules are queued for `codemitra improve --chat`, where the score decides each one."""
     from app.core import coach as coach_mod
     from app.core import dashboard as D
     from app.core import improve_chat as IC
@@ -2227,7 +2231,7 @@ def cmd_cases(
     no_coach: bool = typer.Option(False, "--no-coach", help="Draft from the template only (no Claude call)."),
 ) -> None:
     """Your /bad turns become score cases (D-078 step 6): drafted by the coach (or a template), kept only when you
-    approve, scored in the private, held-out "real" category of `mitra score`."""
+    approve, scored in the private, held-out "real" category of `codemitra score`."""
     from app.core import cases as cases_mod
     from app.core import coach as coach_mod
     from app.core import dashboard as D
@@ -2241,11 +2245,11 @@ def cmd_cases(
         run = None if no_coach or not coach_mod.claude_path() else coach_mod.run_claude
         say(f"Drafting {len(new)} case(s) from your /bad turns" + (" with the coach…" if run else " (template)…"))
         paths = cases_mod.write_drafts(D.run_files(), run_claude=run, say=say)
-        say(f"{len(paths)} draft(s) in {cases_mod.home() / 'drafts'} · next: `mitra cases review`")
+        say(f"{len(paths)} draft(s) in {cases_mod.home() / 'drafts'} · next: `codemitra cases review`")
     elif action == "review":
         drafts = cases_mod.drafts()
         if not drafts:
-            say("No drafts. `mitra cases` drafts your new /bad turns.")
+            say("No drafts. `codemitra cases` drafts your new /bad turns.")
             return
         for p in drafts:
             console.print(Text(f"\n── {p.name}", style="m.tool"))
@@ -2275,16 +2279,16 @@ cli.command("cases")(cmd_cases)
 
 def cmd_practice(
     download: bool = typer.Option(False, "--download", help="Download the sets once (MBPP+, HumanEval+, Spider, about "
-                                  "200 MB) and build the tasks in ~/.mitra/practice."),
+                                  "200 MB) and build the tasks in ~/.codemitra/practice."),
     n: int = typer.Option(20, "--n", help="How many tasks (the same ones every time, spread over the set)."),
     kind: str = typer.Option("", "--kind", help="python or sql (default: both)."),
     split: str = typer.Option("", "--split", help="learn or held_out (default: both)."),
     model: str = typer.Option("", "--model", help="Model (default: your chat model)."),
     remote: bool = typer.Option(False, "--remote", help="Run on the remote GPU in use (Kaggle) instead of the laptop."),
     ctx: int = typer.Option(0, "--ctx", help="Context size for this run (0 = your setting)."),
-    arch: str = typer.Option("phased", "--arch", help="How Mitra handles a message (as `mitra score`)."),
+    arch: str = typer.Option("phased", "--arch", help="How CodeMitra handles a message (as `codemitra score`)."),
 ) -> None:
-    """Coding practice (D-078 step 5): Mitra solves small Python and SQL tasks in a fresh folder, writes its own
+    """Coding practice (D-078 step 5): CodeMitra solves small Python and SQL tasks in a fresh folder, writes its own
     tests, and a hidden check decides; results in results/practice.jsonl."""
     from app.core import harness as harness_mod
     from app.core import practice as P
@@ -2303,7 +2307,7 @@ def cmd_practice(
         raise typer.BadParameter("--kind python|sql, --split learn|held_out")
     tasks = P.order(P.load(kind=kind, split=split))[:max(1, n)]
     if not tasks:
-        say("No practice tasks yet: run `mitra practice --download` once (needs the internet).", "m.err")
+        say("No practice tasks yet: run `codemitra practice --download` once (needs the internet).", "m.err")
         raise typer.Exit(1)
     llm, model_name, num_ctx, backend = _score_model(model, remote, ctx, arch)
     stamp = time.strftime("%Y%m%d-%H%M%S")
@@ -2356,17 +2360,17 @@ def _cmd_free(model: str, num_ctx: int, base_url: str, *, fit_mod=None, tick=Non
     style = {"ok": "m.ok", "tight": "m.info", "no": "m.err"}.get(before.verdict, "m.faint")
     console.print(Text(f"  {model} · {num_ctx // 1024}K · " + fit_mod.summary(before), style=style))
     if before.verdict == "remote":
-        console.print(Text("    nothing to free here: `mitra remote off` goes back to this machine", style="m.faint"))
+        console.print(Text("    nothing to free here: `codemitra remote off` goes back to this machine", style="m.faint"))
         return
     programs, pre = fit_mod.free_choices(before, fit_mod.live_programs())
     unload = [m.split(" (")[0] for m in before.unload]
     options = [fit_mod.label(p) for p in programs] + [f"unload {m} from Ollama" for m in unload]
     pre = pre | {len(programs) + i for i in range(len(unload))}
     if not options:
-        console.print(Text("    nothing big enough to close (Mitra's terminal, Ollama and Windows are never listed)",
+        console.print(Text("    nothing big enough to close (CodeMitra's terminal, Ollama and Windows are never listed)",
                            style="m.faint"))
         return
-    picked = tick(console, "Close which programs to make room? (Mitra's terminal, Ollama and Windows are never "
+    picked = tick(console, "Close which programs to make room? (CodeMitra's terminal, Ollama and Windows are never "
                            "listed)", options, pre)
     if not picked:
         if picked is not None:
@@ -2407,7 +2411,7 @@ def _print_memory_fit(model: str, num_ctx: int, base_url: str) -> None:
     from app import fit as fit_mod
     try:
         fit = fit_mod.check(model, num_ctx, base_url=base_url)
-    except Exception as exc:  # a failed check must not stop Mitra
+    except Exception as exc:  # a failed check must not stop CodeMitra
         console.print(Text(f"  ? could not check memory: {exc}", style="m.faint"))
         return None
     style = {"ok": "m.ok", "tight": "m.info", "no": "m.err"}.get(fit.verdict, "m.faint")
@@ -2418,7 +2422,7 @@ def _print_memory_fit(model: str, num_ctx: int, base_url: str) -> None:
 
 
 def _startup_model(cfg: dict) -> str:
-    """Model for this session without asking: mitra.toml, else the last one used, else qwen3.5:4b (D-034).
+    """Model for this session without asking: codemitra.toml, else the last one used, else qwen3.5:4b (D-034).
     Falls back to the picker only when none of those is installed."""
     configured = cfg.get("local_model") or cfg.get("model")
     if configured:
@@ -2447,15 +2451,15 @@ def _pick_model(cfg: dict) -> str:
         inventory = config.get_local_model_inventory()
         if not inventory:
             console.print(
-                "[m.err]No compatible local Ollama models found. Mitra needs a chat model with tool calling, "
+                "[m.err]No compatible local Ollama models found. CodeMitra needs a chat model with tool calling, "
                 "e.g. 'ollama pull qwen3.5:4b'.[/m.err]"
             )
             raise SystemExit(1)
         incompatible = len(config.get_local_model_inventory(include_incompatible=True)) - len(inventory)
         if incompatible > 0:
             console.print(Text(
-                f"  {incompatible} other installed models hidden: Mitra runs on qwen3.5 4B and 9B, 128K context. "
-                "`mitra models --all` lists them",
+                f"  {incompatible} other installed models hidden: CodeMitra runs on qwen3.5 4B and 9B, 128K context. "
+                "`codemitra models --all` lists them",
                 style="m.faint",
             ))
 
@@ -2528,8 +2532,8 @@ def _pick_model(cfg: dict) -> str:
             # Typing the exact name of a hidden model still works, with a warning.
             others = {m.name: m for m in config.get_local_model_inventory(include_incompatible=True)}
             if choice in others:
-                problem = config.compatibility_problem(config.get_model_facts(choice), choice) or "untested with Mitra"
-                console.print(f"[m.err]  {choice} is not a Mitra model ({problem}); it may fail at tool calls.[/m.err]")
+                problem = config.compatibility_problem(config.get_model_facts(choice), choice) or "untested with CodeMitra"
+                console.print(f"[m.err]  {choice} is not a CodeMitra model ({problem}); it may fail at tool calls.[/m.err]")
                 return choice
         console.print("[m.dim]Invalid choice, try again.[/m.dim]")
 
@@ -2613,13 +2617,13 @@ def _chat():
     model = _startup_model(cfg)
     config.save_last_model(model)
     from app.core import store as _store
-    _store.note_project(cfg["workspace"])  # the dashboard reads every folder Mitra ran in (D-041)
+    _store.note_project(cfg["workspace"])  # the dashboard reads every folder CodeMitra ran in (D-041)
     codegen_model = _resolve_codegen_model(cfg)
     temperature = cfg.get("temperature", 0.2)
     session_mode = _normalize_session_mode(cfg.get("session_mode"))
     show_reasoning = bool(cfg.get("show_reasoning", False))
     from app.core import roles as _roles
-    num_ctx = _roles.context_for(model, cfg)  # max context for the first days (D-052); mitra.toml / /context still win
+    num_ctx = _roles.context_for(model, cfg)  # max context for the first days (D-052); codemitra.toml / /context still win
     gpu_layers_cfg = cfg.get("gpu_layers", "auto")
 
     # Determine GPU placement for the chosen model
@@ -2648,8 +2652,8 @@ def _chat():
     system_prompt = harness_mod.apply_prompt(
         {"one": ONE_PROMPT, "phased": PHASED_PROMPT}.get(architecture, CHAT_PROMPT), harness)  # + learned rules
     if cfg.get("rules"):
-        system_prompt += f"\n\n## Project Rules (from MITRA.md)\n{cfg['rules']}"
-        loaded.append("MITRA.md")
+        system_prompt += f"\n\n## Project Rules (from CODEMITRA.md)\n{cfg['rules']}"
+        loaded.append("CODEMITRA.md")
 
     project_instructions = cfg.get("project_instructions") or []
     instructions_prompt = _build_project_instructions_prompt(project_instructions)
@@ -2671,7 +2675,7 @@ def _chat():
     if ctx_text and one_mitra:  # lighter context (D-071): only what you wrote under "## Notes", not recent topics
         ctx_text = memory.context_notes(ctx_text)
     if ctx_text:
-        system_prompt += f"\n\n## Project Memory (from .mitra/context.md)\n{ctx_text}"
+        system_prompt += f"\n\n## Project Memory (from .codemitra/context.md)\n{ctx_text}"
         loaded.append("project memory")
 
     startup_project_brief = _build_startup_project_brief(cfg["workspace"])
@@ -2681,13 +2685,13 @@ def _chat():
 
     from app.core import resume as resume_mod  # D-065 P1: where we stopped, from the records (before this session)
     resume_brief = resume_mod.brief(pathlib.Path(cfg["workspace"]))
-    if resume_brief and not one_mitra:  # one Mitra: "where did we stop" is answered from the records on request
+    if resume_brief and not one_mitra:  # one CodeMitra: "where did we stop" is answered from the records on request
         system_prompt += f"\n\n{resume_brief}\nFor 'where did we stop' questions answer from this; do not search."
         loaded.append("where we stopped")
 
     plan_text = memory.load_plan(cfg["workspace"])
-    if plan_text and not one_mitra:  # one Mitra reads the plan when the work needs it
-        system_prompt += f"\n\n## Active Plan (from .mitra/plan.md)\n{plan_text}"
+    if plan_text and not one_mitra:  # one CodeMitra reads the plan when the work needs it
+        system_prompt += f"\n\n## Active Plan (from .codemitra/plan.md)\n{plan_text}"
         loaded.append("plan")
 
     from app.core import signals as signals_mod  # D-068 step 1: your notes, read every turn
@@ -2715,9 +2719,9 @@ def _chat():
         return now if now != notes_now else ""
 
 
-    cloud_api_key = ""  # Mitra is local-only (D-025)
+    cloud_api_key = ""  # CodeMitra is local-only (D-025)
     from app.core.roles import thinking_for as _thinking_for
-    _chat_think = _thinking_for("chat", cfg)  # your mitra.toml `thinking` wins over the role table
+    _chat_think = _thinking_for("chat", cfg)  # your codemitra.toml `thinking` wins over the role table
     local_llm = get_local_llm(model, temperature, base_url=cfg.get("ollama_local_base_url"),
                               num_ctx=num_ctx, num_gpu=num_gpu, reasoning=_chat_think)
     review_llm = codegen_llm = local_llm  # one model for everything (M1)
@@ -2730,7 +2734,7 @@ def _chat():
     _turn_clock = {"start": time.monotonic()}
 
     def _working_footer(live_speed, writing):
-        """Under the live answer while Mitra works: this machine and the speed (the status line is hidden then)."""
+        """Under the live answer while CodeMitra works: this machine and the speed (the status line is hidden then)."""
         from app.ui import sysmon as _sysmon
         return _sysmon.working_footer(time.monotonic() - _turn_clock["start"], _sysmon.current(),
                                       speed=live_speed or chat.last_speed, writing=writing)
@@ -2777,7 +2781,7 @@ def _chat():
                 difflib.unified_diff((old or "").splitlines(), new.splitlines(), lineterm="")))
         verb = "Create this file" if old is None else "Apply this edit"
         choice = ui.menu.choose(console, f"{verb}?", [("yes", "Yes"), ("all", "Yes to all for this request"),
-                                                     ("no", "No, and tell Mitra why")], default="yes")
+                                                     ("no", "No, and tell CodeMitra why")], default="yes")
         if choice in ("yes", "all"):
             return choice
         try:
@@ -2815,7 +2819,7 @@ def _chat():
 
     typed_buffer: list[str] = []
     if _me_created:
-        console.print(Text(f"  ✎ created {_me_created}: add your name, mail signature, tone and stack; Mitra reads it "
+        console.print(Text(f"  ✎ created {_me_created}: add your name, mail signature, tone and stack; CodeMitra reads it "
                            "every turn", style="m.faint"))
     chat = ChatSession(
         workspace=cfg["workspace"],
@@ -3032,7 +3036,7 @@ def _chat():
 
     def _kaggle_report(reason: str, note: str = "", turns=None, summarize: bool = True,
                        startup: bool = False) -> None:
-        """B3: facts from Mitra's records + a short summary by the laptop model; written, shown, then Mitra waits."""
+        """B3: facts from CodeMitra's records + a short summary by the laptop model; written, shown, then CodeMitra waits."""
         from app.core import handoff
         st = kaggle_mod.load_state()
         session_min = int((time.time() - st["started"]) / 60) if st.get("started") else None
@@ -3042,7 +3046,7 @@ def _chat():
             night = handoff.night_for_report(_night.status(n=5), st.get("started"))
         except Exception:
             pass
-        summary = None  # not tried (Mitra was closed, or nothing said): the report has no summary part (E-105)
+        summary = None  # not tried (CodeMitra was closed, or nothing said): the report has no summary part (E-105)
         if summarize and len(messages) > 1:
             console.print(Text("  writing the report with the laptop model (the first load takes a moment; "
                                "ctrl+c skips the summary) …", style="m.faint"))
@@ -3052,7 +3056,7 @@ def _chat():
                 summary = ""
         ws_path = pathlib.Path(cfg["workspace"])
         all_turns = chat.turn_log if turns is None else turns
-        if startup and st.get("started"):  # the session ended while Mitra was closed: its record's last write
+        if startup and st.get("started"):  # the session ended while CodeMitra was closed: its record's last write
             rec = handoff.latest_record(ws_path)
             try:
                 end = rec.stat().st_mtime if rec else None
@@ -3093,7 +3097,7 @@ def _chat():
                 health.s.state, health.s.stage = "none", ""
                 bsession.notes.append(f"Kaggle did not start: {exc}")
 
-        _threading.Thread(target=run, daemon=True, name="mitra-kaggle-start").start()
+        _threading.Thread(target=run, daemon=True, name="codemitra-kaggle-start").start()
         console.print(Text("  ☁ starting Kaggle in the background (4-8 min): keep working; the status line shows "
                            "its progress and write work moves there when it is ready", style="m.tool"))
 
@@ -3107,10 +3111,10 @@ def _chat():
         """Case 2 (D-064): Kaggle works here; does the user want it, and when? Saved; None = later."""
         who = f" for {user}" if user else ""
         hours = f" · {left_h:.1f} h left this week" if left_h is not None else ""
-        answer = ui.menu.choose(console, f"Kaggle is set up{who}{hours}. Use its GPU with Mitra (3-4x faster, 256K)?",
+        answer = ui.menu.choose(console, f"Kaggle is set up{who}{hours}. Use its GPU with CodeMitra (3-4x faster, 256K)?",
                                 [("when-needed", "Yes, when I need it (starts on your first write work; no hours "
                                                  "used before)"),
-                                 ("now", "Yes, start it now, and at every Mitra start"),
+                                 ("now", "Yes, start it now, and at every CodeMitra start"),
                                  ("later", "Ask me later"),
                                  ("never", "No, this machine only")], default="when-needed")
         if answer in backend_mod.USE_VALUES:
@@ -3149,7 +3153,7 @@ def _chat():
         interactive = sys.stdin.isatty()
         if not _has_kaggle_key():                                    # case 1: no key
             if use is None and interactive and not backend_mod.asked_later_today():
-                answer = ui.menu.choose(console, "Use a free Kaggle GPU with Mitra? About 30 h a week, 3-4x faster, "
+                answer = ui.menu.choose(console, "Use a free Kaggle GPU with CodeMitra? About 30 h a week, 3-4x faster, "
                                                  "256K context (2 minutes to connect)",
                                         [("yes", "Yes, guide me"), ("later", "Later"),
                                          ("never", "No, this machine only")], default="yes")
@@ -3221,7 +3225,7 @@ def _chat():
                              num_gpu=num_gpu, reasoning=False if _think_cache[model] else None)
 
     if one_mitra:  # sessions closed without `exit` were not remembered yet: catch up in the background (D-071)
-        _runs_dir = pathlib.Path(cfg["workspace"]) / ".mitra" / "runs"
+        _runs_dir = pathlib.Path(cfg["workspace"]) / ".codemitra" / "runs"
         _behind = [f for f in sorted(_runs_dir.glob("chat-*.jsonl"))[-3:] if threads_mod.pending_turns(f)]
         if _behind:
             import threading as _threading
@@ -3233,7 +3237,7 @@ def _chat():
                     except Exception:  # noqa: BLE001 - memory never breaks the chat; tried again next start
                         pass
 
-            _threading.Thread(target=_catch_up, name="mitra-threads", daemon=True).start()
+            _threading.Thread(target=_catch_up, name="codemitra-threads", daemon=True).start()
 
     project_words = intent_mod.project_words(pathlib.Path(cfg["workspace"]))
 
@@ -3296,7 +3300,7 @@ def _chat():
         titles = {t.id: t.title for t in tasks}
         console.print(Text(f"  ▶ building {len(tasks)} steps, one at a time (each with a fresh, small context) · "
                            "ctrl+c stops", style="m.tool"))
-        record_dir = pathlib.Path(cfg["workspace"]) / ".mitra" / "runs" / f"plan-{time.strftime('%Y%m%d-%H%M%S')}"
+        record_dir = pathlib.Path(cfg["workspace"]) / ".codemitra" / "runs" / f"plan-{time.strftime('%Y%m%d-%H%M%S')}"
         saved_hook, chat.ws.before_write = chat.ws.before_write, None
         chat.ws.journal = []
         results: dict = {}
@@ -3332,7 +3336,7 @@ def _chat():
         for tid, r in results.items():
             r["title"] = titles.get(tid, "")
         note = planner_mod.resume_note(task, path, results, final)
-        resume_file = pathlib.Path(cfg["workspace"]) / ".mitra" / "resume.md"
+        resume_file = pathlib.Path(cfg["workspace"]) / ".codemitra" / "resume.md"
         resume_file.parent.mkdir(parents=True, exist_ok=True)
         resume_file.write_text(note, encoding="utf-8")
         console.print(Markdown(note))
@@ -3351,7 +3355,7 @@ def _chat():
                 "total": len(results)}
 
     if _kaggle_died_turns is not None:
-        _kaggle_report("the Kaggle GPU ended while Mitra was closed", turns=_kaggle_died_turns, summarize=False,
+        _kaggle_report("the Kaggle GPU ended while CodeMitra was closed", turns=_kaggle_died_turns, summarize=False,
                        startup=True)
     _kaggle_at_start()
     _learning_notices(harness)
@@ -3403,7 +3407,7 @@ def _chat():
                     _due, _why = _IC.auto_due(_files)
                     if _due:
                         _log = _IC.start_auto(pathlib.Path(cfg["workspace"]), remote=bool(remote_mod.active()))
-                        console.print(Text(f"  ✻ learning in the background ({_why}): one `mitra improve --chat` "
+                        console.print(Text(f"  ✻ learning in the background ({_why}): one `codemitra improve --chat` "
                                            f"round, ~20 min on the GPU · log: {_log}", style="m.tool"))
                 except Exception as _exc:  # noqa: BLE001 - learning must never block leaving
                     console.print(Text(f"  could not start learning: {str(_exc)[:120]}", style="m.faint"))
@@ -3445,7 +3449,7 @@ def _chat():
             console.print("[dim]Session reset.[/dim]")
             continue
 
-        if cmd in ("/init", "mitra init"):
+        if cmd in ("/init", "codemitra init"):
             _run_init()
             continue
 
@@ -3464,7 +3468,7 @@ def _chat():
 
         if cmd.startswith("/context "):  # /context 128k|256k|auto: speed vs room, kept per model (E-046)
             if cfg.get("num_ctx"):
-                _say(f"`num_ctx = {cfg['num_ctx']}` is set in mitra.toml; change it there (it wins over /context).")
+                _say(f"`num_ctx = {cfg['num_ctx']}` is set in codemitra.toml; change it there (it wins over /context).")
                 continue
             new_ctx, err = roles_mod.choose_context(model, user_input.strip()[len("/context "):], cfg)
             if err:
@@ -3590,7 +3594,7 @@ def _chat():
                 continue
             role_name, target = parts[2].lower(), parts[3]
             if target != "default" and target not in roles_mod.installed():
-                _say(f"`{target}` is not one of Mitra's installed models. `/model list` shows them.")
+                _say(f"`{target}` is not one of CodeMitra's installed models. `/model list` shows them.")
                 continue
             roles_mod.save_choice(role_name, target)
             console.print(Text(f"  {role_name} → {target} (kept for next time)", style="m.tool"))
@@ -3601,12 +3605,12 @@ def _chat():
         if cmd.startswith(("/model use ", "/model switch ", "/model set ")):  # live, no restart (was: restart)
             target = user_input.strip().split(maxsplit=2)[2].strip()
             if target not in roles_mod.installed():
-                _say(f"`{target}` is not one of Mitra's installed models. `/model list` shows them.")
+                _say(f"`{target}` is not one of CodeMitra's installed models. `/model list` shows them.")
                 continue
-            roles_mod.use_for_chat(target)  # beats mitra.toml local_model and an older chat choice (E-054)
+            roles_mod.use_for_chat(target)  # beats codemitra.toml local_model and an older chat choice (E-054)
             toml_chat = (cfg.get("roles") or {}).get("chat") if isinstance(cfg.get("roles"), dict) else None
             if toml_chat and toml_chat != target:
-                _say(f"mitra.toml sets `[roles] chat = \"{toml_chat}\"`, which wins over `/model use`: change it there.")
+                _say(f"codemitra.toml sets `[roles] chat = \"{toml_chat}\"`, which wins over `/model use`: change it there.")
             _apply_role("chat")
             continue
 
@@ -3639,7 +3643,7 @@ def _chat():
 
         if cmd.startswith("/review"):
             review_target = _parse_review_target(user_input)
-            detail = "Checking the staged git diff and status." if review_target == "staged" else "Checking the current git diff or last Mitra change set."
+            detail = "Checking the staged git diff and status." if review_target == "staged" else "Checking the current git diff or last CodeMitra change set."
             _print_progress_message("Reviewing current changes", detail)
             ai_reply = _cmd_review(cfg["workspace"], review_llm, target=review_target)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
@@ -3666,7 +3670,7 @@ def _chat():
                 session_changes.clear()
             elif session_changes:
                 session_changes.pop()
-            chat.signal("undo", all=cmd == "/undo all")  # D-068: you took Mitra's change back
+            chat.signal("undo", all=cmd == "/undo all")  # D-068: you took CodeMitra's change back
             ai_reply = filesystem.undo_last_change_set(cfg["workspace"])
             _say(ai_reply)
             memory.append_activity(cfg["workspace"], user_input, ai_reply)
@@ -3711,14 +3715,14 @@ def _chat():
             import webbrowser
 
             from app.core import server as dash_server
-            if dash_server.running():  # the live page (mitra dashboard) rebuilds itself on Refresh
+            if dash_server.running():  # the live page (codemitra dashboard) rebuilds itself on Refresh
                 console.print(Text(f"  dashboard: {dash_server.URL}", style="m.faint"))
                 webbrowser.open(dash_server.URL)
                 continue
             out = _rebuild_dashboard()
             if out:
                 webbrowser.open(out.as_uri())
-                console.print(Text("  tip: `mitra dashboard` in another terminal serves it on localhost", style="m.faint"))
+                console.print(Text("  tip: `codemitra dashboard` in another terminal serves it on localhost", style="m.faint"))
             continue
 
         if cmd == "/doctor":
@@ -3758,10 +3762,10 @@ def _chat():
                     health.check()
                     if bsession.kind == backend_mod.REMOTE:
                         _to_laptop("Kaggle stopped")  # back on this machine
-                elif sub == "use":  # D-064: when Mitra uses Kaggle
+                elif sub == "use":  # D-064: when CodeMitra uses Kaggle
                     value = (user_input.strip().split() + ["", "", ""])[2].lower()
                     if value not in backend_mod.USE_VALUES:
-                        _say("`/kaggle use now` (start at every Mitra start) · `/kaggle use when-needed` (on your "
+                        _say("`/kaggle use now` (start at every CodeMitra start) · `/kaggle use when-needed` (on your "
                              "first write work) · `/kaggle use never` (this machine only)")
                     else:
                         backend_mod.save_prefs(kaggle_use=value, onboarded=True)
@@ -3782,7 +3786,7 @@ def _chat():
                 console.print(Text("  stopped waiting; the Kaggle run goes on: `/kaggle status`", style="m.info"))
             continue
 
-        if cmd == "/free":  # make RAM room for the model: tick programs, Mitra closes them (I-21)
+        if cmd == "/free":  # make RAM room for the model: tick programs, CodeMitra closes them (I-21)
             _cmd_free(model, num_ctx, cfg.get("ollama_local_base_url") or "http://127.0.0.1:11434")
             continue
 
@@ -3833,7 +3837,7 @@ def _chat():
                                        style="m.dim"))
             else:
                 console.print(Text("    showing it live here · ctrl+c stops watching (the night keeps going, also if you "
-                                   "close Mitra) · `/night` shows it again · don't chat meanwhile", style="m.faint"))
+                                   "close CodeMitra) · `/night` shows it again · don't chat meanwhile", style="m.faint"))
                 _follow_night()
             continue
 
@@ -3847,7 +3851,7 @@ def _chat():
                     _say(f"`{target.name}` already exists here; `/plan check` checks it.")
                 else:
                     target.write_text(plans_mod.TEMPLATE, encoding="utf-8")
-                    _say(f"Wrote the plan template to `{target}`. Fill it in (or ask Mitra: \"fill plan.md for <idea>\"), "
+                    _say(f"Wrote the plan template to `{target}`. Fill it in (or ask CodeMitra: \"fill plan.md for <idea>\"), "
                          "then `/plan check` and `/run plan.md`.")
             elif sub == "check":
                 if not target.is_file():
@@ -3858,7 +3862,7 @@ def _chat():
                          else f"✓ `{target.name}` is runnable with `/run {target.name}` ({n} tasks).")
             else:
                 _say("`/plan template` writes a runnable plan template here · `/plan check [file]` checks a plan · "
-                     "`/run [plan] [hours]` builds it (Mitra writing whole plans itself comes with the planner).")
+                     "`/run [plan] [hours]` builds it (CodeMitra writing whole plans itself comes with the planner).")
             continue
 
         if cmd == "/night":  # the latest night run: live while it runs, then the report
@@ -3890,12 +3894,12 @@ def _chat():
             continue
 
         _cli = intent_mod.terminal_command(user_input)
-        if _cli:  # live 2026-11-11: "mitra score" typed in the chat was explained as a question about the project
+        if _cli:  # live 2026-11-11: "codemitra score" typed in the chat was explained as a question about the project
             chat.note_request(user_input, "terminal_command", "cli_hint", "answered")
             _say(f"`{_cli}` is a terminal command, not a chat message. Run it in **another terminal** "
-                 f"(this chat can stay open)" + (": `mitra score --remote` uses the Kaggle GPU, `mitra score` the "
+                 f"(this chat can stay open)" + (": `codemitra score --remote` uses the Kaggle GPU, `codemitra score` the "
                                                   "laptop; it takes a while, don't chat on the same GPU meanwhile."
-                                                  if _cli.startswith("mitra score") else "."))
+                                                  if _cli.startswith("codemitra score") else "."))
             continue
 
         # ── What kind of request (D-065 P3) ───────────────────────────────────
@@ -3903,11 +3907,11 @@ def _chat():
         # "ok lets build it" after a discussion; an explicit `/plan <task>` is its own task
         talked_first = not force_kind and last_kind in ("general", "question")
         last_kind = request_kind
-        if request_kind == "resume":  # from Mitra's records: instant, no model call, no searching
+        if request_kind == "resume":  # from CodeMitra's records: instant, no model call, no searching
             _brief = resume_mod.brief(pathlib.Path(cfg["workspace"]))
             chat.note_request(user_input, "resume", "resume_brief", "answered" if _brief else "nothing_recorded")
             console.print(Markdown(_brief or "Nothing recorded for this project yet."))
-            console.print(Text("  (from Mitra's records, no model call) · ask for the next step, or "
+            console.print(Text("  (from CodeMitra's records, no model call) · ask for the next step, or "
                                "`/plan <task>` to plan a bigger change", style="m.faint"))
             continue
 
@@ -3931,7 +3935,7 @@ def _chat():
                 architecture == "phased" and chat.role == "chat" and not force_kind):
             _maybe_offer_kaggle()  # phased chat: only after a turn that worked (below), never for talk (D-074)
 
-        if request_kind == "big" and (force_kind or not one_mitra):  # D-065 P4/P5: plan first (one Mitra: /plan)
+        if request_kind == "big" and (force_kind or not one_mitra):  # D-065 P4/P5: plan first (one CodeMitra: /plan)
             _t_plan = time.monotonic()
             _plan_info = _plan_first(planner_mod.with_discussion(user_input, messages) if talked_first
                                      else user_input) or {}
@@ -4060,7 +4064,7 @@ def _chat():
             except Exception:
                 pass
             console.print(ui.tool_line("Error", ok=False,
-                                       detail=f"{_friendly_error(e)} (full trace in .mitra/errors.log)"))
+                                       detail=f"{_friendly_error(e)} (full trace in .codemitra/errors.log)"))
 
 
 # ── Guided Builder (/create) ──────────────────────────────────────────────────
@@ -4173,12 +4177,12 @@ def _cmd_fix(command: str, workspace: str, codegen_llm) -> str:
     from app.core.tools import Workspace
 
     ws = Workspace(pathlib.Path(workspace), test_command=command, read_only=())
-    ws.spill_dir = ws.root / ".mitra" / "output"
+    ws.spill_dir = ws.root / ".codemitra" / "output"
     journal: list = []
     ws.journal = journal
     res = solve(f"Make this command succeed: `{command}`. Find the cause of the failure and fix the code.",
                 ws, codegen_llm, on_event=EventPrinter(console),
-                record_path=ws.root / ".mitra" / "runs" / time.strftime("fix-%Y%m%d-%H%M%S.jsonl"))
+                record_path=ws.root / ".codemitra" / "runs" / time.strftime("fix-%Y%m%d-%H%M%S.jsonl"))
     if journal:
         memory.record_last_change_set(workspace, {"entries": journal})
     status = "fixed" if res.status == "passed" else f"not fixed ({res.status})"
@@ -4321,7 +4325,7 @@ def _build_move_preview(src: str, dest: str) -> str:
 
 
 # ── Tokens at which auto-compact kicks in ────────────────────────────────────
-_AUTO_COMPACT_THRESHOLD = 0  # 0 = 80% of num_ctx (E-046); overridden at runtime from mitra.toml
+_AUTO_COMPACT_THRESHOLD = 0  # 0 = 80% of num_ctx (E-046); overridden at runtime from codemitra.toml
 
 
 def _compact(

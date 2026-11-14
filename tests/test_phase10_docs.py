@@ -6,7 +6,7 @@ import pathlib
 
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
-# local-codex's own docs moved to docs/archive/local-codex when the code was imported into Mitra
+# local-codex's own docs moved to docs/archive/local-codex when the code was imported into CodeMitra
 UPSTREAM_DOCS = REPO_ROOT / "docs" / "archive" / "local-codex"
 DEMO_ROOT = UPSTREAM_DOCS / "demo_flows"
 

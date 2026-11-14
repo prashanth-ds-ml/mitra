@@ -10,7 +10,7 @@ from html.parser import HTMLParser
 from langchain_core.tools import tool
 
 
-_USER_AGENT = "Mitra/1.0 (+https://github.com)"
+_USER_AGENT = "CodeMitra/1.0 (+https://github.com)"
 _MAX_FETCH_CHARS = 6000
 _DEFAULT_TIMEOUT = 15
 

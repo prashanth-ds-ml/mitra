@@ -39,7 +39,7 @@ def test_a_role_cannot_run_a_tool_outside_its_set(tmp_path):
 
 
 def test_model_use_beats_local_model_in_mitra_toml():
-    """E-054: `/model use X` saved the last model, but mitra.toml local_model (and an older chat choice) won."""
+    """E-054: `/model use X` saved the last model, but codemitra.toml local_model (and an older chat choice) won."""
     cfg = {"local_model": "qwen3.5:4b"}
     have = {"qwen3.5:4b", "deepseek-r1:8b", "mimo-v2.6:9b"}
     roles.save_choice("chat", "mimo-v2.6:9b")
@@ -60,7 +60,7 @@ def test_context_auto_gives_the_same_size_as_a_restart(monkeypatch):
 
 
 def test_files_a_night_will_change_are_not_counted_as_your_corrections(tmp_path):
-    """E-057: a /run night rewrote a file Mitra had left; the next turn recorded it as the user's correction."""
+    """E-057: a /run night rewrote a file CodeMitra had left; the next turn recorded it as the user's correction."""
     (tmp_path / "game").mkdir()
     game, other = tmp_path / "game" / "game.py", tmp_path / "notes.py"
     for f in (game, other):
@@ -76,7 +76,7 @@ def test_files_a_night_will_change_are_not_counted_as_your_corrections(tmp_path)
 
 
 def test_redirected_output_takes_any_character():
-    """E-062: `mitra night ... > night.log` crashed on the first ✗ (cp1252 file output on Windows)."""
+    """E-062: `codemitra night ... > night.log` crashed on the first ✗ (cp1252 file output on Windows)."""
     raw = io.BytesIO()
     stream = io.TextIOWrapper(raw, encoding="cp1252")
     _utf8_streams([stream])

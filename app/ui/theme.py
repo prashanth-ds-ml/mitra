@@ -63,7 +63,7 @@ THEME = Theme({
 
 
 class _PhosphorCode(PygmentsStyle):
-    """Code blocks in Mitra's colours (D-076): Rich's default (monokai) is pink and yellow on grey."""
+    """Code blocks in CodeMitra's colours (D-076): Rich's default (monokai) is pink and yellow on grey."""
     background_color = P["panel"]
     styles = {
         Token: P["text"],
@@ -87,12 +87,12 @@ CODE_THEME = PygmentsSyntaxTheme(_PhosphorCode)
 
 
 def md(text: str) -> Markdown:
-    """Markdown as Mitra shows it: the theme's styles and Phosphor code blocks. Use this, not Markdown()."""
+    """Markdown as CodeMitra shows it: the theme's styles and Phosphor code blocks. Use this, not Markdown()."""
     return Markdown(text or "", code_theme=CODE_THEME)
 
 
 def apply(console: Console) -> Console:
-    """Push the Mitra theme onto an existing console (keeps every caller's Console object)."""
+    """Push the CodeMitra theme onto an existing console (keeps every caller's Console object)."""
     console.push_theme(THEME)
     return console
 

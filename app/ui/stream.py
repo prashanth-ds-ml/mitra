@@ -152,7 +152,7 @@ def stream_reply(
     footer: Callable | None = None,
 ) -> StreamResult:
     """Consume model chunks, drawing the thinking timer and the answer live. Returns the merged message.
-    `footer(live_speed, writing)`: a line under the live part while Mitra works (this machine, the speed);
+    `footer(live_speed, writing)`: a line under the live part while CodeMitra works (this machine, the speed);
     `writing` is True once the answer (not the thinking timer) is on screen."""
     res = StreamResult()
     start = clock()

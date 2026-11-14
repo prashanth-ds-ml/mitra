@@ -1,4 +1,4 @@
-"""D-071 one Mitra: one conversational loop decides whether to talk, look or change (behind `architecture = "one"`).
+"""D-071 one CodeMitra: one conversational loop decides whether to talk, look or change (behind `architecture = "one"`).
 Fixed rules stay only for /commands, `mitra ...` typed in the chat and "where did we stop"."""
 import json
 
@@ -49,7 +49,7 @@ def test_your_notes_reach_a_turn_only_when_changed_and_leave_no_trace(tmp_path):
     s = C.ChatSession(workspace=tmp_path, llm=Watch(AIMessage(content="ok")), hooks=fake_hooks()[0])
     messages = [SystemMessage(content="sys"), HumanMessage(content="hi")]
     s.converse(messages, notes="## About the user (me.md)\nName: P")
-    assert "Name: P" in " ".join(seen[0]) and len(messages) == 3              # sys, you, Mitra: no note left
+    assert "Name: P" in " ".join(seen[0]) and len(messages) == 3              # sys, you, CodeMitra: no note left
 
 
 def test_context_notes_keeps_what_you_wrote_not_the_topic_list():
@@ -67,16 +67,16 @@ def test_the_score_runs_one_mitra_through_converse(tmp_path):
     out = S.run_behaviour(r, only={"B1_hello"})
     assert [(c.id, c.passed) for c in out] == [("B1_hello", True)]
     assert m.tool_names                                                          # tools offered, none used
-    assert r.system().content.startswith("You are Mitra, the user's thinking partner")
+    assert r.system().content.startswith("You are CodeMitra, the user's thinking partner")
 
 
 def test_one_mitra_in_the_real_chat_loop(harness, capsys):  # noqa: F811
     state, ws = harness
-    (ws / "mitra.toml").write_text('architecture = "one"\n', encoding="utf-8")
+    (ws / "codemitra.toml").write_text('architecture = "one"\n', encoding="utf-8")
     Inputs.script = ["hi mitra", "build a score system for the game with a high score file and a menu",
-                     "where did we stop", "mitra score", "exit"]
+                     "where did we stop", "codemitra score", "exit"]
     main._chat()
-    rows = [json.loads(x) for f in (ws / ".mitra" / "runs").glob("chat-*.jsonl")
+    rows = [json.loads(x) for f in (ws / ".codemitra" / "runs").glob("chat-*.jsonl")
             for x in f.read_text(encoding="utf-8").splitlines() if x.strip()]
     paths = [r["path"] for r in rows if r["kind"] == "turn_start"]
     assert paths == ["one", "one", "resume_brief", "cli_hint"]                 # no sorter, no plan-first guess

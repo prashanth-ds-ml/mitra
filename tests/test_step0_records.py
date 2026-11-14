@@ -33,8 +33,8 @@ def session(tmp_path, *replies, hooks=None):
 
 def test_notes_version_changes_with_your_notes(tmp_path):
     assert SIG.notes_version(tmp_path) == "none"
-    (tmp_path / ".mitra").mkdir()
-    (tmp_path / ".mitra" / "notes.md").write_text("use uv", encoding="utf-8")
+    (tmp_path / ".codemitra").mkdir()
+    (tmp_path / ".codemitra" / "notes.md").write_text("use uv", encoding="utf-8")
     v1 = SIG.notes_version(tmp_path)
     H.home().mkdir(parents=True, exist_ok=True)
     (H.home() / "me.md").write_text("Prashanth, concise", encoding="utf-8")

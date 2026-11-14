@@ -42,12 +42,12 @@ def test_e053_cut_off_work_is_stashed_and_mitra_logs_stay(tmp_path):
     ws = _repo(tmp_path)
     (ws / "game.py").write_text("x = 2  # half done\n", encoding="utf-8")
     (ws / "new.py").write_text("y = 1\n", encoding="utf-8")
-    (ws / ".mitra").mkdir()
-    (ws / ".mitra" / "night-1.log").write_text("log\n", encoding="utf-8")
+    (ws / ".codemitra").mkdir()
+    (ws / ".codemitra" / "night-1.log").write_text("log\n", encoding="utf-8")
     assert N.save_cut_off(ws) == "stash"
     assert N.STASH_MESSAGE in _git(ws, "stash", "list").stdout
     assert (ws / "game.py").read_text(encoding="utf-8") == "x = 1\n" and not (ws / "new.py").exists()
-    assert (ws / ".mitra" / "night-1.log").exists()
+    assert (ws / ".codemitra" / "night-1.log").exists()
     assert N.save_cut_off(ws) == "nothing"
 
 
@@ -105,7 +105,7 @@ def _write_rows(path: Path, rows: list[dict]) -> Path:
 
 def test_e056_night_marks_reach_the_session_and_the_dashboard(tmp_path):
     now = time.time()
-    rec = _write_rows(tmp_path / "proj" / ".mitra" / "runs" / "chat-20261109.jsonl", [
+    rec = _write_rows(tmp_path / "proj" / ".codemitra" / "runs" / "chat-20261109.jsonl", [
         {"kind": "session", "t": now - 100, "model": "m"},
         {"kind": "turn_start", "t": now - 90, "turn": 1, "user": "start the night"},
         {"kind": "turn_end", "t": now - 80, "turn": 1, "outcome": "answered"},
@@ -123,7 +123,7 @@ def test_e056_night_marks_reach_the_session_and_the_dashboard(tmp_path):
 # ── E-058: training data per session, not per turn number across a daily file ─────────────────────────────────
 
 def test_e058_two_sessions_in_one_file_keep_their_own_trajectories(tmp_path):
-    rec = _write_rows(tmp_path / "proj" / ".mitra" / "runs" / "chat-20261109.jsonl", [
+    rec = _write_rows(tmp_path / "proj" / ".codemitra" / "runs" / "chat-20261109.jsonl", [
         {"kind": "session", "t": 100.0},
         {"kind": "turn_start", "t": 101.0, "turn": 1, "user": "A"},
         {"kind": "turn_end", "t": 105.0, "turn": 1, "outcome": "tests_passed"},
@@ -146,7 +146,7 @@ def test_e058_two_sessions_in_one_file_keep_their_own_trajectories(tmp_path):
 
 
 def test_e058_a_session_without_traces_does_not_borrow_another_sessions_calls(tmp_path):
-    rec = _write_rows(tmp_path / "proj" / ".mitra" / "runs" / "chat-20261109.jsonl", [
+    rec = _write_rows(tmp_path / "proj" / ".codemitra" / "runs" / "chat-20261109.jsonl", [
         {"kind": "session", "t": 100.0},
         {"kind": "turn_start", "t": 101.0, "turn": 1, "user": "A"},
         {"kind": "turn_end", "t": 105.0, "turn": 1, "outcome": "tests_passed"},

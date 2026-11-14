@@ -29,7 +29,7 @@ def test_reachable_and_loaded_with_matching_context():
     assert "reachable at `http://h:1/`" in out
     assert "`qwen3.5:4b`: 4.0 GiB, 75% on GPU, context 131,072" in out
     assert "**`qwen3.5:4b`:** loaded" in out
-    assert "131,072, as Mitra asked" in out
+    assert "131,072, as CodeMitra asked" in out
     assert "smaller context" not in out
 
 
@@ -55,7 +55,7 @@ def test_nothing_loaded():
 
 def test_smaller_context_warns():
     out = ollama_report("qwen3.5:4b", 131072, get=_fake(_loaded(ctx=4096)))
-    assert "Ollama is running it with a smaller context than Mitra asked for" in out
+    assert "Ollama is running it with a smaller context than CodeMitra asked for" in out
     assert "4,096 < 131,072" in out
 
 

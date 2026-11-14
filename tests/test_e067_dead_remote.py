@@ -1,4 +1,4 @@
-"""E-067: a Kaggle run that stopped by itself left Mitra on a dead address ("no compatible local Ollama models")."""
+"""E-067: a Kaggle run that stopped by itself left CodeMitra on a dead address ("no compatible local Ollama models")."""
 import os
 
 from app import remote
@@ -17,7 +17,7 @@ def test_a_dead_kaggle_address_is_forgotten_and_this_machine_used(monkeypatch):
     assert remote.check_alive(cfg, echo=said.append) is False
     assert cfg["ollama_local_base_url"] == "http://localhost:11434" and cfg["num_ctx"] == 0 and "remote" not in cfg
     assert "OLLAMA_HOST" not in os.environ and remote.active() is None
-    assert "run has ended" in said[0] and "mitra kaggle start" in said[0]
+    assert "run has ended" in said[0] and "codemitra kaggle start" in said[0]
 
 
 def test_a_live_remote_is_kept(monkeypatch):
@@ -39,7 +39,7 @@ def test_another_dead_remote_stays_set_but_is_not_used_now(monkeypatch):
     monkeypatch.setattr(remote, "probe", lambda url, timeout=15: ([], "timed out"))
     said = []
     assert remote.check_alive(cfg, echo=said.append) is False
-    assert "remote" not in cfg and remote.active()["name"] == "office" and "mitra remote off" in said[0]
+    assert "remote" not in cfg and remote.active()["name"] == "office" and "codemitra remote off" in said[0]
     remote.clear()
 
 

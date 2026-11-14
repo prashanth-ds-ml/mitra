@@ -1,4 +1,4 @@
-"""`mitra improve --chat` (Phase B, first part): a rule is proposed from failed score cases and your signals, and the
+"""`codemitra improve --chat` (Phase B, first part): a rule is proposed from failed score cases and your signals, and the
 score decides whether it stays. No model: a scripted proposer and a scripted score."""
 import json
 
@@ -49,7 +49,7 @@ class Scores:
 def _run(proposer, scores, row, files=(), **kw):
     return IC.improve_chat(proposer=proposer, make_runner=lambda h, rec: type("R", (), {"harness": h})(),
                            model="qwen3.5:latest", arch="phased", score_row=row, files=list(files),
-                           instructions=lambda h: H.apply_prompt("You are Mitra.", h), run_score=scores,
+                           instructions=lambda h: H.apply_prompt("You are CodeMitra.", h), run_score=scores,
                            say=lambda t: None, **kw)
 
 

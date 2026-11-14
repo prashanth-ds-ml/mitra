@@ -23,7 +23,7 @@ def test_paths_and_chat_messages_are_left_alone():
 
 def _feedback_rows(tmp_path):
     rows = []
-    for f in (tmp_path / ".mitra" / "runs").glob("chat-*.jsonl"):
+    for f in (tmp_path / ".codemitra" / "runs").glob("chat-*.jsonl"):
         rows += [json.loads(line) for line in f.read_text(encoding="utf-8").splitlines() if line.strip()]
     return [r for r in rows if r.get("kind") == "feedback"]
 

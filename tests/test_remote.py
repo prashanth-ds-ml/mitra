@@ -1,4 +1,4 @@
-"""D-060: Mitra on a remote Ollama (Kaggle) through the token proxy."""
+"""D-060: CodeMitra on a remote Ollama (Kaggle) through the token proxy."""
 import json
 import os
 import pathlib
@@ -99,7 +99,7 @@ def test_set_status_and_off(stack, monkeypatch):
     cfg = remote.apply({"ollama_local_base_url": "http://localhost:11434", "num_ctx": 0})
     assert cfg["ollama_local_base_url"] == data["url"] and cfg["num_ctx"] == 262144 and cfg["remote"] == "kaggle"
     assert os.environ["OLLAMA_HOST"] == data["url"] and config._ollama_base_url() == data["url"]
-    assert remote.apply({"num_ctx": 65536})["num_ctx"] == 65536  # mitra.toml still wins
+    assert remote.apply({"num_ctx": 65536})["num_ctx"] == 65536  # codemitra.toml still wins
     assert remote.clear() and remote.active() is None
     monkeypatch.delenv("OLLAMA_HOST", raising=False)
 
@@ -135,7 +135,7 @@ def test_memory_check_and_free_skip_this_machine(monkeypatch):
 
 
 def test_mitra_solve_uses_the_configured_address(monkeypatch, tmp_path):
-    """Night runs (`mitra solve`) always used localhost; they now follow mitra.toml / the remote."""
+    """Night runs (`codemitra solve`) always used localhost; they now follow codemitra.toml / the remote."""
     from app.core import cli
     seen = {}
 
@@ -156,11 +156,11 @@ def test_the_notebook_embeds_the_tested_proxy_and_is_up_to_date():
     nb_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(nb_mod)
     built = nb_mod.build()
-    saved = json.loads((KAGGLE / "mitra_kaggle_server.ipynb").read_text(encoding="utf-8"))
+    saved = json.loads((KAGGLE / "codemitra_kaggle_server.ipynb").read_text(encoding="utf-8"))
     assert saved == built, "run python remote/kaggle/build_notebook.py"
     proxy_cell = "".join(next(c["source"] for c in saved["cells"] if "".join(c["source"]).startswith("%%writefile")))
     assert proxy_cell.split("\n", 1)[1] == (KAGGLE / "proxy.py").read_text(encoding="utf-8")
     code = "".join("".join(c["source"]) for c in saved["cells"])
     for needed in ("OLLAMA_KV_CACHE_TYPE=\"q8_0\"", "OLLAMA_FLASH_ATTENTION=\"1\"", "CONTEXT = 262144",
-                   "mitra remote set {URL} --ctx {CONTEXT}", "trycloudflare"):
+                   "codemitra remote set {URL} --ctx {CONTEXT}", "trycloudflare"):
         assert needed in code

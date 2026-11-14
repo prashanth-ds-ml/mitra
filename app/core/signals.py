@@ -36,7 +36,7 @@ _AGAIN = re.compile(r"^\s*(no\b|nope\b|not (that|this|what)|i meant\b|i mean\b|t
                     r"try again\b|again\b|still (wrong|not|failing|broken)|it (still )?(doesn'?t|does not|didn'?t) work)",
                     re.IGNORECASE)
 # E-104 (live 2026-11-11): "i said you to pick and tell me with a reason right why are not following that mitra" was
-# not a signal: you correcting Mitra for not doing what you asked
+# not a signal: you correcting CodeMitra for not doing what you asked
 _CORRECTED = re.compile(
     r"^\s*(i (already |just )?(said|told you|asked you)\b|you (didn'?t|did not|are not|aren'?t|forgot|ignored|missed)\b"
     r"|(that'?s|this is|it'?s) not what i (asked|said|wanted|meant))"
@@ -46,8 +46,8 @@ REPHRASE_RATIO = 0.6  # this similar to the previous message = the same request 
 
 
 def notes_files(workspace: Path) -> list[Path]:
-    """Your notes Mitra reads every turn (D-068 step 1): ~/.mitra/me.md and the project's .mitra/notes.md."""
-    return [H.home() / "me.md", Path(workspace) / ".mitra" / "notes.md"]
+    """Your notes CodeMitra reads every turn (D-068 step 1): ~/.codemitra/me.md and the project's .codemitra/notes.md."""
+    return [H.home() / "me.md", Path(workspace) / ".codemitra" / "notes.md"]
 
 
 def notes_version(workspace: Path) -> str:
@@ -73,7 +73,7 @@ def is_rephrase(previous: str, now: str) -> bool:
     if not prev or not cur:
         return False
     if _AGAIN.match(cur):
-        # a bare "no" answers Mitra's question ("shall I add tests too?"); "no, I meant ..." asks again
+        # a bare "no" answers CodeMitra's question ("shall I add tests too?"); "no, I meant ..." asks again
         return not re.fullmatch(r"(no|nope)\W*(thanks?|thank you)?\W*", cur)
     if _CORRECTED.search(cur):
         return True
@@ -103,7 +103,7 @@ def implicit_label(previous_answer: str, now: str, did_work: bool = False) -> tu
 # ── your notes, read every turn (D-068 step 1) ──────────────────────────────────
 
 NOTES_MAX_CHARS = 2000  # both files together, so a long notes file never crowds out the task
-ME_TEMPLATE = """# About me (Mitra reads this every turn; edit it any time)
+ME_TEMPLATE = """# About me (CodeMitra reads this every turn; edit it any time)
 
 Name:
 Role:
@@ -118,7 +118,7 @@ Habits:
 
 
 def ensure_me() -> Path | None:
-    """Create ~/.mitra/me.md from the template the first time; returns its path when it was just created."""
+    """Create ~/.codemitra/me.md from the template the first time; returns its path when it was just created."""
     f = H.home() / "me.md"
     if f.exists():
         return None
@@ -133,7 +133,7 @@ def ensure_me() -> Path | None:
 def notes_text(workspace: Path, max_chars: int = NOTES_MAX_CHARS) -> str:
     """Your notes for the prompt: me.md, then the project's notes; template lines left empty are dropped."""
     parts = []
-    for f, title in zip(notes_files(workspace), ("About the user (me.md)", "Project notes (.mitra/notes.md)")):
+    for f, title in zip(notes_files(workspace), ("About the user (me.md)", "Project notes (.codemitra/notes.md)")):
         try:
             text = f.read_text(encoding="utf-8")
         except OSError:

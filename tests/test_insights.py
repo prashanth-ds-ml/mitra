@@ -59,7 +59,7 @@ def test_tool_stats_count_by_tool_and_mcp_server(tmp_path):
 
 
 def test_model_stats_from_traces(tmp_path):
-    rec = L.Recorder(tmp_path / "p" / ".mitra" / "runs" / "r.jsonl")
+    rec = L.Recorder(tmp_path / "p" / ".codemitra" / "runs" / "r.jsonl")
     reply = AIMessage(content="hi", usage_metadata={"input_tokens": 26214, "output_tokens": 100, "total_tokens": 0})
     rec.trace([SystemMessage(content="s"), HumanMessage(content="u")], reply, model="qwen3.5:latest",
               num_ctx=262144, seconds=10.0)
@@ -82,7 +82,7 @@ def test_improvement_per_version_with_not_enough_data(tmp_path):
 
 
 def _traced_turn(root, outcome, author="mitra"):
-    rec = L.Recorder(root / ".mitra" / "runs" / "chat-1.jsonl")
+    rec = L.Recorder(root / ".codemitra" / "runs" / "chat-1.jsonl")
     rec.write("turn_start", turn=1, user="make tests pass", harness_version=2, author=author)
     msgs = [SystemMessage(content="sys"), HumanMessage(content="make tests pass")]
     r1 = AIMessage(content="", tool_calls=[{"name": "run_tests", "args": {}, "id": "c1"}])
@@ -97,7 +97,7 @@ def test_training_counts_usable_turns_and_why_others_are_out(tmp_path):
     good = _traced_turn(tmp_path / "good", "tests_passed")
     failed = _traced_turn(tmp_path / "bad", "tests_failed")
     claude = _traced_turn(tmp_path / "claude", "tests_passed", author="claude")
-    old = tmp_path / "old" / ".mitra" / "runs" / "chat-0.jsonl"
+    old = tmp_path / "old" / ".codemitra" / "runs" / "chat-0.jsonl"
     _write(old, _session_rows(outcome="tests_passed"))
     tr = I.training([good, failed, claude, old])
     assert tr.turns == 4 and tr.usable == 1
@@ -122,7 +122,7 @@ def test_the_page_has_every_section_and_works_from_the_store_alone(tmp_path):
     shutil.rmtree(tmp_path / "proj")  # the project is gone; the store still has it
     out, _ = D.build(roots=[tmp_path], out=tmp_path / "dash.html")
     page = out.read_text(encoding="utf-8")
-    for heading in ("<h2>Sessions</h2>", "Tools", "Models (from traces)", "Is Mitra improving?",
+    for heading in ("<h2>Sessions</h2>", "Tools", "Models (from traces)", "Is CodeMitra improving?",
                     "Training data (D-022)"):
         assert heading in page
     assert "<b>proj</b>" in page and "qwen3.5:4b" in page and "tests_passed" in page

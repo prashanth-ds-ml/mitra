@@ -1,5 +1,5 @@
 """E-126 (live 2026-11-13 20:38-23:11, mitra-try, 22 turns building Neon Chomp on d7f9bc1). Every case here is a
-real turn of that session: change requests landed in the read-only look phase and Mitra told the user to edit by
+real turn of that session: change requests landed in the read-only look phase and CodeMitra told the user to edit by
 hand (5 turns); brick-breaker's tests stood in for neon_chomp's ("37 passed"); "fixed" / "running successfully"
 with nothing changed or tests failing; drift to brick-breaker; a 524 ended the turn as "Kaggle ended"; and the
 E-125 go-ahead never fired because the questions were in bold."""

@@ -9,7 +9,7 @@ useless.
 
 With a state_dir (the notebook passes /kaggle/working): `POST /<token>/mitra/stop` writes `stop` there (the notebook
 then shuts everything down, which ends the Kaggle run), and every model request touches `last_request`, so the
-notebook can stop by itself when Mitra has not used it for a while.
+notebook can stop by itself when CodeMitra has not used it for a while.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-QUIET = {"/api/tags", "/api/ps", "/api/version", "/api/show"}  # status checks: not "Mitra is using it"
+QUIET = {"/api/tags", "/api/ps", "/api/version", "/api/show"}  # status checks: not "CodeMitra is using it"
 
 HOP = {"connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade", "proxy-authorization",
        "proxy-authenticate", "host", "content-length"}
@@ -55,7 +55,7 @@ def make_handler(token: str, upstream: str, state_dir: str | None = None):
                 self._refuse()
                 return
             tail = "/" + (parts[2] if len(parts) > 2 else "")
-            if tail.startswith("/mitra/"):  # Mitra's own commands, never forwarded to Ollama
+            if tail.startswith("/mitra/"):  # CodeMitra's own commands, never forwarded to Ollama
                 ok = tail == "/mitra/ping" or (tail == "/mitra/stop" and state_dir is not None)
                 if ok and tail == "/mitra/stop":
                     _touch(os.path.join(state_dir, "stop"))

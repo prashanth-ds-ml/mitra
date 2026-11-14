@@ -1,7 +1,7 @@
-"""Runnable plans: the template, the check, and the note Mitra gets when it writes a plan (D-055).
+"""Runnable plans: the template, the check, and the note CodeMitra gets when it writes a plan (D-055).
 
-A plan runs with `/run` (or `mitra night` / `mitra solve --plan`) when it has tasks `### T1: title`, each with a
-line `- Done when: `<test command>` passes`. The same check is used by /run, `/plan check`, and right after Mitra
+A plan runs with `/run` (or `codemitra night` / `codemitra solve --plan`) when it has tasks `### T1: title`, each with a
+line `- Done when: `<test command>` passes`. The same check is used by /run, `/plan check`, and right after CodeMitra
 writes a plan file, so a plan it writes is fixed on the spot instead of failing at night.
 """
 from __future__ import annotations
@@ -108,7 +108,7 @@ def check_text(text: str, folder: str = "") -> tuple[int, str]:
 
 
 def write_note(rel: str, text: str) -> str:
-    """Appended to the write_file / edit_file / append_file result when Mitra writes a plan file."""
+    """Appended to the write_file / edit_file / append_file result when CodeMitra writes a plan file."""
     if not is_plan_file(rel):
         return ""
     parts = rel.replace("\\", "/").split("/")

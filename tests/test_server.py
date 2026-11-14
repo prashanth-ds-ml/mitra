@@ -1,4 +1,4 @@
-"""`mitra dashboard` on localhost (D-042): serves the page, caches it, rebuilds on Refresh or when the store grows."""
+"""`codemitra dashboard` on localhost (D-042): serves the page, caches it, rebuilds on Refresh or when the store grows."""
 import threading
 import urllib.error
 import urllib.request
@@ -28,8 +28,8 @@ def _get(url):
 def test_serves_the_page_with_a_refresh_button_and_health(served):
     srv, base, _ = served
     code, page = _get(base + "/")
-    assert code == 200 and "Mitra dashboard" in page and "href='/?refresh=1'" in page
-    assert _get(base + "/health") == (200, "mitra dashboard")
+    assert code == 200 and "CodeMitra dashboard" in page and "href='/?refresh=1'" in page
+    assert _get(base + "/health") == (200, "codemitra dashboard")
     with pytest.raises(urllib.error.HTTPError) as err:
         _get(base + "/../secrets")
     assert err.value.code == 404
@@ -40,11 +40,11 @@ def test_cached_until_the_store_changes_and_refresh_always_rebuilds(served):
     _get(base + "/")
     _get(base + "/")
     assert srv.pages.builds == 1  # nothing changed: served from cache
-    L.Recorder(tmp / "proj" / ".mitra" / "runs" / "chat-1.jsonl").write("turn_start", turn=1, user="hello there")
+    L.Recorder(tmp / "proj" / ".codemitra" / "runs" / "chat-1.jsonl").write("turn_start", turn=1, user="hello there")
     code, page = _get(base + "/")
     assert srv.pages.builds == 2 and "hello there" in page
     code, page = _get(base + "/?refresh=1")  # the button: rebuild, then back to /
-    assert code == 200 and srv.pages.builds == 3 and "Mitra dashboard" in page
+    assert code == 200 and srv.pages.builds == 3 and "CodeMitra dashboard" in page
 
 
 def test_binds_to_localhost_only(served):

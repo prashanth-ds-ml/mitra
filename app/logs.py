@@ -3,15 +3,15 @@ from __future__ import annotations
 import logging
 import pathlib
 
-_LOGGER_NAME = "mitra"
+_LOGGER_NAME = "codemitra"
 
 
 def setup_logging(workspace: str | None = None) -> logging.Logger:
     """Configure a simple file logger for CLI commands."""
     root = pathlib.Path(workspace).resolve() if workspace else pathlib.Path.cwd().resolve()
-    log_dir = root / ".mitra"
+    log_dir = root / ".codemitra"
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / "mitra.log"
+    log_path = log_dir / "codemitra.log"
 
     logger = logging.getLogger(_LOGGER_NAME)
     configured_path = getattr(logger, "_mitra_log_path", None)

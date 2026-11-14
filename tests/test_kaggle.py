@@ -1,4 +1,4 @@
-"""D-061: `mitra kaggle start | stop | status` with a stand-in Kaggle API (no network, no GPU hours)."""
+"""D-061: `codemitra kaggle start | stop | status` with a stand-in Kaggle API (no network, no GPU hours)."""
 import importlib.util
 import json
 import os
@@ -32,7 +32,7 @@ class FakeApi:
         meta = json.loads((pathlib.Path(folder) / "kernel-metadata.json").read_text(encoding="utf-8"))
         nb = json.loads((pathlib.Path(folder) / f"{kaggle.SLUG}.ipynb").read_text(encoding="utf-8"))
         self.pushed.append({"meta": meta, "nb": nb, "timeout": timeout, "acc": acc})
-        return SimpleNamespace(error="", url="https://www.kaggle.com/code/someone/mitra-gpu-server")
+        return SimpleNamespace(error="", url="https://www.kaggle.com/code/someone/codemitra-gpu-server")
 
     def kernels_logs_stream(self, ref):
         for line in self.log_lines:
@@ -57,7 +57,7 @@ def test_start_pushes_a_private_gpu_notebook_and_switches_mitra_when_ready(monke
     push = api.pushed[0]
     assert push["acc"] == "NvidiaTeslaT4" and push["meta"]["is_private"] is True
     assert push["meta"]["enable_gpu"] and push["meta"]["enable_internet"]
-    assert push["meta"]["id"] == "someone/mitra-gpu-server" and float(push["timeout"]) == 11.5 * 3600
+    assert push["meta"]["id"] == "someone/codemitra-gpu-server" and float(push["timeout"]) == 11.5 * 3600
     token = kaggle.load_state()["token"]
     settings = "".join(push["nb"]["cells"][1]["source"])
     assert f"TOKEN = {token!r}" in settings and "IDLE_MIN = 30" in settings
@@ -120,7 +120,7 @@ def test_quota_reads_the_kaggle_api_numbers(monkeypatch):
 
 @pytest.fixture
 def proxy_stack(tmp_path):
-    """The real proxy with a state dir, in front of nothing (Mitra's own commands never reach Ollama)."""
+    """The real proxy with a state dir, in front of nothing (CodeMitra's own commands never reach Ollama)."""
     spec = importlib.util.spec_from_file_location("kaggle_proxy2", KAGGLE_DIR / "proxy.py")
     proxy = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(proxy)
@@ -133,7 +133,7 @@ def proxy_stack(tmp_path):
 def test_stop_asks_the_notebook_to_stop_and_goes_back_local(proxy_stack, fake_quota):
     url, state_dir = proxy_stack
     remote.set_remote(url + "/tok", 262144, "kaggle")
-    kaggle.save_state({"ref": "someone/mitra-gpu-server", "token": "tok", "public": url, "url": "u"})
+    kaggle.save_state({"ref": "someone/codemitra-gpu-server", "token": "tok", "public": url, "url": "u"})
     api = FakeApi([], statuses=("RUNNING", "COMPLETE"))
     said = []
     kaggle.stop(echo=said.append, api=api, sleep=lambda s: None)
@@ -240,7 +240,7 @@ def test_setup_finds_the_downloaded_key_and_checks_it(fake_home, fake_quota):
     assert kaggle.setup(echo=said.append, api_factory=_ok_api)
     assert json.loads(kaggle.key_path().read_text(encoding="utf-8"))["username"] == "friend"
     assert any("saved to" in s for s in said) and any("Kaggle GPU:" in s for s in said)
-    assert any("mitra kaggle start" in s for s in said)
+    assert any("codemitra kaggle start" in s for s in said)
     assert not any("abc123" in s for s in said)  # the key itself is never printed
 
 

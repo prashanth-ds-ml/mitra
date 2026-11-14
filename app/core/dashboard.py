@@ -1,4 +1,4 @@
-"""The Mitra dashboard (D-041, D-042, D-044): one local HTML page from the central store, no network.
+"""The CodeMitra dashboard (D-041, D-042, D-044): one local HTML page from the central store, no network.
 
 Order on the page, most useful first: headline → trends → is it improving → your judgment → where it works
 (kind / project / model) → sessions → tools and models → training data → self-improvement internals
@@ -17,7 +17,7 @@ MITRA_ROOT = Path(__file__).resolve().parents[2]
 
 
 def default_roots() -> list[Path]:
-    """Where to look for records: the current folder and the folder holding the Mitra repo (playground lives there)."""
+    """Where to look for records: the current folder and the folder holding the CodeMitra repo (playground lives there)."""
     cwd, home = Path.cwd().resolve(), MITRA_ROOT.parent
     if cwd == home or home in cwd.parents:
         return [home]
@@ -26,7 +26,7 @@ def default_roots() -> list[Path]:
 
 def run_files(roots: list[Path] | None = None) -> list[Path]:
     """Every run record ever made, from the central store (D-041). Records under `roots`, the known projects and
-    ~/.mitra are merged in first (append-only), so nothing written before the store existed is missed."""
+    ~/.codemitra are merged in first (append-only), so nothing written before the store existed is missed."""
     from app.core import store
     store.import_all(roots or default_roots())
     return store.stored_files()
@@ -176,7 +176,7 @@ def render_more(sess, tools, models, versions, tr, *, days=None, by_code=None, b
         ("👍 / 👎", f"{pool('good') + n_good} / {pool('bad') + n_bad}",
          f"your marks ({len(nights7)} on night runs)" if nights7 else "your marks"),
         ("your fixes", pool("corrections"), f"declined {pool('declines')}"),
-        ("crashes", pool("crashes"), "Mitra errors"),
+        ("crashes", pool("crashes"), "CodeMitra errors"),
         ("usable for training", tr.usable, f"of {I.TRAINING_TARGET} needed"),
     ]
     head_html = "<div class='tiles'>" + "".join(
@@ -262,7 +262,7 @@ def render_more(sess, tools, models, versions, tr, *, days=None, by_code=None, b
                 marks.append("<span class='bad'>crash</span>")
             fixes = "".join(f"<div class='ex'>{e(c.get('path') or '')}: +{c.get('added') or 0} -{c.get('removed') or 0}"
                             f"<pre>{e((c.get('diff') or '')[:1500])}</pre></div>" for c in t.corrections)
-            info = [x for x in (t.model, t.mode, f"Mitra {t.code_version}" if t.code_version else "",
+            info = [x for x in (t.model, t.mode, f"CodeMitra {t.code_version}" if t.code_version else "",
                                 f"harness v{t.harness_version}",
                                 f"{t.ram_free_gb} GB RAM free" if t.ram_free_gb is not None else "",
                                 f"context {t.ctx_used:,}" if t.ctx_used else "",
@@ -299,10 +299,10 @@ def render_more(sess, tools, models, versions, tr, *, days=None, by_code=None, b
     return f"""
 {head_html}
 <h2>Trends</h2>{trend_html}{day_table}
-<h2>Is Mitra improving?</h2>{_group_table(by_code or versions, "Mitra version · harness", judge=True)}
+<h2>Is CodeMitra improving?</h2>{_group_table(by_code or versions, "CodeMitra version · harness", judge=True)}
 <div class="note">first try = tests passed, no fix from you, no 👎 (count of tested turns in brackets) · time to green
 = first code edit to passing tests · fails/turn = tool failures per turn · fixes = files you changed after
-Mitra · "{I.OLD}" = records from before the version was saved · a version needs {I.MIN_TURNS_TO_JUDGE}+ turns to judge</div>
+CodeMitra · "{I.OLD}" = records from before the version was saved · a version needs {I.MIN_TURNS_TO_JUDGE}+ turns to judge</div>
 <h2>Your corrections, declines and marks</h2><div class="wrap"><table><tr><th>when</th><th>project</th><th>turn</th>
 <th>what</th></tr>{judged_html or "<tr><td colspan=4 class='dim'>none yet: /good, /bad and your own edits after a turn show here</td></tr>"}</table></div>
 <h3>Crashes</h3><div class="wrap"><table><tr><th>when</th><th>project</th><th>error</th></tr>
@@ -318,11 +318,11 @@ Mitra · "{I.OLD}" = records from before the version was saved · a version need
 <th>context used (median / max)</th><th>prompt s (median)</th><th>reloads</th><th>failed calls</th></tr>
 {m_rows or "<tr><td colspan=8 class='dim'>no traces yet</td></tr>"}</table></div>
 <h2>Training data (D-022)</h2><div class="tiles"><div class="tile"><b>{tr.usable}</b>usable turns<small>tests passed or
-👍 · all Mitra · traced · not corrected</small></div><div class="tile"><b>{tr.untested}</b>of them untested<small>your
+👍 · all CodeMitra · traced · not corrected</small></div><div class="tile"><b>{tr.untested}</b>of them untested<small>your
 👍 without tests</small></div><div class="tile"><b>{tr.turns}</b>turns recorded</div><div class="tile"><b>{tr.target_pct}%</b>
 of {I.TRAINING_TARGET} needed<div class="bar"><i style="width:{tr.target_pct}%"></i></div></div></div>
 <div class="wrap" style="margin-top:10px"><table><tr><th>turns</th><th>why not usable</th></tr>{r_rows or "<tr><td colspan=2 class='dim'>none</td></tr>"}
-</table></div><div class="note">Export: <code>mitra report --export-training out.jsonl</code> (local file, nothing
+</table></div><div class="note">Export: <code>codemitra report --export-training out.jsonl</code> (local file, nothing
 sent) · store {e(store_text())}</div>"""
 
 
@@ -357,14 +357,14 @@ def render(results: list[dict], rep: A.Report, history: list[tuple[str, str]], c
                      f"<td class='{cls}'>{e(t.get('result', ''))}</td></tr>")
     rules = "".join(f"<li>{e(r)}</li>" for r in current.rules) or "<li class='dim'>none yet</li>"
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Mitra Dashboard</title><style>{CSS}</style></head>
-<body><main><h1>Mitra dashboard</h1><div class="dim">made {time.strftime('%Y-%m-%d %H:%M')} · Mitra
-{e(runinfo.code_version())} · harness v{current.version} · local only · rebuilt when a Mitra session ends · /report
-or <code>mitra dashboard</code></div>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>CodeMitra Dashboard</title><style>{CSS}</style></head>
+<body><main><h1>CodeMitra dashboard</h1><div class="dim">made {time.strftime('%Y-%m-%d %H:%M')} · CodeMitra
+{e(runinfo.code_version())} · harness v{current.version} · local only · rebuilt when a CodeMitra session ends · /report
+or <code>codemitra dashboard</code></div>
 {more_html}
 <h2>Self-improvement</h2>
-<h3>What Mitra has learned (harness v{current.version})</h3><ul>{rules}</ul>
-<h3>Improve attempts (mitra improve)</h3><div class="wrap"><table><tr><th>date</th><th>proposal</th>
+<h3>What CodeMitra has learned (harness v{current.version})</h3><ul>{rules}</ul>
+<h3>Improve attempts (codemitra improve)</h3><div class="wrap"><table><tr><th>date</th><th>proposal</th>
 <th>tune tasks passed</th><th>result</th></tr>{''.join(tried) or "<tr><td colspan=4 class='dim'>none yet</td></tr>"}
 </table></div>
 <h3>Harness history</h3><div class="wrap"><table><tr><th>version</th><th>why</th></tr>
@@ -372,7 +372,7 @@ or <code>mitra dashboard</code></div>
 <h3>Playground results (hidden tests)</h3><div class="wrap"><table><tr><th>date</th><th>level</th><th>model</th>
 <th>visible</th><th>visible + hidden</th><th>build</th><th>result</th></tr>{''.join(rows) or "<tr><td colspan=7 class='dim'>no results yet</td></tr>"}
 </table></div>
-<h3>Problem patterns in the records ({rep.files} files) — what <code>mitra improve</code> works on</h3>
+<h3>Problem patterns in the records ({rep.files} files) — what <code>codemitra improve</code> works on</h3>
 {''.join(pats) or "<div class='dim'>none found</div>"}</main></body></html>"""
 
 

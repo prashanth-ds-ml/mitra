@@ -179,7 +179,7 @@ def test_plan_runs_on_a_branch_commits_each_task_and_writes_needs_help(ws, tmp_p
         *[tc("finish", n, summary="done") for n in range(5, 9)],                           # T2 fails
     )
     out = L.run_plan(PLAN, ws, model, full_test_command="python -m pytest -q tests", record_dir=tmp_path / "runs")
-    assert out["branch"].startswith("mitra/plan-") and git(ws.root, "branch", "--show-current") == out["branch"]
+    assert out["branch"].startswith("codemitra/plan-") and git(ws.root, "branch", "--show-current") == out["branch"]
     assert out["tasks"]["T1"]["status"] == "passed" and out["tasks"]["T2"]["status"] == "failed"
     assert out["commits"]["T1"] and "mitra: T1 add" in git(ws.root, "log", "-1", "--format=%s")
     assert "def sub" not in (ws.root / "calc.py").read_text()          # T2's edit was rolled back
@@ -225,7 +225,7 @@ def test_repeat_guard_allows_rerunning_tests_and_rereading_after_an_edit():
 
 
 def test_run_records_are_scrubbed(ws, tmp_path):
-    """D-022: a secret the model reads or writes never lands in .mitra/runs."""
+    """D-022: a secret the model reads or writes never lands in .codemitra/runs."""
     token = "ghp_" + "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8"
     (ws.root / "config.txt").write_text(f"GITHUB_TOKEN={token}\n", encoding="utf-8")
     model = Scripted(tc("read_file", 1, path="config.txt"), tc("write_file", 2, path="calc.py", content=GOOD),
@@ -237,7 +237,7 @@ def test_run_records_are_scrubbed(ws, tmp_path):
 
 
 def test_tests_run_with_the_projects_python(tmp_path, monkeypatch):
-    """E-028: installed as a command, Mitra's own Python had no pytest; prefer the project's venv, then PATH."""
+    """E-028: installed as a command, CodeMitra's own Python had no pytest; prefer the project's venv, then PATH."""
     venv_py = tmp_path / ".venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
     venv_py.parent.mkdir(parents=True)
     venv_py.write_text("", encoding="utf-8")

@@ -7,7 +7,7 @@ body:
     id: what
     attributes:
       label: What you typed and what happened
-      description: Copy the terminal (the Mitra header too, it shows the model and version). Remove anything private.
+      description: Copy the terminal (the CodeMitra header too, it shows the model and version). Remove anything private.
       render: text
     validations:
       required: true
@@ -18,8 +18,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: Mitra version and machine
-      description: "`mitra --version`, OS, GPU / RAM, model"
-      placeholder: "mitra 0.1.0, macOS 15, M2 16 GB, qwen3.5:4b"
+      label: CodeMitra version and machine
+      description: "`codemitra --version`, OS, GPU / RAM, model"
+      placeholder: "codemitra 0.8.0, macOS 15, M2 16 GB, qwen3.5:4b"
     validations:
       required: true

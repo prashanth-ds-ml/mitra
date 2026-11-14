@@ -65,7 +65,7 @@ class Monitor:
         if self._thread is None:
             # psutil's first CPU reading is always 0: leave CPU out until the first real one, 2 s later
             self.last = replace(self._sampler(), cpu_pct=None)
-            self._thread = threading.Thread(target=self._run, name="mitra-sysmon", daemon=True)
+            self._thread = threading.Thread(target=self._run, name="codemitra-sysmon", daemon=True)
             self._thread.start()
         return self
 
@@ -119,7 +119,7 @@ def segments(s: Sample, *, speed: float | None = None, slow: bool = False, ram_w
 
 def working_footer(seconds: float, sample: Sample, *, speed: float | None = None, slow: bool = False,
                    ram_warn_gb: float = 2.0, writing: bool = True):
-    """The line under the live part while Mitra works (user, 2026-11-11: the status line vanished during a turn):
+    """The line under the live part while CodeMitra works (user, 2026-11-11: the status line vanished during a turn):
     '  working 12s · 24 tok/s · CPU 35% · RAM 4.1G free · GPU 5.2/8G 92% 74°C   esc to stop'. Rich Text."""
     from rich.text import Text
 

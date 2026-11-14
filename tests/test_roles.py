@@ -24,7 +24,7 @@ def test_your_choice_and_mitra_toml_win(monkeypatch):
     have = {"qwen3.5:latest", "qwen3.5:4b", "mimo-v2.6:9b"}
     R.save_choice("builder", "qwen3.5:4b")
     assert R.resolve("builder", {}, have) == ("qwen3.5:4b", "your choice")
-    assert R.resolve("builder", {"roles": {"builder": "mimo-v2.6:9b"}}, have) == ("mimo-v2.6:9b", "mitra.toml")
+    assert R.resolve("builder", {"roles": {"builder": "mimo-v2.6:9b"}}, have) == ("mimo-v2.6:9b", "codemitra.toml")
     R.save_choice("builder", "default")
     assert R.resolve("builder", {}, have)[1] == "default"
     assert json.loads(R._file().read_text(encoding="utf-8")) == {}
@@ -37,7 +37,7 @@ def test_every_role_runs_at_its_models_maximum_context(monkeypatch):
     assert R.context_for("deepseek-r1:8b") == 131_072    # its own maximum is the ceiling
     config.save_context_choice("qwen3.5:4b", 65_536)
     assert R.context_for("qwen3.5:4b") == 65_536         # your /context choice still wins
-    assert R.context_for("qwen3.5:4b", {"num_ctx": 32_768}) == 32_768  # and mitra.toml over both
+    assert R.context_for("qwen3.5:4b", {"num_ctx": 32_768}) == 32_768  # and codemitra.toml over both
 
 
 def test_routes_carry_tools_mcp_thinking_and_read_only(monkeypatch):
@@ -99,7 +99,7 @@ def test_switching_role_changes_tools_mcp_read_only_and_model_and_is_recorded(tm
     from app.core import tools as T
     with pytest.raises(T.ToolError):
         s.ws.check_writable(tmp_path / "tests" / "test_x.py")
-    rows = [json.loads(x) for x in next((tmp_path / ".mitra" / "runs").glob("chat-*.jsonl")).read_text(
+    rows = [json.loads(x) for x in next((tmp_path / ".codemitra" / "runs").glob("chat-*.jsonl")).read_text(
         encoding="utf-8").splitlines()]
     routes = [r for r in rows if r["kind"] == "route"]
     assert [r["role"] for r in routes] == ["planner", "builder"] and routes[0]["mcp"][0] == "context7"

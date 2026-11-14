@@ -17,12 +17,12 @@ bench/runs/
 # bench Ollama server log (local paths, not a result)
 results/ollama-bench.log
 
-# Mitra runtime files (logs, trimmed MCP outputs)
-.mitra/logs/
-.mitra/mcp-output/
+# CodeMitra runtime files (logs, trimmed MCP outputs)
+.codemitra/logs/
+.codemitra/mcp-output/
 
 # agent worktrees and local Claude Code state
 .claude/
-.mitra/health/
-.mitra/runs/
-.mitra/output/
+.codemitra/health/
+.codemitra/runs/
+.codemitra/output/

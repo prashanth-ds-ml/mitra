@@ -1,11 +1,11 @@
-"""Obsidian-compatible project memory for Mitra.
+"""Obsidian-compatible project memory for CodeMitra.
 
-Files written to <workspace>/.mitra/
+Files written to <workspace>/.codemitra/
   activity.md  — timestamped log of every conversation turn (daily-note style)
   context.md   — running project state, injected into the system prompt
   plan.md      — current active plan (populated by the planner agent later)
 
-All files are plain Markdown — open the .mitra/ folder as an Obsidian vault
+All files are plain Markdown — open the .codemitra/ folder as an Obsidian vault
 to browse, search, and link between sessions.
 """
 
@@ -21,7 +21,7 @@ from datetime import datetime
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
-_DIR = ".mitra"
+_DIR = ".codemitra"
 _ACTIVITY  = "activity.md"
 _SESSION_LOG = "session_log.md"
 _CONTEXT   = "context.md"
@@ -54,7 +54,7 @@ def append_activity(workspace: str, user_msg: str, ai_summary: str) -> None:
       ## YYYY-MM-DD
       ### HH:MM
       **You:** ...
-      **Mitra:** ...
+      **CodeMitra:** ...
     """
     path = _dir(workspace) / _ACTIVITY
     now  = datetime.now()
@@ -68,7 +68,7 @@ def append_activity(workspace: str, user_msg: str, ai_summary: str) -> None:
     entry = (
         f"\n{time_heading}\n"
         f"**You:** {user_short}\n\n"
-        f"**Mitra:** {ai_short}\n"
+        f"**CodeMitra:** {ai_short}\n"
     )
 
     if path.exists():
@@ -81,10 +81,10 @@ def append_activity(workspace: str, user_msg: str, ai_summary: str) -> None:
         header = textwrap.dedent(f"""\
             ---
             title: Activity Log
-            tags: [mitra, activity, log]
+            tags: [codemitra, activity, log]
             ---
 
-            # Mitra - Activity Log
+            # CodeMitra - Activity Log
 
             {date_heading}
         """)
@@ -106,13 +106,13 @@ def append_activity(workspace: str, user_msg: str, ai_summary: str) -> None:
 _CONTEXT_TEMPLATE = textwrap.dedent("""\
     ---
     title: Project Context
-    tags: [mitra, context, memory]
+    tags: [codemitra, context, memory]
     updated: {updated}
     ---
 
     # Project Context
 
-    > Auto-maintained by Mitra. Edit freely - it is re-read at every startup.
+    > Auto-maintained by CodeMitra. Edit freely - it is re-read at every startup.
 
     ## Last active
     {updated}
@@ -121,7 +121,7 @@ _CONTEXT_TEMPLATE = textwrap.dedent("""\
     {topics}
 
     ## Notes
-    <!-- Add anything you want Mitra to always remember about this project -->
+    <!-- Add anything you want CodeMitra to always remember about this project -->
 
 """)
 
@@ -135,7 +135,7 @@ def load_context(workspace: str) -> str | None:
 
 
 def context_notes(text: str | None) -> str | None:
-    """Only what you wrote under '## Notes' in context.md (one Mitra, D-071): the auto-kept topic list is the
+    """Only what you wrote under '## Notes' in context.md (one CodeMitra, D-071): the auto-kept topic list is the
     first line of each request, which steered every answer back to old work. None when there is nothing."""
     m = re.search(r"^## Notes\s*$(.*?)(?=^## |\Z)", text or "", re.M | re.S)
     body = re.sub(r"<!--.*?-->", "", m.group(1), flags=re.S).strip() if m else ""
@@ -197,13 +197,13 @@ def update_context(workspace: str, new_topic: str) -> None:
 _PLAN_TEMPLATE = textwrap.dedent("""\
     ---
     title: Active Plan
-    tags: [mitra, plan]
+    tags: [codemitra, plan]
     updated: {updated}
     ---
 
     # Active Plan
 
-    > Managed by Mitra's planner. Ask Mitra to make or change the plan.
+    > Managed by CodeMitra's planner. Ask CodeMitra to make or change the plan.
 
     ## Goal
     {goal}
@@ -212,7 +212,7 @@ _PLAN_TEMPLATE = textwrap.dedent("""\
     {steps}
 
     ## Completed
-    <!-- Mitra will check off steps here as work progresses -->
+    <!-- CodeMitra will check off steps here as work progresses -->
 
 """)
 
@@ -261,8 +261,8 @@ def load_recent_activity(workspace: str, limit: int = 5) -> list[dict[str, str]]
             continue
         if line.startswith("**You:** "):
             current["user"] = line[len("**You:** "):].strip()
-        elif line.startswith("**Mitra:** "):
-            current["assistant"] = line[len("**Mitra:** "):].strip()
+        elif line.startswith("**CodeMitra:** "):
+            current["assistant"] = line[len("**CodeMitra:** "):].strip()
 
     if current:
         entries.append(current)
@@ -429,10 +429,10 @@ def trust_shell_command(workspace: str, cwd: str, command_name: str) -> dict:
 _ACTIVITY_TEMPLATE = textwrap.dedent("""\
     ---
     title: Activity Log
-    tags: [mitra, activity, log]
+    tags: [codemitra, activity, log]
     ---
 
-    # Mitra - Activity Log
+    # CodeMitra - Activity Log
 
     > One entry per conversation turn. Open this folder as an Obsidian vault.
 
@@ -441,10 +441,10 @@ _ACTIVITY_TEMPLATE = textwrap.dedent("""\
 _SESSION_LOG_TEMPLATE = textwrap.dedent("""\
     ---
     title: Session Log
-    tags: [mitra, session, log]
+    tags: [codemitra, session, log]
     ---
 
-    # Mitra - Session Log
+    # CodeMitra - Session Log
 
     > Mirror of high-level session activity for traceability.
 
@@ -453,19 +453,19 @@ _SESSION_LOG_TEMPLATE = textwrap.dedent("""\
 _DECISIONS_TEMPLATE = textwrap.dedent("""\
     ---
     title: Decision Journal
-    tags: [mitra, decisions]
+    tags: [codemitra, decisions]
     ---
 
     # Decision Journal
 
-    > Important implementation and operator decisions recorded by Mitra.
+    > Important implementation and operator decisions recorded by CodeMitra.
 
 """)
 
 _ERRORS_TEMPLATE = textwrap.dedent("""\
     ---
     title: Error Log
-    tags: [mitra, errors]
+    tags: [codemitra, errors]
     ---
 
     # Error Log
@@ -477,7 +477,7 @@ _ERRORS_TEMPLATE = textwrap.dedent("""\
 _TASK_BOARD_TEMPLATE = textwrap.dedent("""\
     ---
     title: Task Board
-    tags: [mitra, tasks]
+    tags: [codemitra, tasks]
     updated: {updated}
     ---
 
@@ -495,9 +495,9 @@ _USER_PROFILE_TEMPLATE = textwrap.dedent("""\
 """)
 
 _OBSIDIAN_README = textwrap.dedent("""\
-    # .mitra vault
+    # .codemitra vault
 
-    This folder is managed by **Mitra** and doubles as an [Obsidian](https://obsidian.md) vault.
+    This folder is managed by **CodeMitra** and doubles as an [Obsidian](https://obsidian.md) vault.
 
     | File | Purpose |
     |---|---|
@@ -518,7 +518,7 @@ _OBSIDIAN_README = textwrap.dedent("""\
 
 
 def init_memory(workspace: str) -> list[str]:
-    """Create the .mitra/ vault skeleton during `mitra init`.
+    """Create the .codemitra/ vault skeleton during `codemitra init`.
 
     Returns a list of file paths that were created (skips existing files).
     """
@@ -547,8 +547,8 @@ def init_memory(workspace: str) -> list[str]:
         )
         # Inject project name into Notes section
         content = content.replace(
-            "<!-- Add anything you want Mitra to always remember about this project -->",
-            f"<!-- Add anything you want Mitra to always remember about this project -->\n"
+            "<!-- Add anything you want CodeMitra to always remember about this project -->",
+            f"<!-- Add anything you want CodeMitra to always remember about this project -->\n"
             f"- Project: **{project_name}**",
         )
         context_path.write_text(content, encoding="utf-8")
@@ -559,7 +559,7 @@ def init_memory(workspace: str) -> list[str]:
     if not plan_path.exists():
         content = _PLAN_TEMPLATE.format(
             updated=now,
-            goal="_No active goal. Ask Mitra to make a plan._",
+            goal="_No active goal. Ask CodeMitra to make a plan._",
             steps="- [ ] Define project goal",
         )
         plan_path.write_text(content, encoding="utf-8")
@@ -571,12 +571,12 @@ def init_memory(workspace: str) -> list[str]:
             textwrap.dedent("""\
                 ---
                 title: Understand Notes
-                tags: [mitra, understand, notes]
+                tags: [codemitra, understand, notes]
                 ---
 
                 # Understand Notes
 
-                > Mitra keeps the questions and answers about the idea here.
+                > CodeMitra keeps the questions and answers about the idea here.
             """),
             encoding="utf-8",
         )
@@ -588,12 +588,12 @@ def init_memory(workspace: str) -> list[str]:
             textwrap.dedent("""\
                 ---
                 title: Product Requirements Document
-                tags: [mitra, prd, requirements]
+                tags: [codemitra, prd, requirements]
                 ---
 
                 # Product Requirements Document
 
-                > Mitra keeps the project PRD here.
+                > CodeMitra keeps the project PRD here.
             """),
             encoding="utf-8",
         )
@@ -605,12 +605,12 @@ def init_memory(workspace: str) -> list[str]:
             textwrap.dedent("""\
                 ---
                 title: Brainstorm Notes
-                tags: [mitra, brainstorm, notes]
+                tags: [codemitra, brainstorm, notes]
                 ---
 
                 # Brainstorm Notes
 
-                > Mitra keeps idea exploration here.
+                > CodeMitra keeps idea exploration here.
             """),
             encoding="utf-8",
         )

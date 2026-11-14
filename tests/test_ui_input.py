@@ -171,4 +171,4 @@ def test_notify_rings_only_after_a_long_turn(monkeypatch):
     ui.notify.done(None, 5)
     ui.notify.done(None, 45)
     ui.notify.waiting(None)
-    assert calls == ["Mitra · ready", "✓ Mitra · done", "bell", "❓ Mitra · waiting for you", "bell"]
+    assert calls == ["CodeMitra · ready", "✓ CodeMitra · done", "bell", "❓ CodeMitra · waiting for you", "bell"]

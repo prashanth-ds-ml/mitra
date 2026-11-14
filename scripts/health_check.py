@@ -1,10 +1,10 @@
-"""Restart and check everything Mitra depends on, step by step, so a break shows up in one place.
+"""Restart and check everything CodeMitra depends on, step by step, so a break shows up in one place.
 
     python scripts/health_check.py               # full: restart Ollama, reinstall, tests, live run
     python scripts/health_check.py --no-restart  # same, without restarting Ollama (e.g. while it is busy)
     python scripts/health_check.py --quick       # skip the slow steps (unit tests, live run)
 
-Each step prints ok / FAIL with a short reason; the whole report is saved to .mitra/health/<time>.json.
+Each step prints ok / FAIL with a short reason; the whole report is saved to .codemitra/health/<time>.json.
 Exit code 0 only if every step passed.
 """
 from __future__ import annotations
@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PLAYGROUND = ROOT.parent / "mitra-playground"
+PLAYGROUND = ROOT.parent / "codemitra-playground"
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 if not OLLAMA.startswith("http"):
     OLLAMA = "http://" + OLLAMA
@@ -93,11 +93,11 @@ def step_clear_caches():
 
 
 def mitra_sessions_open() -> int:
-    """Running `mitra` processes. Reinstalling under them deletes their packages mid-session (E-029)."""
+    """Running `codemitra` processes. Reinstalling under them deletes their packages mid-session (E-029)."""
     if sys.platform != "win32":
         return 0
-    code, out = run(["tasklist", "/FI", "IMAGENAME eq mitra.exe", "/NH"], timeout=30)
-    return sum(1 for ln in out.splitlines() if ln.lower().startswith("mitra.exe"))
+    code, out = run(["tasklist", "/FI", "IMAGENAME eq codemitra.exe", "/NH"], timeout=30)
+    return sum(1 for ln in out.splitlines() if ln.lower().startswith("codemitra.exe"))
 
 
 def step_reinstall():
@@ -122,22 +122,22 @@ def step_unit_tests():
 
 
 def step_cli_anywhere():
-    exe = shutil.which("mitra")
+    exe = shutil.which("codemitra")
     if not exe:
-        return False, "`mitra` not on PATH (uv tool install --editable . --python 3.12)"
+        return False, "`codemitra` not on PATH (uv tool install --editable . --python 3.12)"
     with tempfile.TemporaryDirectory() as tmp:
         code, out = run([exe, "--version"], cwd=Path(tmp), timeout=60)
         if code != 0:
-            return False, f"mitra --version failed: {last_line(out)}"
+            return False, f"codemitra --version failed: {last_line(out)}"
         version = last_line(out)
         code, out = run([exe, "models"], cwd=Path(tmp), timeout=120)
         if code != 0 or "qwen3.5" not in out:
-            return False, f"mitra models failed: {last_line(out)}"
-    return True, f"{version}; `mitra models` lists qwen3.5 (run from a temp folder)"
+            return False, f"codemitra models failed: {last_line(out)}"
+    return True, f"{version}; `codemitra models` lists qwen3.5 (run from a temp folder)"
 
 
 def step_mcp_config():
-    exe = shutil.which("mitra") or ""
+    exe = shutil.which("codemitra") or ""
     code, out = run([exe, "mcp", "list"], cwd=ROOT, timeout=120) if exe else (1, "mitra not on PATH")
     if code != 0:
         return False, last_line(out)
@@ -149,9 +149,9 @@ def step_mcp_config():
 
 
 def step_live_solve():
-    exe = shutil.which("mitra")
+    exe = shutil.which("codemitra")
     if not exe:
-        return False, "`mitra` not on PATH"
+        return False, "`codemitra` not on PATH"
     with tempfile.TemporaryDirectory() as tmp:
         ws = Path(tmp)
         (ws / "tests").mkdir()
@@ -187,26 +187,26 @@ sys.exit(0 if g.passed else 1)
 
 
 def step_self_improve():
-    exe = shutil.which("mitra")
+    exe = shutil.which("codemitra")
     if not exe:
-        return False, "`mitra` not on PATH"
+        return False, "`codemitra` not on PATH"
     with tempfile.TemporaryDirectory() as tmp:
         code, out = run([exe, "harness"], cwd=Path(tmp), timeout=60)
         if code != 0 or "Harness v" not in out:
-            return False, f"mitra harness failed: {last_line(out)}"
+            return False, f"codemitra harness failed: {last_line(out)}"
         version = next(ln.strip() for ln in out.splitlines() if "Harness v" in ln)
         code, out = run([exe, "report", "--json"], cwd=Path(tmp), timeout=300)
         try:
             rep = json.loads(out[out.index("{"):])
         except ValueError:
-            return False, f"mitra report --json gave no JSON (exit {code}): {last_line(out)}"
+            return False, f"codemitra report --json gave no JSON (exit {code}): {last_line(out)}"
     # grading runs in the installed tool's Python, not this venv (E-035)
     code, tool_dir = run(["uv", "tool", "dir"], cwd=ROOT, timeout=60)
     tool_root = Path(tool_dir.strip().splitlines()[-1]) / "mitra" if code == 0 else None
     tool_py = next((p for p in (tool_root / "Scripts" / "python.exe", tool_root / "bin" / "python")
                     if tool_root and p.is_file()), None)
     if not tool_py:
-        return False, f"could not find the mitra tool's Python ({last_line(tool_dir)})"
+        return False, f"could not find the codemitra tool's Python ({last_line(tool_dir)})"
     code, out = run([str(tool_py), "-c", GRADE_REFERENCE], cwd=ROOT, timeout=300)
     if code != 0:
         return False, f"benchmark reference does not grade as passed from the tool's Python: {last_line(out)}"
@@ -216,7 +216,7 @@ def step_self_improve():
 
 def step_playground():
     if not PLAYGROUND.exists():
-        return True, "skipped (no ../mitra-playground)"
+        return True, "skipped (no ../codemitra-playground)"
     code, out = run([PY, "scripts/check_level.py", "--all"], cwd=PLAYGROUND, timeout=600)
     return code == 0, last_line(out)
 
@@ -225,10 +225,10 @@ STEPS = [
     ("Restart Ollama", step_restart_ollama, "restart"),
     ("Ollama models", step_ollama_models, ""),
     ("Clear Python caches", step_clear_caches, ""),
-    ("Reinstall `mitra` command", step_reinstall, ""),
+    ("Reinstall `codemitra` command", step_reinstall, ""),
     ("Lint", step_lint, ""),
     ("Unit tests", step_unit_tests, "slow"),
-    ("`mitra` from any folder", step_cli_anywhere, ""),
+    ("`codemitra` from any folder", step_cli_anywhere, ""),
     ("MCP config", step_mcp_config, ""),
     ("Live run (real model)", step_live_solve, "slow"),
     ("Self-improve tools (harness, report, bench grading)", step_self_improve, ""),
@@ -256,7 +256,7 @@ def main() -> int:
         failed += 0 if ok else 1
         print(f"  {'ok  ' if ok else 'FAIL'}  {name}: {detail}  ({secs:.0f}s)", flush=True)
         report.append({"step": name, "ok": ok, "detail": detail, "seconds": round(secs, 1)})
-    out_dir = ROOT / ".mitra" / "health"
+    out_dir = ROOT / ".codemitra" / "health"
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / time.strftime("%Y%m%d-%H%M%S.json")
     out.write_text(json.dumps({"failed": failed, "steps": report}, indent=2), encoding="utf-8")

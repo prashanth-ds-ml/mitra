@@ -64,7 +64,7 @@ def generate_ascii_art(image_path: str, size: Tuple[int, int] = (40, 40), chars:
 
 
 def generate_mitra_banner_art() -> Text:
-	"""Return the fixed Mitra startup banner supplied for the CLI."""
+	"""Return the fixed CodeMitra startup banner supplied for the CLI."""
 	return Text(_MITRA_BANNER, style="bold #87ceeb", no_wrap=True)
 
 
@@ -202,7 +202,7 @@ def generate_halfblock_art(
 
 
 def generate_title_art(
-	text: str = "Mitra",
+	text: str = "CodeMitra",
 	cols: int = 96,
 	rows: int = 9,
 	font_path: str = "C:/Windows/Fonts/consolab.ttf",

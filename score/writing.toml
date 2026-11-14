@@ -11,16 +11,16 @@ Tone: concise, friendly, plain English; no filler"""
 
 [[case]]
 id = "W1_team_mail"
-request = "draft a mail to the team saying Mitra can now run on a free Kaggle GPU; setup is `mitra kaggle setup` then `mitra kaggle start`"
+request = "draft a mail to the team saying CodeMitra can now run on a free Kaggle GPU; setup is `codemitra kaggle setup` then `codemitra kaggle start`"
 must = ["Subject:", "kaggle setup", "kaggle start"]
-must_not = ['(?im)^\s*(thanks|regards|best|cheers),?\s*\n\s*mitra\s*$', '\[your name\]', '(?i)paid (plan|option|tier)']
+must_not = ['(?im)^\s*(thanks|regards|best|cheers),?\s*\n\s*(code)?mitra\s*$', '\[your name\]', '(?i)paid (plan|option|tier)']
 signature = ["Regards,", "Prashanth"]
 max_words = 160
-reference = """Subject: Mitra now runs on a free Kaggle GPU
+reference = """Subject: CodeMitra now runs on a free Kaggle GPU
 
 Hi team,
 
-Mitra can now run on a free Kaggle GPU. To set it up, run `mitra kaggle setup` once, then `mitra kaggle start`.
+CodeMitra can now run on a free Kaggle GPU. To set it up, run `codemitra kaggle setup` once, then `codemitra kaggle start`.
 
 Regards,
 Prashanth"""
@@ -29,7 +29,7 @@ Prashanth"""
 id = "W2_leave_mail"
 request = "write an email to my manager asking for leave on Friday 14 November for a family function"
 must = ["Subject:", "14", "Friday", "leave"]
-must_not = ['(?im)^\s*(thanks|regards|best|cheers),?\s*\n\s*mitra\s*$', '\[your name\]']
+must_not = ['(?im)^\s*(thanks|regards|best|cheers),?\s*\n\s*(code)?mitra\s*$', '\[your name\]']
 signature = ["Regards,", "Prashanth"]
 max_words = 130
 reference = """Subject: Leave request for Friday, 14 November

@@ -3,7 +3,7 @@
 project_words = ["game", "paddle", "ball", "snake", "api", "serve", "web"]
 
 cases = [
-  # small talk and answers to Mitra
+  # small talk and answers to CodeMitra
   { text = "hi", want = "chat" },
   { text = "thanks a lot", want = "chat" },
   { text = "good morning mitra", want = "chat" },
@@ -64,6 +64,6 @@ cases = [
   { text = "the tests are failing, can you check", want = "small" },
   { text = "rename paddle to player in the game", want = "small" },
   { text = "help me write a prd for a roman telugu chat app", want = "writing" },
-  # from Mitra's records
+  # from CodeMitra's records
   { text = "where did we stop", want = "resume" },
 ]

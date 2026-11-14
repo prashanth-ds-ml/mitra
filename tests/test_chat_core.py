@@ -193,7 +193,7 @@ def test_chat_run_plan_runs_in_the_plans_folder_with_the_project_test_command(tm
     C.ChatSession(workspace=tmp_path, llm=model, hooks=hooks, mode="auto").turn(msgs("run the plan"))
     assert calls[0]["root"] == (tmp_path / "game").resolve()
     assert calls[0]["tests"] == "python -m pytest -q"
-    assert calls[0]["record_dir"] == (tmp_path / "game").resolve() / ".mitra" / "runs" / "plan"
+    assert calls[0]["record_dir"] == (tmp_path / "game").resolve() / ".codemitra" / "runs" / "plan"
 
 
 def test_chat_run_plan_does_not_rerun_an_unchanged_plan_in_one_turn(tmp_path, monkeypatch):
@@ -250,6 +250,6 @@ def test_every_chat_step_is_recorded_for_live_follow_up(tmp_path):
     model = Model(call(tc("read_file", 1, path="tests/test_calc.py")), AIMessage(content="It tests add."))
     hooks, _ = fake_hooks()
     C.ChatSession(workspace=tmp_path, llm=model, hooks=hooks).turn(msgs("what does the test check?"))
-    rec = next((tmp_path / ".mitra" / "runs").glob("chat-*.jsonl"))
+    rec = next((tmp_path / ".codemitra" / "runs").glob("chat-*.jsonl"))
     kinds = [_json.loads(line)["kind"] for line in rec.read_text(encoding="utf-8").splitlines()]
     assert kinds == ["turn_start", "model", "tool", "model", "turn_end"]

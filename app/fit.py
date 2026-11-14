@@ -11,7 +11,7 @@ import urllib.request
 from dataclasses import dataclass, field
 
 GIB = 1024 ** 3
-COMFORT_GB = 3.0     # RAM left after loading: Mitra, the terminal, tests and builds need room (L-008)
+COMFORT_GB = 3.0     # RAM left after loading: CodeMitra, the terminal, tests and builds need room (L-008)
 MIN_PROGRAM_GB = 0.3  # smaller programs are not worth closing
 
 # Loaded size and GPU part measured on this machine (8 GB GPU, flash attention + q8_0 KV, EVALS 2026-11-07, D-039).
@@ -24,7 +24,7 @@ MEASURED: dict[tuple[str, int], tuple[float, float]] = {
     ("qwen3.5:9b", 131_072): (9.5, 5.5),
 }
 
-# Never suggest closing these: Windows itself, the AV, the desktop, Ollama (it is the model), Mitra's own terminal.
+# Never suggest closing these: Windows itself, the AV, the desktop, Ollama (it is the model), CodeMitra's own terminal.
 _NEVER = {
     "system", "system idle process", "idle", "registry", "memory compression", "memcompression", "secure system", "smss.exe",
     "csrss.exe", "wininit.exe", "winlogon.exe", "services.exe", "lsass.exe", "svchost.exe", "dwm.exe",
@@ -167,7 +167,7 @@ def _ollama_ps(base_url: str) -> list[dict]:
 
 
 def _own_pids() -> set[int]:
-    """Mitra and the terminal it runs in (closing those closes Mitra)."""
+    """CodeMitra and the terminal it runs in (closing those closes CodeMitra)."""
     try:
         import psutil
         me = psutil.Process()
@@ -341,7 +341,7 @@ def _signal(pids: list[int], force: bool, run) -> None:
 def close_programs(programs: list[Program], *, force: bool = False, wait_s: float = 10.0, run=None, alive=None,
                    sleep=None) -> dict[str, bool]:
     """Close each program (all its processes); {name: closed}. Polite unless `force`; waits up to `wait_s`.
-    Never touches Mitra, its terminal or the never-close list: those are not in `programs` (group_programs)."""
+    Never touches CodeMitra, its terminal or the never-close list: those are not in `programs` (group_programs)."""
     import subprocess
     import time
     run = run or subprocess.run

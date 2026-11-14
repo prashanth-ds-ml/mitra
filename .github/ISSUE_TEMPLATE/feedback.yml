@@ -1,11 +1,11 @@
 name: Feedback (preview)
-description: You tried Mitra on your own project. What worked, what did not? (2 minutes)
+description: You tried CodeMitra on your own project. What worked, what did not? (2 minutes)
 title: "Feedback: "
 labels: ["feedback"]
 body:
   - type: markdown
     attributes:
-      value: Thanks for trying Mitra. Short answers are fine; skip anything you like.
+      value: Thanks for trying CodeMitra. Short answers are fine; skip anything you like.
   - type: input
     id: machine
     attributes:
@@ -18,7 +18,7 @@ body:
     id: model
     attributes:
       label: Model and context
-      description: From the Mitra header, e.g. "qwen3.5:4b 64K".
+      description: From the CodeMitra header, e.g. "qwen3.5:4b 64K".
   - type: textarea
     id: tried
     attributes:

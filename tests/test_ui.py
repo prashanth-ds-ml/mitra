@@ -163,7 +163,7 @@ def test_header_shows_model_context_placement_folder_and_mcp():
     c.print(ui.header.header(model="qwen3.5:4b", folder="snake_game", context=65536, placement="gpu",
                              mcp_servers=["git", "github"]))
     out = printed(c)
-    assert "✻ Mitra" in out
+    assert "✻ CodeMitra" in out
     assert "qwen3.5:4b  (64K context, on GPU)" in out
     assert "snake_game" in out and "● git  ● github" in out
 
@@ -189,7 +189,7 @@ def test_startup_shows_no_banner(monkeypatch):
 def test_startup_model_uses_the_last_model_without_asking(monkeypatch, tmp_path):
     import app.main as main
     from app import config
-    monkeypatch.setenv("MITRA_HOME", str(tmp_path))
+    monkeypatch.setenv("CODEMITRA_HOME", str(tmp_path))
     inv = [SimpleNamespace(name="qwen3.5:4b"), SimpleNamespace(name="qwen3.5:latest")]
     monkeypatch.setattr(config, "get_local_model_inventory", lambda **_kw: inv)
     monkeypatch.setattr(main, "_pick_model", lambda cfg: (_ for _ in ()).throw(AssertionError("asked")))
@@ -197,17 +197,17 @@ def test_startup_model_uses_the_last_model_without_asking(monkeypatch, tmp_path)
     assert main._startup_model({}) == "qwen3.5:4b"          # first start: the default
     config.save_last_model("qwen3.5:latest")
     assert main._startup_model({}) == "qwen3.5:latest"      # then the last one used
-    assert main._startup_model({"local_model": "x"}) == "x"  # mitra.toml wins
+    assert main._startup_model({"local_model": "x"}) == "x"  # codemitra.toml wins
 
 
 def test_model_use_remembers_the_choice(monkeypatch, tmp_path):
     import app.main as main
     from app import config
-    monkeypatch.setenv("MITRA_HOME", str(tmp_path))
+    monkeypatch.setenv("CODEMITRA_HOME", str(tmp_path))
     monkeypatch.setattr(config, "get_local_model_inventory", lambda **_kw: [SimpleNamespace(name="qwen3.5:latest")])
     reply = main._handle_model_command("/model use qwen3.5:latest", "qwen3.5:4b", "", cloud_codegen_enabled=False)
     assert "next time" in reply and config.load_last_model() == "qwen3.5:latest"
-    assert "not one of Mitra's models" in main._handle_model_command(
+    assert "not one of CodeMitra's models" in main._handle_model_command(
         "/model use llama3.1:8b", "qwen3.5:4b", "", cloud_codegen_enabled=False)
 
 

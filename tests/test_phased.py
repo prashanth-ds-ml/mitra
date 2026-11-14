@@ -97,10 +97,10 @@ def test_a_real_tool_name_in_the_decide_step_picks_its_phase(tmp_path):
 
 def test_phased_in_the_real_chat_loop(harness):  # noqa: F811
     state, ws = harness
-    (ws / "mitra.toml").write_text('architecture = "phased"\n', encoding="utf-8")
+    (ws / "codemitra.toml").write_text('architecture = "phased"\n', encoding="utf-8")
     Inputs.script = ["hi mitra", "where did we stop", "exit"]
     main._chat()
-    rows = [json.loads(x) for f in (ws / ".mitra" / "runs").glob("chat-*.jsonl")
+    rows = [json.loads(x) for f in (ws / ".codemitra" / "runs").glob("chat-*.jsonl")
             for x in f.read_text(encoding="utf-8").splitlines() if x.strip()]
     assert [r["path"] for r in rows if r["kind"] == "turn_start"] == ["phased", "resume_brief"]
 

@@ -31,7 +31,7 @@ _WORD = re.compile(r"[a-z][a-z\-]*")
 # D-068 step 1: everyday requests take the one-call reply path (no tools, thinking off)
 EVERYDAY = ("chat", "writing", "general")
 SMALL_TALK = {"hi", "hello", "hey", "hii", "yo", "thanks", "thank", "thx", "ok", "okay", "cool", "great", "nice",
-              "good", "morning", "afternoon", "evening", "night", "bye", "cheers", "mitra", "there", "you", "how",
+              "good", "morning", "afternoon", "evening", "night", "bye", "cheers", "mitra", "codemitra", "there", "you", "how",
               "are", "doing", "what's", "whats", "up", "sup", "awesome", "perfect", "done", "fine", "welcome",
               "namaste", "yes", "no", "sure", "alright", "much", "a", "lot", "it", "is", "that", "works", "worked",
               "very", "so", "and", "again", "all", "the", "for", "help", "your"}
@@ -70,7 +70,7 @@ FAILING = re.compile(r"\b(fail(s|ing|ed)?|broken|not working|doesn'?t work|does 
 HOW_TO = ("how do i", "how can i", "how to", "how should i", "how would i", "how do we", "how can we")
 NEED = re.compile(r"^(i|we) (need|want) (a|an|you to|to (build|make|write|create|add|have|get))\b")
 SMALL_VERBS = {"rename", "remove", "delete", "move", "run", "commit", "revert", "install", "push"}
-# picking one of the options Mitra just gave ("go with option 2", "the first idea", "let's do 3")
+# picking one of the options CodeMitra just gave ("go with option 2", "the first idea", "let's do 3")
 PICK = re.compile(r"\b(option|idea|approach|choice|number|no\.?) ?#?\d\b|\b(first|second|third|fourth|fifth|last) "
                   r"(one|idea|option|approach)\b|^(go with|let'?s do|lets do|do|pick|take|choose|use) \S+$|"
                   r"^(go with|let'?s (do|go with)|lets (do|go with)|pick|take|choose) (option |idea |#)?\d\b")
@@ -80,7 +80,7 @@ DOC_TARGET = re.compile(r"\b(the|our|my|this) (plan|roadmap|todo list|to-?do|rea
 # a question that names these is about the project (explainer / chat loop), not general knowledge
 PROJECT_WORDS = {"this", "our", "code", "codebase", "project", "repo", "repository", "file", "files", "function",
                  "functions", "class", "classes", "method", "test", "tests", "bug", "error", "errors", "module",
-                 "script", "here", "mitra", "folder", "game", "app", "commit", "branch", "diff", "logic",
+                 "script", "here", "mitra", "codemitra", "folder", "game", "app", "commit", "branch", "diff", "logic",
                  "variable", "import", "config", "readme", "traceback", "exception", "fails",
                  "failing", "crash", "crashes", "build", "setup", "kaggle", "we",
                  # "where is the score stored?" asks where in this code, not general knowledge
@@ -88,7 +88,7 @@ PROJECT_WORDS = {"this", "our", "code", "codebase", "project", "repo", "reposito
                  "initialised", "changed", "changes"}
 
 
-# "ok", "yes", "go" right after a working turn answer Mitra's question ("shall I run the tests?"): not small talk
+# "ok", "yes", "go" right after a working turn answer CodeMitra's question ("shall I run the tests?"): not small talk
 ANSWERS = {"yes", "no", "sure", "ok", "okay", "alright", "go", "do", "please", "proceed", "fine", "done", "ahead",
            "continue", "carry", "on", "start", "now", "let's", "lets", "with", "yep", "yeah", "nope"}
 
@@ -144,9 +144,9 @@ CLI_COMMANDS = ("score", "kaggle", "report", "dashboard", "solve", "night", "har
 
 
 def terminal_command(text: str) -> str:
-    """'mitra score --remote' typed in the chat: a terminal command (the CLI), not a request. Returns it, or ''."""
+    """'codemitra score --remote' typed in the chat: a terminal command (the CLI), not a request. Returns it, or ''."""
     t = " ".join((text or "").strip().strip("`").split())
-    m = re.match(r"^\$?\s*mitra\s+(" + "|".join(CLI_COMMANDS) + r")\b[^\n]{0,80}$", t, re.I)
+    m = re.match(r"^\$?\s*(?:code)?mitra\s+(" + "|".join(CLI_COMMANDS) + r")\b[^\n]{0,80}$", t, re.I)
     return t if m else ""
 
 
@@ -183,7 +183,7 @@ def classify(text: str, previous: str = "", project_words: frozenset | set = fro
     if previous == "question" and len(short) <= 12 and FOLLOW_UP.match(low) and not CHANGE_VERBS & set(short):
         return "question"  # "why?", "and where is the score kept?": the explainer, building on what it read
     if previous in ("question", "small", "big") and len(short) <= 8 and PICK.search(low) and not low.endswith("?"):
-        return "small"  # "go with option 2" after Mitra's ideas: build the one you picked, with tools
+        return "small"  # "go with option 2" after CodeMitra's ideas: build the one you picked, with tools
     if DAILY.match(low):
         return "general"
     named = set(re.findall(r"[a-z0-9_\-]+", low)) & {w.lower() for w in project_words}

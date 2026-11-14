@@ -95,7 +95,7 @@ class PermissionGuard:
         """Return an error string if any path escapes the workspace, else None."""
         if self.workspace is None and not self.allowed_roots:
             # E-003: fail closed. Without a workspace there is nothing to keep the model inside.
-            return "✗ Permission denied: no workspace is set, so Mitra does not touch files"
+            return "✗ Permission denied: no workspace is set, so CodeMitra does not touch files"
         for p in paths:
             resolved = _resolve_path(p)
             roots = ([self.workspace] if self.workspace else []) + self.allowed_roots
@@ -262,7 +262,7 @@ def _resolve_path(path: str | None) -> pathlib.Path:
         workspace = pathlib.Path(_guard.workspace)
         parts = target.parts
         # E-019: models often start a relative path with the workspace's own folder name
-        # ("mitra-playground/levels/..." inside mitra-playground), which nested a copy of the project.
+        # ("codemitra-playground/levels/..." inside codemitra-playground), which nested a copy of the project.
         # Drop that first part unless a real subfolder of that name exists.
         if len(parts) > 1 and parts[0].lower() == workspace.name.lower() and not (workspace / parts[0]).exists():
             target = pathlib.Path(*parts[1:])

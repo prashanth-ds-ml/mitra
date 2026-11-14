@@ -15,17 +15,17 @@ def _rows(path):
 
 def test_every_record_line_is_mirrored_to_the_store(tmp_path):
     proj = tmp_path / "game"
-    rec = L.Recorder(proj / ".mitra" / "runs" / "chat-20261107.jsonl")
+    rec = L.Recorder(proj / ".codemitra" / "runs" / "chat-20261107.jsonl")
     rec.write("turn_start", turn=1, user="hi")
     rec.write("turn_end", turn=1, steps=1)
-    stored = S.mirror_path(proj / ".mitra" / "runs" / "chat-20261107.jsonl")
+    stored = S.mirror_path(proj / ".codemitra" / "runs" / "chat-20261107.jsonl")
     assert stored.parent.parent == S.runs_root() and stored.parent.name.startswith("game-")
     assert [r["kind"] for r in _rows(stored)] == ["turn_start", "turn_end"]
 
 
 def test_deleting_the_project_keeps_its_sessions_on_the_dashboard(tmp_path):
     proj = tmp_path / "brick"
-    rec = L.Recorder(proj / ".mitra" / "runs" / "chat-1.jsonl")
+    rec = L.Recorder(proj / ".codemitra" / "runs" / "chat-1.jsonl")
     rec.write("turn_start", turn=1, user="go", harness_version=0)
     rec.write("tool", turn=1, step=1, name="read_file", args={"path": "x"}, ok=False, output="no such file")
     shutil.rmtree(proj)
@@ -35,7 +35,7 @@ def test_deleting_the_project_keeps_its_sessions_on_the_dashboard(tmp_path):
 
 
 def test_import_copies_old_records_once_and_merges_new_lines(tmp_path):
-    old = tmp_path / "proj" / ".mitra" / "runs" / "chat-old.jsonl"
+    old = tmp_path / "proj" / ".codemitra" / "runs" / "chat-old.jsonl"
     old.parent.mkdir(parents=True)
     old.write_text('{"kind": "turn_start", "turn": 1}\n{"kind": "turn_end", "turn": 1}\n', encoding="utf-8")
     assert S.import_all([tmp_path]) == {"files": 1, "lines": 2}
@@ -47,7 +47,7 @@ def test_import_copies_old_records_once_and_merges_new_lines(tmp_path):
 
 
 def test_live_mirror_and_import_do_not_double_count(tmp_path):
-    rec = L.Recorder(tmp_path / "p" / ".mitra" / "runs" / "r.jsonl")
+    rec = L.Recorder(tmp_path / "p" / ".codemitra" / "runs" / "r.jsonl")
     rec.write("start", task="t")
     assert S.import_all([tmp_path])["lines"] == 0
 
@@ -65,8 +65,8 @@ def test_records_under_mitra_home_go_to_their_own_slug(tmp_path):
 
 def test_projects_are_noted_and_found_by_import(tmp_path):
     far = tmp_path / "elsewhere" / "deep" / "project"
-    (far / ".mitra" / "runs").mkdir(parents=True)
-    (far / ".mitra" / "runs" / "chat.jsonl").write_text('{"kind": "start"}\n', encoding="utf-8")
+    (far / ".codemitra" / "runs").mkdir(parents=True)
+    (far / ".codemitra" / "runs" / "chat.jsonl").write_text('{"kind": "start"}\n', encoding="utf-8")
     S.note_project(far)
     S.note_project(far)
     data = json.loads(S.projects_file().read_text(encoding="utf-8"))
@@ -76,14 +76,14 @@ def test_projects_are_noted_and_found_by_import(tmp_path):
 
 def test_a_broken_store_never_breaks_recording(tmp_path, monkeypatch):
     monkeypatch.setattr(S, "mirror_path", lambda p: (_ for _ in ()).throw(OSError("disk full")))
-    rec = L.Recorder(tmp_path / "p" / ".mitra" / "runs" / "r.jsonl")
+    rec = L.Recorder(tmp_path / "p" / ".codemitra" / "runs" / "r.jsonl")
     rec.write("start", task="t")
-    assert (tmp_path / "p" / ".mitra" / "runs" / "r.jsonl").exists()
+    assert (tmp_path / "p" / ".codemitra" / "runs" / "r.jsonl").exists()
 
 
 def test_size_text_names_the_folder():
     assert "empty" in S.size_text()
-    L.Recorder(S.H.home().parent / "p" / ".mitra" / "runs" / "r.jsonl").write("start")
+    L.Recorder(S.H.home().parent / "p" / ".codemitra" / "runs" / "r.jsonl").write("start")
     assert "1 record files" in S.size_text()
 
 
@@ -97,5 +97,5 @@ def test_a_short_temp_name_still_counts_as_the_test_home(tmp_path, monkeypatch):
     (tmp_path / "x").mkdir()
     # the same folder, spelled so that only resolving makes it match (as RUNNER~1 vs runneradmin does on CI)
     monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path / "x" / ".."))
-    rec = tmp_path / "proj" / ".mitra" / "runs" / "chat-1.jsonl"
+    rec = tmp_path / "proj" / ".codemitra" / "runs" / "chat-1.jsonl"
     assert store.mirror_path(rec) is not None

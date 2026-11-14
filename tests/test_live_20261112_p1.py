@@ -23,7 +23,7 @@ def test_a_whatsapp_draft_has_no_subject_and_whatsapp_bold():
 def _decide_note(tmp_path, said):
     m = Spy(AIMessage(content="ok"))
     C.ChatSession(workspace=tmp_path, llm=m, hooks=fake_hooks()[0]).phased(_msgs(said))
-    return " ".join(x.content for x in m.seen[0] if isinstance(x, HumanMessage) and x.content.startswith("[Mitra"))
+    return " ".join(x.content for x in m.seen[0] if isinstance(x, HumanMessage) and x.content.startswith("[CodeMitra"))
 
 
 def test_a_deep_dive_or_search_request_is_told_to_search_now(tmp_path):

@@ -1,12 +1,12 @@
-"""MCP client for Mitra: connect to any MCP server (stdio or Streamable HTTP) with the official SDK.
+"""MCP client for CodeMitra: connect to any MCP server (stdio or Streamable HTTP) with the official SDK.
 
 Config is the standard ``mcpServers`` JSON used by Claude Code, Cursor and server READMEs:
 
 * built-in defaults (``DEFAULT_SERVERS`` below)
-* ``~/.mitra/mcp.json`` (yours; trusted)
-* ``<project>/.mitra/mcp.json`` (the project's; ignored until you run ``/mcp trust``, and again after it changes)
+* ``~/.codemitra/mcp.json`` (yours; trusted)
+* ``<project>/.codemitra/mcp.json`` (the project's; ignored until you run ``/mcp trust``, and again after it changes)
 
-Mitra-only keys per server: ``enabled``, ``timeout_s``, ``connect_timeout_s``, ``allow`` / ``ask`` (tool-name patterns;
+CodeMitra-only keys per server: ``enabled``, ``timeout_s``, ``connect_timeout_s``, ``allow`` / ``ask`` (tool-name patterns;
 a tool runs freely only if it matches ``allow`` and not ``ask``), ``description``, ``descriptions`` (short text per
 tool) and ``env_commands`` (env vars filled from a command, e.g. ``gh auth token``; never logged).
 
@@ -69,7 +69,7 @@ DEFAULT_SERVERS: dict[str, dict[str, Any]] = {
         "args": ["-y", "@modelcontextprotocol/server-filesystem", "${WORKSPACE}"],
         "description": "Search for files and read them inside this project",
         "allow": ["read_*", "list_*", "search_files", "directory_tree", "get_file_info"],
-        "enabled": False,  # duplicates Mitra's own read / list / search tools: confuses a small model (D-049)
+        "enabled": False,  # duplicates CodeMitra's own read / list / search tools: confuses a small model (D-049)
     },
     "semgrep": {
         "command": "uvx",
@@ -108,7 +108,7 @@ _VAR = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 # ─── Paths ───────────────────────────────────────────────────────────────────
 
 def user_dir() -> pathlib.Path:
-    return pathlib.Path(os.environ.get("MITRA_HOME") or pathlib.Path.home() / ".mitra")
+    return pathlib.Path(os.environ.get("CODEMITRA_HOME") or pathlib.Path.home() / ".codemitra")
 
 
 def user_config_path() -> pathlib.Path:
@@ -116,7 +116,7 @@ def user_config_path() -> pathlib.Path:
 
 
 def project_config_path(workspace: str | os.PathLike) -> pathlib.Path:
-    return pathlib.Path(workspace) / ".mitra" / "mcp.json"
+    return pathlib.Path(workspace) / ".codemitra" / "mcp.json"
 
 
 def _trust_path() -> pathlib.Path:
@@ -401,7 +401,7 @@ def trim_output(text: str, save_dir: pathlib.Path, label: str) -> tuple[str, str
 
 
 def _log_call(workspace: str | os.PathLike, record: dict[str, Any]) -> None:
-    path = pathlib.Path(workspace) / ".mitra" / "logs" / "mcp_calls.jsonl"
+    path = pathlib.Path(workspace) / ".codemitra" / "logs" / "mcp_calls.jsonl"
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as fh:
@@ -530,7 +530,7 @@ class MCPManager:
         with self._lock:
             if self._loop is None:
                 self._loop = asyncio.new_event_loop()
-                self._thread = threading.Thread(target=self._loop.run_forever, name="mitra-mcp", daemon=True)
+                self._thread = threading.Thread(target=self._loop.run_forever, name="codemitra-mcp", daemon=True)
                 self._thread.start()
             return self._loop
 
@@ -540,7 +540,7 @@ class MCPManager:
         if conn is not None and conn.alive():
             return conn
         resolved = resolve(spec, workspace)
-        errlog = pathlib.Path(workspace) / ".mitra" / "logs" / f"mcp-{spec.name}.log"
+        errlog = pathlib.Path(workspace) / ".codemitra" / "logs" / f"mcp-{spec.name}.log"
         conn = _Connection(spec, resolved, errlog)
         loop = self._ensure_loop()
         asyncio.run_coroutine_threadsafe(conn.run(), loop)
@@ -617,7 +617,7 @@ def list_tools(workspace: str | os.PathLike, server: str) -> list[ToolInfo]:
     if spec is None:
         raise KeyError(f"No MCP server named '{server}'")
     if not spec.trusted:
-        raise PermissionError(f"'{server}' comes from this project's .mitra/mcp.json; run /mcp trust first")
+        raise PermissionError(f"'{server}' comes from this project's .codemitra/mcp.json; run /mcp trust first")
     return _manager.connect(spec, workspace).tools
 
 
@@ -649,7 +649,7 @@ def call_tool(
     if not spec.enabled:
         return finish(False, f"✗ MCP server '{server}' is turned off (/mcp on {server}).")
     if not spec.trusted:
-        return finish(False, f"✗ MCP server '{server}' is from this project's .mitra/mcp.json; run /mcp trust first.")
+        return finish(False, f"✗ MCP server '{server}' is from this project's .codemitra/mcp.json; run /mcp trust first.")
 
     try:
         conn = _manager.connect(spec, workspace)
@@ -675,7 +675,7 @@ def call_tool(
 
     text, is_error = _result_text(result)
     text = mask(text, conn.resolved.secrets)
-    short, path = trim_output(text, pathlib.Path(workspace) / ".mitra" / "mcp-output", f"{server}-{tool}")
+    short, path = trim_output(text, pathlib.Path(workspace) / ".codemitra" / "mcp-output", f"{server}-{tool}")
     if is_error:
         short = f"✗ tool error: {short}"
     return finish(not is_error, short, approved=approved, secrets=conn.resolved.secrets, path=path)
@@ -757,11 +757,11 @@ def _set_enabled(workspace: str | os.PathLike, name: str, enabled: bool) -> str:
     _save_json(path, data)
     if was_trusted:
         trust_project(workspace)  # our own edit keeps an already-trusted file trusted
-    return f"`{name}` turned {'on' if enabled else 'off'} for this project (`.mitra/mcp.json`)."
+    return f"`{name}` turned {'on' if enabled else 'off'} for this project (`.codemitra/mcp.json`)."
 
 
 def import_claude_code(workspace: str | os.PathLike) -> str:
-    """Copy servers from Claude Code configs into ~/.mitra/mcp.json (never into the repo: they may hold secrets)."""
+    """Copy servers from Claude Code configs into ~/.codemitra/mcp.json (never into the repo: they may hold secrets)."""
     found: dict[str, dict[str, Any]] = {}
     for path in claude_config_paths(workspace):
         data = _load_json(path, {}) if path.is_file() else {}
@@ -795,7 +795,7 @@ def handle_command(workspace: str | os.PathLike, argline: str = "") -> str:
         return format_prompt(servers)
     if sub == "trust":
         trust_project(workspace)
-        return "This project's `.mitra/mcp.json` is trusted. Mitra asks again if the file changes."
+        return "This project's `.codemitra/mcp.json` is trusted. CodeMitra asks again if the file changes."
     if sub == "import":
         return import_claude_code(workspace)
     if sub in {"on", "off"} and len(parts) >= 2:
@@ -806,7 +806,7 @@ def handle_command(workspace: str | os.PathLike, argline: str = "") -> str:
             started = time.time()
             tools = list_tools(workspace, name)
         except Exception as exc:  # noqa: BLE001 - shown to the user
-            return f"✗ `{name}` failed to start: {exc}\n\nServer log: `.mitra/logs/mcp-{name}.log`"
+            return f"✗ `{name}` failed to start: {exc}\n\nServer log: `.codemitra/logs/mcp-{name}.log`"
         spec = find(servers, name)
         rows = [f"- `{t.name}`{' (asks)' if spec and needs_approval(spec, t.name) else ''}: {t.description}"
                 for t in tools]

@@ -1,6 +1,6 @@
-"""D-078 step 5b: `mitra practice` runs Mitra's own chat loop on a task in a fresh folder, then the hidden check decides;
+"""D-078 step 5b: `codemitra practice` runs CodeMitra's own chat loop on a task in a fresh folder, then the hidden check decides;
 a task its own tests pass but the hidden check fails is "misread". Also E-122 (phase names leaked to the user) and
-the terminal-command hint for "mitra practice" typed in the chat."""
+the terminal-command hint for "codemitra practice" typed in the chat."""
 import json
 import sqlite3
 
@@ -90,8 +90,8 @@ def test_the_phase_names_are_never_named_to_the_user():
 
 
 def test_mitra_practice_typed_in_the_chat_gets_the_terminal_hint():
-    assert intent.terminal_command("mitra practice")
-    assert intent.terminal_command("mitra practice --download")
+    assert intent.terminal_command("codemitra practice")
+    assert intent.terminal_command("codemitra practice --download")
 
 
 # ── E-124: write a file into an empty folder ───────────────────────────────────────────────────────────────────

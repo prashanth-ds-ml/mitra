@@ -1,14 +1,14 @@
-"""Remote Ollama (I-23, D-060): run Mitra's model on a bigger GPU elsewhere, e.g. a Kaggle notebook, at full context.
+"""Remote Ollama (I-23, D-060): run CodeMitra's model on a bigger GPU elsewhere, e.g. a Kaggle notebook, at full context.
 
 The notebook (remote/kaggle/) starts Ollama behind a small token proxy and a Cloudflare quick tunnel, and prints
-    mitra remote set https://<name>.trycloudflare.com/<token> --ctx 262144
+    codemitra remote set https://<name>.trycloudflare.com/<token> --ctx 262144
 The token is part of the URL path, so every client (ChatOllama, urllib calls, the night runner) just uses it as the
 base URL. While a remote is set:
 - every Ollama call goes there (`ollama_local_base_url` and OLLAMA_HOST), also in `/run` night children;
-- the context is the remote's (`num_ctx`), unless mitra.toml sets one;
+- the context is the remote's (`num_ctx`), unless codemitra.toml sets one;
 - the local memory check and `/free` are skipped (your laptop's RAM is not used);
 - sessions are recorded with `remote = <name>`: energy is not measured there, and the dashboard can split it out.
-`mitra remote off` goes back to the local Ollama.
+`codemitra remote off` goes back to the local Ollama.
 """
 from __future__ import annotations
 
@@ -92,7 +92,7 @@ def apply(cfg: dict) -> dict:
 
 
 def unapply(cfg: dict) -> dict:
-    """Back to this machine in a running Mitra (`/kaggle stop`): the settings `apply` replaced."""
+    """Back to this machine in a running CodeMitra (`/kaggle stop`): the settings `apply` replaced."""
     local = cfg.pop("_local", None)
     cfg.pop("remote", None)
     if local is None:
@@ -107,7 +107,7 @@ def unapply(cfg: dict) -> dict:
 
 
 def check_alive(cfg: dict, echo=print, timeout: float = 15.0) -> bool:
-    """At start: a remote that does not answer is not used (E-067: a Kaggle run that stopped by itself left Mitra
+    """At start: a remote that does not answer is not used (E-067: a Kaggle run that stopped by itself left CodeMitra
     asking a dead address, which then said "no compatible local Ollama models"). A dead Kaggle address is forgotten
     (each session gets a new one); another remote stays set but this run uses this machine. True = remote in use."""
     if not cfg.get("remote"):
@@ -125,10 +125,10 @@ def check_alive(cfg: dict, echo=print, timeout: float = 15.0) -> bool:
     if name == "kaggle":
         clear()
         echo("☁ the Kaggle GPU is not answering: its run has ended (30 min unused, its time limit, or stopped on "
-             "Kaggle). Using this machine's Ollama. `mitra kaggle start` starts a new one.")
+             "Kaggle). Using this machine's Ollama. `codemitra kaggle start` starts a new one.")
     else:
         echo(f"☁ {name} ({shown(r['url'])}) is not answering: using this machine's Ollama for now. "
-             "`mitra remote off` forgets it.")
+             "`codemitra remote off` forgets it.")
     return False
 
 

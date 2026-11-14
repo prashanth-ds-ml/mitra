@@ -1,14 +1,14 @@
 """Your /bad becomes a score case (D-078 Phase 2, step 6; must-have 10: an exam that grows from your real failures).
 
     find    -> every /bad in your recorded conversations not drafted yet: what you said, the turns before it, what
-               Mitra answered, your note (sessions are split, since turn numbers restart in each one)
+               CodeMitra answered, your note (sessions are split, since turn numbers restart in each one)
     draft   -> the coach (Claude, `claude -p`, no tools) writes the case when it can; otherwise a template from your
                note (search/web -> lookup, files/code -> look, else talk). A small model never writes the case: the
                research says a 9B judges itself poorly
-    review  -> you keep, edit or drop each draft; kept cases go to ~/.mitra/score/real.toml
+    review  -> you keep, edit or drop each draft; kept cases go to ~/.codemitra/score/real.toml
 
-The "real" category is private (your words stay on this machine, never in the repo) and held out: `mitra score` runs
-it, `mitra improve` never learns from it, so a learned rule cannot be fitted to it."""
+The "real" category is private (your words stay on this machine, never in the repo) and held out: `codemitra score` runs
+it, `codemitra improve` never learns from it, so a learned rule cannot be fitted to it."""
 from __future__ import annotations
 
 import json
@@ -23,8 +23,8 @@ FIELDS = {"id", "text", "history", "expect", "max_words", "ask_back", "must_not"
 HISTORY_TURNS = 2
 MAX_TEXT = 1500
 
-CASE_PROMPT = """You turn one conversation turn the user marked /bad into a test case for Mitra, a local coding
-assistant. The case is replayed later: Mitra gets the same message (and the turns before it) and must now do the
+CASE_PROMPT = """You turn one conversation turn the user marked /bad into a test case for CodeMitra, a local coding
+assistant. The case is replayed later: CodeMitra gets the same message (and the turns before it) and must now do the
 right thing. Write ONLY one TOML [[case]] table, no prose, using only these keys:
   id        "R_<short_snake_case_name>"
   text      the user's message, exactly as below
@@ -195,7 +195,7 @@ def draft(turn: dict, run_claude=None) -> tuple[dict, str]:
 
 
 def write_drafts(files: list[Path], run_claude=None, say=lambda t: None) -> list[Path]:
-    """Draft every new /bad into ~/.mitra/cases/drafts/<id>.toml (a comment says what happened)."""
+    """Draft every new /bad into ~/.codemitra/cases/drafts/<id>.toml (a comment says what happened)."""
     state, written = _state(), []
     d = home() / "drafts"
     d.mkdir(parents=True, exist_ok=True)
@@ -207,7 +207,7 @@ def write_drafts(files: list[Path], run_claude=None, say=lambda t: None) -> list
             path = d / f"{case['id']}_{n}.toml"
             n += 1
         case["id"] = path.stem
-        head = (f"# /bad from {turn['project']} · drafted by the {who}\n# Mitra answered: "
+        head = (f"# /bad from {turn['project']} · drafted by the {who}\n# CodeMitra answered: "
                 + " ".join(turn["mitra"].split())[:300] + "\n# Edit the checks if needed, then `mitra cases review`.\n")
         path.write_text(head + to_toml(case), encoding="utf-8")
         state.setdefault("drafted", []).append(turn["key"])
@@ -229,7 +229,7 @@ def kept_ids() -> set[str]:
 
 
 def held_out_texts() -> set[str]:
-    """The messages of the kept real cases (whitespace folded): `mitra improve` leaves these turns out."""
+    """The messages of the kept real cases (whitespace folded): `codemitra improve` leaves these turns out."""
     try:
         data = tomllib.loads(real_path().read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError):
@@ -238,14 +238,14 @@ def held_out_texts() -> set[str]:
 
 
 def keep(path: Path) -> dict:
-    """Check the draft and add it to ~/.mitra/score/real.toml; the draft file is removed."""
+    """Check the draft and add it to ~/.codemitra/score/real.toml; the draft file is removed."""
     case = parse_case(path.read_text(encoding="utf-8"))
     if case["id"] in kept_ids():
         raise ValueError(f"{case['id']} is already in real.toml")
     real = real_path()
     real.parent.mkdir(parents=True, exist_ok=True)
     if not real.exists():
-        real.write_text('# Your real failures (D-078 step 6): private, held out from `mitra improve`.\n'
+        real.write_text('# Your real failures (D-078 step 6): private, held out from `codemitra improve`.\n'
                         'project = "snake"\n\n', encoding="utf-8")
     with real.open("a", encoding="utf-8") as f:
         f.write("\n" + to_toml(case))

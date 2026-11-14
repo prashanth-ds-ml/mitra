@@ -76,7 +76,7 @@ def build_resume_reply(workspace: str) -> str:
         index = int(step.get("index", 0)) + 1
         status = step.get("status", "unknown")
         text = step.get("text", "")
-        next_action = "Ask Mitra to continue the plan."
+        next_action = "Ask CodeMitra to continue the plan."
         lines.append(f"- **Plan checkpoint:** Step {index} `{status}` - {text}")
         lines.append(f"- **Next plan action:** {next_action}")
     if snapshot.last_compaction:

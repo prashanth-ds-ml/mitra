@@ -24,7 +24,7 @@ def test_the_report_holds_the_facts_and_the_summary(tmp_path):
                    "/kaggle start"):
         assert needed in text, needed
     path = H.write(tmp_path, text)
-    assert path.parent == tmp_path / ".mitra" / "reports" and path.name.startswith("kaggle-ended-")
+    assert path.parent == tmp_path / ".codemitra" / "reports" and path.name.startswith("kaggle-ended-")
 
 
 def test_no_summary_still_gives_a_complete_report(tmp_path):
@@ -89,7 +89,7 @@ def test_a_remote_that_drops_mid_turn_ends_the_turn_cleanly(tmp_path, monkeypatc
     assert model.calls == 3  # the call, then one quick retry, then give up
     assert session.turn_log[-1]["outcome"] == "kaggle_ended"
     assert isinstance(history[-1], ToolMessage)  # the chat history stays valid for the laptop model
-    rows = [json.loads(line) for f in (tmp_path / ".mitra" / "runs").glob("chat-*.jsonl")
+    rows = [json.loads(line) for f in (tmp_path / ".codemitra" / "runs").glob("chat-*.jsonl")
             for line in f.read_text(encoding="utf-8").splitlines()]
     assert any(r.get("kind") == "turn_end" and r.get("outcome") == "kaggle_ended" for r in rows)
 

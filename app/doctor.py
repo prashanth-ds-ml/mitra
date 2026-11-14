@@ -37,7 +37,7 @@ def ollama_report(model: str, num_ctx: int, base_url: str = "http://127.0.0.1:11
     except Exception as exc:  # any failure here means "not reachable" to the user
         return (
             f"- **Ollama:** not reachable at `{base_url}` ({type(exc).__name__}: {exc})\n"
-            "- Start it with `ollama serve`, or check `ollama_local_base_url` in mitra.toml."
+            "- Start it with `ollama serve`, or check `ollama_local_base_url` in codemitra.toml."
         )
 
     lines = [f"- **Ollama:** reachable at `{base_url}`"]
@@ -66,12 +66,12 @@ def ollama_report(model: str, num_ctx: int, base_url: str = "http://127.0.0.1:11
         lines.append("- **Context:** this Ollama version does not report it; cannot check")
     elif int(ctx) < num_ctx:
         lines.append(
-            f"- **Warning:** Ollama is running it with a smaller context than Mitra asked for "
+            f"- **Warning:** Ollama is running it with a smaller context than CodeMitra asked for "
             f"({int(ctx):,} < {num_ctx:,}). Long chats will be cut silently; "
             "set `OLLAMA_CONTEXT_LENGTH` or reload the model."
         )
     elif int(ctx) == num_ctx:
-        lines.append(f"- **Context:** {int(ctx):,}, as Mitra asked")
+        lines.append(f"- **Context:** {int(ctx):,}, as CodeMitra asked")
     else:
-        lines.append(f"- **Context:** {int(ctx):,} (Mitra asked for {num_ctx:,}; larger is fine)")
+        lines.append(f"- **Context:** {int(ctx):,} (CodeMitra asked for {num_ctx:,}; larger is fine)")
     return "\n".join(lines)

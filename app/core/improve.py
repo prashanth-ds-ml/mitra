@@ -1,4 +1,4 @@
-"""`mitra improve` (self-improvement step 3): a local model proposes one harness change for the top problem in the
+"""`codemitra improve` (self-improvement step 3): a local model proposes one harness change for the top problem in the
 run records; the benchmark's tune half decides whether it stays.
 
     propose  -> the proposer model (local, default the 9B) gets the top patterns + the current harness and answers with
@@ -6,7 +6,7 @@ run records; the benchmark's tune half decides whether it stays.
     evaluate -> the builder model solves every tune task with the current harness and with the candidate; grading
                 uses the hidden tests (bench/bench.py grade)
     decide   -> keep only if more tasks pass and the prompt tokens grow at most 20%; every attempt is logged in
-                ~/.mitra/harness/attempts.jsonl, a kept change becomes the next harness version (revertable)
+                ~/.codemitra/harness/attempts.jsonl, a kept change becomes the next harness version (revertable)
 
 Local models only (D-025); nothing from Claude goes into the harness (D-022). The held-out half is never used here.
 """
@@ -184,7 +184,7 @@ def evaluate(h: H.Harness, llm, *, tasks=None, bench=None, num_ctx: int = 131072
     tasks = tasks if tasks is not None else [t for t in bench.load_tasks() if t.split == "tune"]
     score = Score(total=len(tasks))
     for task in tasks:
-        tmp = Path(tempfile.mkdtemp(prefix=f"mitra-improve-{task.id}-"))
+        tmp = Path(tempfile.mkdtemp(prefix=f"codemitra-improve-{task.id}-"))
         try:
             ws_dir = tmp / "ws"
             bench.prepare(task, ws_dir)

@@ -1,6 +1,6 @@
-"""`mitra night` / `/run`: a plan built unattended, with a time limit (the overnight stopgap before I-16).
+"""`codemitra night` / `/run`: a plan built unattended, with a time limit (the overnight stopgap before I-16).
 
-It runs `mitra solve --plan <plan> --json` as a child process in the project folder, keeps Windows awake while it
+It runs `codemitra solve --plan <plan> --json` as a child process in the project folder, keeps Windows awake while it
 runs (no system settings changed), stops it at the time limit, and writes `NIGHT_REPORT.md` (tasks, tests, the git
 branch, how to play) plus a fresh dashboard. Everything the child does is recorded as usual (records, traces).
 """
@@ -43,9 +43,9 @@ def _state_file() -> Path:
 
 
 def launch(plan: Path, project: Path, hours: float, model: str) -> dict:
-    """Start `mitra night` in the background: no window, and it keeps running if Mitra is closed."""
+    """Start `codemitra night` in the background: no window, and it keeps running if CodeMitra is closed."""
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    console_log = project / ".mitra" / f"night-console-{stamp}.log"
+    console_log = project / ".codemitra" / f"night-console-{stamp}.log"
     console_log.parent.mkdir(parents=True, exist_ok=True)
     cmd = [sys.executable, "-m", "app.main", "night", str(plan), "--workspace", str(project), "--hours", str(hours)]
     if model:
@@ -80,13 +80,13 @@ def tail(path: Path, n: int = 15) -> str:
 
 
 def status(n: int = 15) -> dict | None:
-    """The latest night (from ~/.mitra/night.json): running?, elapsed, last log lines, the report when done."""
+    """The latest night (from ~/.codemitra/night.json): running?, elapsed, last log lines, the report when done."""
     try:
         info = json.loads(_state_file().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     project = Path(info["project"])
-    logs = sorted(project.glob(".mitra/night-2*.log"))
+    logs = sorted(project.glob(".codemitra/night-2*.log"))
     night_log = logs[-1] if logs and logs[-1].stat().st_mtime >= info["started"] - 5 else None
     report_path = project / "NIGHT_REPORT.md"
     report = report_path.read_text(encoding="utf-8") if report_path.exists() and \
@@ -173,7 +173,7 @@ def kill_tree(proc) -> None:
         pass
 
 
-STASH_MESSAGE = "mitra night: task cut off at the time limit"
+STASH_MESSAGE = "codemitra night: task cut off at the time limit"
 
 
 def save_cut_off(workspace: Path) -> str:
@@ -182,8 +182,8 @@ def save_cut_off(workspace: Path) -> str:
     code, out = _git_run(workspace, "rev-parse", "--is-inside-work-tree")
     if code != 0 or out.strip() != "true":
         return "no git"
-    # the night's logs live in .mitra and must stay; NIGHT_REPORT.md is rewritten right after (a pop would clash)
-    spec = ("--", ".", ":(exclude).mitra", ":(exclude)NIGHT_REPORT.md")
+    # the night's logs live in .codemitra and must stay; NIGHT_REPORT.md is rewritten right after (a pop would clash)
+    spec = ("--", ".", ":(exclude).codemitra", ":(exclude)NIGHT_REPORT.md")
     code, out = _git_run(workspace, "status", "--porcelain", "--untracked-files=all", *spec)
     if code != 0:
         return f"left: {out[:200]}"
@@ -235,13 +235,13 @@ def report(workspace: Path, plan: Path, model: str, hours: float, started: float
         lines += ["", f"## Git: branch `{branch}`", "```", commits or "(no commits)", "```"]
     lines += ["", "## Try it", "```", r".venv\Scripts\python -m breakout.app" if (workspace / "breakout").is_dir()
               else "(see the plan for how to run it)", "```",
-              "", "Then mark the night in Mitra with `/good` or `/bad <why>`, and look at the dashboard (`mitra dashboard`)."]
+              "", "Then mark the night in CodeMitra with `/good` or `/bad <why>`, and look at the dashboard (`codemitra dashboard`)."]
     return "\n".join(lines) + "\n"
 
 
 def _latest_result(ws: Path, since: float) -> dict | None:
-    """The result.json `mitra solve --plan` left next to its records during this night."""
-    found = [p for p in ws.glob(".mitra/runs/*/result.json") if p.stat().st_mtime >= since - 5]
+    """The result.json `codemitra solve --plan` left next to its records during this night."""
+    found = [p for p in ws.glob(".codemitra/runs/*/result.json") if p.stat().st_mtime >= since - 5]
     if not found:
         return None
     try:
@@ -262,10 +262,10 @@ def run(plan: str, workspace: str = ".", hours: float = 4.0, model: str = "", wr
         echo(f"✗ The plan cannot run: {problem}")
         return 2
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    log = ws / ".mitra" / f"night-{stamp}.log"
+    log = ws / ".codemitra" / f"night-{stamp}.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     awake = keep_awake(True)
-    echo(f"✻ Mitra night · {plan_path.name} · {model or 'builder default'} · limit {hours:g} h · "
+    echo(f"✻ CodeMitra night · {plan_path.name} · {model or 'builder default'} · limit {hours:g} h · "
          f"{'keeping Windows awake' if awake else 'could not keep Windows awake'}")
     echo(f"  log: {log}")
     started = time.time()

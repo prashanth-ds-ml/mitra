@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", ".mitra", ".mypy_cache",
+SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", ".codemitra", ".mitra", ".mypy_cache",
              ".ruff_cache", "dist", "build"}
 MAX_READ_LINES = 400
 MAX_OUTPUT_CHARS = 4000
@@ -84,7 +84,7 @@ class Workspace:
             name = parts[-1]
             hits = []
             for found in self.root.rglob(name):
-                if any(x in found.parts for x in (".git", ".venv", "node_modules", "__pycache__", ".mitra")):
+                if any(x in found.parts for x in (".git", ".venv", "node_modules", "__pycache__", ".codemitra")):
                     continue
                 hits.append(found.relative_to(self.root).as_posix())
                 if len(hits) > 3:
@@ -103,7 +103,7 @@ class Workspace:
                 raise ToolError(f"'{rel}' is a test file; tests are read-only. Change the code so the tests pass.")
         name = full.name.lower()
         if name.startswith(".env") or name.endswith((".pem", ".key")):
-            raise ToolError(f"'{rel}' looks like a secret file; Mitra does not write those.")
+            raise ToolError(f"'{rel}' looks like a secret file; CodeMitra does not write those.")
 
 
 def _commit(ws: Workspace, full: Path, new_text: str) -> None:
@@ -240,10 +240,10 @@ def make_dir(ws: Workspace, path: str) -> str:
 
 def syntax_note(rel: str, text: str) -> str:
     """A warning when a written .py / .json / .toml file does not parse, so the model fixes it right away
-    (2026-11-06: Mitra wrote level.toml as Markdown bullets)."""
+    (2026-11-06: CodeMitra wrote level.toml as Markdown bullets)."""
     suffix = rel.rsplit(".", 1)[-1].lower() if "." in rel else ""
     from app.core import plans
-    if plans.is_plan_file(rel):  # a plan Mitra writes must run with /run (D-055)
+    if plans.is_plan_file(rel):  # a plan CodeMitra writes must run with /run (D-055)
         return plans.write_note(rel, text)
     try:
         if suffix == "py":
@@ -440,7 +440,7 @@ _PYTEST_CHECK: dict[str, bool] = {}
 
 SHRINK_MIN_LINES = 20   # D-078 #4: write_file refuses to shrink a file this long ...
 SHRINK_RATIO = 0.5      # ... to under half its lines (an accidental whole-file overwrite)
-_TEST_SKIP = {".git", ".mitra", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "dist", "build"}
+_TEST_SKIP = {".git", ".codemitra", ".mitra", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "dist", "build"}
 
 
 def has_tests(root: Path, max_depth: int = 4) -> bool:
@@ -473,7 +473,7 @@ def is_multi_project(root: Path) -> bool:
 
 
 def project_dir(root: Path, path: str) -> str:
-    """E-126 (live 2026-11-13): mitra-try holds two projects, brick-breaker/ and neon_chomp/. After Mitra wrote
+    """E-126 (live 2026-11-13): mitra-try holds two projects, brick-breaker/ and neon_chomp/. After CodeMitra wrote
     neon_chomp files, the tests that ran were brick-breaker's ("37 passed"), so broken code looked green. The project
     a file belongs to: its top-level folder when the workspace root is not itself one project (no tests or project
     files of its own at the top); '' when the root is the project."""
@@ -501,9 +501,9 @@ def _has_pytest(python: str) -> bool:
 def project_python(root: Path) -> str:
     """The Python a test command's `python` should mean (E-028).
 
-    Installed as a command, Mitra runs in its own private Python without the project's packages, so tests failed
+    Installed as a command, CodeMitra runs in its own private Python without the project's packages, so tests failed
     with "No module named pytest". Use, in order: the project's .venv / venv, then `python` on PATH if it has
-    pytest, then Mitra's own Python (which ships pytest for small projects without a venv).
+    pytest, then CodeMitra's own Python (which ships pytest for small projects without a venv).
     """
     import shutil
 

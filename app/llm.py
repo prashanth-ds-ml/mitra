@@ -88,7 +88,7 @@ def get_local_llm(
 
 
 def thinking_setting(value) -> bool | str:
-    """mitra.toml `thinking`: "on" -> think, "off" -> no thinking (faster), anything else -> auto (on for models
+    """codemitra.toml `thinking`: "on" -> think, "off" -> no thinking (faster), anything else -> auto (on for models
     that support it). D-020."""
     v = str(value or "auto").strip().lower()
     if v in ("on", "true", "yes"):

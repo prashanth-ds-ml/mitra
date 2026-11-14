@@ -1,6 +1,6 @@
 """The core agent loop (M1): model -> tools -> results -> repeat, until the tests pass or a limit is hit.
 
-One loop for everything: `mitra solve`, the plan runner, and (next) the terminal chat. Built for small models:
+One loop for everything: `codemitra solve`, the plan runner, and (next) the terminal chat. Built for small models:
 - the tests decide "done", not the model: a passing test run ends the task;
 - a step limit, a repeat guard and a cap on failed test runs stop a stuck model;
 - one retry on a failed model call; an empty reply is a mistake the model is told about, never a pass (L-002);
@@ -24,7 +24,7 @@ from app.core import tools as T
 from app.core.parse import text_tool_calls
 from app.core.scrub import scrub_obj
 
-SYSTEM_PROMPT = """You are Mitra, a coding agent. You work inside one project folder using tools.
+SYSTEM_PROMPT = """You are CodeMitra, a coding agent. You work inside one project folder using tools.
 
 How to work:
 1. Look first: list_files, then read the files that matter (the task, plan.md, the tests).
@@ -473,11 +473,11 @@ def _git(ws: T.Workspace, *args: str) -> tuple[int, str]:
 
 
 def start_branch(ws: T.Workspace) -> tuple[str, str]:
-    """Work on a new branch mitra/plan-<time> so the user's branch is never touched. Returns (branch, error)."""
+    """Work on a new branch codemitra/plan-<time> so the user's branch is never touched. Returns (branch, error)."""
     code, top = _git(ws, "rev-parse", "--show-toplevel")
     if code != 0:
         return "", "not a git repository"
-    branch = time.strftime("mitra/plan-%Y%m%d-%H%M%S")
+    branch = time.strftime("codemitra/plan-%Y%m%d-%H%M%S")
     code, out = _git(ws, "switch", "-c", branch)
     return (branch, "") if code == 0 else ("", out)
 
@@ -532,7 +532,7 @@ def run_plan(plan_text: str, ws: T.Workspace, llm, *, full_test_command: str, ma
         files = sorted({T.Path(e["path"]).resolve().relative_to(ws.root).as_posix() for e in ws.journal[start:]}
                        | set(res.changed))
         if res.status == "passed" and branch:
-            commits[task.id] = commit_task(ws, files, f"mitra: {task.id} {task.title}")
+            commits[task.id] = commit_task(ws, files, f"codemitra: {task.id} {task.title}")
         elif res.status != "passed":
             helps.append(needs_help(task, res, files))
     ws.test_command = full_test_command

@@ -1,6 +1,6 @@
 """Replay a recorded run without Ollama (M1 record/replay, dsh llm-replay).
 
-Every run writes `.mitra/runs/<time>/*.jsonl`; its "model" rows hold what the model said and which tools it called.
+Every run writes `.codemitra/runs/<time>/*.jsonl`; its "model" rows hold what the model said and which tools it called.
 `ReplayModel(path)` answers with those replies in order, so a real run can become a regression test.
 """
 from __future__ import annotations

@@ -1,6 +1,6 @@
-"""Find what goes wrong in Mitra's recorded runs (self-improvement step 2).
+"""Find what goes wrong in CodeMitra's recorded runs (self-improvement step 2).
 
-Reads the run records (`.mitra/runs/**/*.jsonl`: chat sessions, `mitra solve`, plan tasks) and groups problems into
+Reads the run records (`.codemitra/runs/**/*.jsonl`: chat sessions, `codemitra solve`, plan tasks) and groups problems into
 patterns, each with a count and examples. The improve loop works on the top patterns; the dashboard shows them.
 """
 from __future__ import annotations
@@ -77,12 +77,12 @@ def find_run_files(roots: list[Path], max_depth: int = 7) -> list[Path]:
     out: set[Path] = set()  # a set: overlapping roots must not count a record twice
     for root in roots:
         for dirpath, dirnames, filenames in os.walk(root):
-            dirnames[:] = [d for d in dirnames if d not in SKIP and (d == ".mitra" or not d.startswith("."))]
+            dirnames[:] = [d for d in dirnames if d not in SKIP and (d == ".codemitra" or not d.startswith("."))]
             parts = Path(dirpath).relative_to(root).parts
             if len(parts) > max_depth:
                 dirnames[:] = []
                 continue
-            if ".mitra" in parts and "runs" in parts:
+            if ".codemitra" in parts and "runs" in parts:
                 out |= {(Path(dirpath) / f).resolve() for f in filenames if f.endswith(".jsonl")}
     return sorted(out)
 
@@ -95,7 +95,7 @@ def _norm_error(text: str) -> str:
 
 
 def _project(path: Path) -> str:
-    """The project folder a record belongs to (the folder holding `.mitra`, or its slug in the central store)."""
+    """The project folder a record belongs to (the folder holding `.codemitra`, or its slug in the central store)."""
     from app.core import store
     return store.project_of(path)
 
@@ -211,7 +211,7 @@ def analyze(files: list[Path], harness_version: int | None = None) -> Report:
 
 
 def format_report(rep: Report, n: int = 8) -> str:
-    lines = [f"Mitra run report: {rep.files} record files, {rep.units} turns/tasks, {rep.steps} model calls, "
+    lines = [f"CodeMitra run report: {rep.files} record files, {rep.units} turns/tasks, {rep.steps} model calls, "
              f"{rep.tokens_in:,} prompt tokens, {rep.seconds / 60:.0f} min"]
     if rep.passed_units:
         lines.append(f"Tasks passed: {rep.passed_units}")

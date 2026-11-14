@@ -37,7 +37,7 @@ def test_the_planner_gets_the_discussion_not_just_build_it():
                 AIMessage(content="Plan: FastAPI + SQLite, a rating table, a HF Space.")]
     task = planner.with_discussion("ok lets build it", messages)
     assert task.startswith("ok lets build it") and "brainstrom" in task and "roman telugu" in task
-    assert task.index("Mitra's last answer") > task.index("roman telugu") and "HF Space" in task
+    assert task.index("CodeMitra's last answer") > task.index("roman telugu") and "HF Space" in task
     assert len(planner.with_discussion("go", [HumanMessage(content="x" * 50_000)])) < 5000
     assert planner.with_discussion("go", [SystemMessage(content="sys")]) == "go"
 
@@ -67,13 +67,13 @@ def test_the_kaggle_report_names_only_a_night_from_this_session():
 
 
 def test_planned_and_resume_turns_are_not_empty_answers(tmp_path):
-    """Deep dive 2026-11-11: `mitra report` counted plan-first and "where did we stop" turns (no answer text by
+    """Deep dive 2026-11-11: `codemitra report` counted plan-first and "where did we stop" turns (no answer text by
     design) and esc stops as the model's empty answers, which the coach would read as failures."""
     import json as _json
 
     from app.core import analyze
 
-    runs = tmp_path / "proj" / ".mitra" / "runs"
+    runs = tmp_path / "proj" / ".codemitra" / "runs"
     runs.mkdir(parents=True)
     rows = [{"kind": "turn_start", "turn": 1, "path": "plan_first"}, {"kind": "turn_end", "turn": 1, "text": "",
                                                                         "outcome": "plan_cancelled"},
@@ -92,7 +92,7 @@ def test_planned_and_resume_turns_are_not_empty_answers(tmp_path):
 
 
 def test_a_workspace_in_the_temp_folder_is_never_mirrored_to_your_store(tmp_path, monkeypatch):
-    """Deep dive 2026-11-11: dev checks and a leaked test thread put 10 temp workspaces into ~/.mitra/data."""
+    """Deep dive 2026-11-11: dev checks and a leaked test thread put 10 temp workspaces into ~/.codemitra/data."""
     import tempfile as _tf
     from pathlib import Path as _P
 
@@ -101,14 +101,14 @@ def test_a_workspace_in_the_temp_folder_is_never_mirrored_to_your_store(tmp_path
 
     home = _P(_tf.gettempdir()).parent / "not-temp-home-for-test"   # a real home outside the temp folder
     monkeypatch.setattr(_H, "home", lambda: home)
-    rec = _P(_tf.gettempdir()) / "mitra-score-x" / "snake" / ".mitra" / "runs" / "chat-20261111.jsonl"
+    rec = _P(_tf.gettempdir()) / "codemitra-score-x" / "snake" / ".codemitra" / "runs" / "chat-20261111.jsonl"
     assert store.mirror_path(rec) is None
-    project = _P("C:/Users/someone/projects/game/.mitra/runs/chat-20261111.jsonl")
+    project = _P("C:/Users/someone/projects/game/.codemitra/runs/chat-20261111.jsonl")
     assert store.mirror_path(project) is not None
 
 
 def test_your_mitra_toml_thinking_wins_over_the_role_table():
-    """Review 2026-11-11: with every role set to on/off, `thinking = "on"` in mitra.toml changed nothing."""
+    """Review 2026-11-11: with every role set to on/off, `thinking = "on"` in codemitra.toml changed nothing."""
     from app.core import roles
 
     assert roles.thinking_for("chat") is False and roles.thinking_for("planner") is True
@@ -139,13 +139,13 @@ def test_the_sweep_of_everyday_follow_ups_is_sorted_right():
 
 
 def test_a_mitra_command_typed_in_the_chat_is_recognised():
-    """Live 2026-11-11: the user typed `mitra score` in the chat; it was explained as a question about the project."""
+    """Live 2026-11-11: the user typed `codemitra score` in the chat; it was explained as a question about the project."""
     from app.core.intent import terminal_command
 
-    assert terminal_command("mitra score") == "mitra score"
-    assert terminal_command("  `mitra score --remote` ") == "mitra score --remote"
-    assert terminal_command("$ mitra kaggle stop") == "$ mitra kaggle stop"
-    assert terminal_command("how does mitra score the tasks?") == ""
+    assert terminal_command("codemitra score") == "codemitra score"
+    assert terminal_command("  `codemitra score --remote` ") == "codemitra score --remote"
+    assert terminal_command("$ codemitra kaggle stop") == "$ codemitra kaggle stop"
+    assert terminal_command("how does codemitra score the tasks?") == ""
     assert terminal_command("mitra, explain the score module") == ""
     assert terminal_command("mitra") == ""
 
@@ -155,12 +155,12 @@ def test_the_chat_answers_a_terminal_command_with_a_hint(harness, capsys):  # no
     from tests.test_backend_chat import Inputs
 
     state, ws = harness
-    Inputs.script = ["mitra score", "exit"]
+    Inputs.script = ["codemitra score", "exit"]
     main._chat()
     out = " ".join(capsys.readouterr().out.split())
-    assert "is a terminal command" in out and "another terminal" in out and "mitra score --remote" in out
+    assert "is a terminal command" in out and "another terminal" in out and "codemitra score --remote" in out
     import json as _json
-    rows = [_json.loads(x) for f in (ws / ".mitra" / "runs").glob("chat-*.jsonl")
+    rows = [_json.loads(x) for f in (ws / ".codemitra" / "runs").glob("chat-*.jsonl")
             for x in f.read_text(encoding="utf-8").splitlines() if x.strip()]
     starts = [r for r in rows if r["kind"] == "turn_start"]
     assert [(r["path"], r["request_kind"]) for r in starts] == [("cli_hint", "terminal_command")]

@@ -24,7 +24,7 @@ class TestReviewerAgent:
     def test_render_returns_panel(self):
         response = reviewer.ReviewResponse(
             request="Review current changes",
-            source="last Mitra change set",
+            source="last CodeMitra change set",
             summary="Potential regression in app.py.",
         )
         assert "Potential regression in app.py." in _text_of(reviewer.render(response))

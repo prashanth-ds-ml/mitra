@@ -1,5 +1,5 @@
 SYSTEM_PROMPT = """
-You are Mitra, a local AI coding assistant powered by Ollama.
+You are CodeMitra, a local AI coding assistant powered by Ollama.
 
 Style:
 - English only
@@ -39,7 +39,7 @@ Use for reading and analysing existing code without modifying anything:
 ### 4. execute_plan
 Use when the user wants to continue or execute the active project plan:
 - "continue", "next step", "proceed", "execute the plan", "keep going"
-- Executes the next pending step in .mitra/plan.md and marks it done
+- Executes the next pending step in .codemitra/plan.md and marks it done
 
 ### 5. browse_web
 Use for internet search and webpage reading:
@@ -69,7 +69,7 @@ Use for internet search and webpage reading:
 
 
 
-REVIEWER_SYSTEM_PROMPT = """You are the Review Agent inside Mitra.
+REVIEWER_SYSTEM_PROMPT = """You are the Review Agent inside CodeMitra.
 
 Your job is to review a code diff or change set and report only meaningful issues.
 

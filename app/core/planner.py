@@ -1,5 +1,5 @@
 """Plan first (D-065 P4, P5): a small context pack → a short runnable plan → (you: Go / Change / Save / Cancel) →
-the steps run one at a time with fresh context → failed steps re-planned once → `.mitra/resume.md`.
+the steps run one at a time with fresh context → failed steps re-planned once → `.codemitra/resume.md`.
 
 The plan uses the format `/run` understands (`### T1:` … `- Done when: ` + one command in backticks), so the same
 plan can also run unattended. `plans.check_text` checks it; problems go back to the planner once.
@@ -65,16 +65,16 @@ DISCUSSION_MAX_CHARS = 4000
 
 def with_discussion(request: str, messages: list, max_chars: int = DISCUSSION_MAX_CHARS) -> str:
     """"ok lets build it" after talking an idea through: the task is the discussion, not those four words.
-    The last few user messages and Mitra's last answer, newest kept first when it is too long (live 2026-11-11)."""
+    The last few user messages and CodeMitra's last answer, newest kept first when it is too long (live 2026-11-11)."""
     from langchain_core.messages import AIMessage, HumanMessage
 
     talk = [m for m in messages if isinstance(m, (HumanMessage, AIMessage)) and str(m.content or "").strip()
             and not getattr(m, "tool_calls", None)]
     users = [str(m.content).strip() for m in talk if isinstance(m, HumanMessage)
-             and not str(m.content).lstrip().startswith(("[Mitra", "✗"))][-4:]  # Mitra's own notes are not yours
+             and not str(m.content).lstrip().startswith(("[CodeMitra", "✗"))][-4:]  # CodeMitra's own notes are not yours
     answer = next((str(m.content).strip() for m in reversed(talk) if isinstance(m, AIMessage)), "")
     parts = [f"- {u[:1200]}" for u in users]
-    text = "\n".join(parts) + (f"\n\nMitra's last answer:\n{answer[:2000]}" if answer else "")
+    text = "\n".join(parts) + (f"\n\nCodeMitra's last answer:\n{answer[:2000]}" if answer else "")
     if len(text) > max_chars:
         text = text[-max_chars:]
     return f"{request}\n\nBuild what we discussed just before. What you said, in order:\n{text}" if text else request
@@ -184,7 +184,7 @@ def replan_failed(llm, plan_text: str, failures: dict) -> str:
 
 
 def resume_note(task: str, plan_path: Path | None, results: dict, final_tests: str) -> str:
-    """`.mitra/resume.md`: what the plan did, so "where did we stop" is instant next time."""
+    """`.codemitra/resume.md`: what the plan did, so "where did we stop" is instant next time."""
     lines = [f"# Plan: {task[:120]}", f"{time.strftime('%Y-%m-%d %H:%M')}"
              + (f" · plan file: {plan_path.name}" if plan_path else "")]
     next_step = ""

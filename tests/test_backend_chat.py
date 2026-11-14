@@ -104,7 +104,7 @@ def test_switching_between_kaggle_and_the_laptop(harness, capsys):
     assert KAGGLE_URL in bases and "http://localhost:11434" in bases
     # Kaggle died: laptop, report, the message back in the input box
     assert "the Kaggle GPU stopped answering" in out and "Kaggle ended ·" in out
-    reports = list((ws / ".mitra" / "reports").glob("kaggle-ended-*.md"))
+    reports = list((ws / ".codemitra" / "reports").glob("kaggle-ended-*.md"))
     assert len(reports) == 1 and "explain the code" in reports[0].read_text(encoding="utf-8")
     assert Inputs.defaults[-1] == "change the code"
     assert remote.active() is None  # a dead Kaggle address is forgotten
@@ -113,7 +113,7 @@ def test_switching_between_kaggle_and_the_laptop(harness, capsys):
 
 def test_kaggle_dead_at_start_reports_on_the_last_session(harness, capsys):
     state, ws = harness
-    runs = ws / ".mitra" / "runs"
+    runs = ws / ".codemitra" / "runs"
     runs.mkdir(parents=True)
     (runs / "chat-20261110.jsonl").write_text(
         '{"kind": "session"}\n{"kind": "turn_start", "turn": 1, "user": "build the paddle"}\n'
@@ -124,9 +124,9 @@ def test_kaggle_dead_at_start_reports_on_the_last_session(harness, capsys):
     main._chat()
     out = " ".join(capsys.readouterr().out.split())
     # E-107: one line at start-up; the full report (with the turns) only in its file
-    assert "Kaggle ended while Mitra was closed" in out and "1 turn, no files changed" in out
+    assert "Kaggle ended while CodeMitra was closed" in out and "1 turn, no files changed" in out
     assert "build the paddle" not in out and "is not answering" not in out and "What you asked" not in out
-    reports = list((ws / ".mitra" / "reports").glob("kaggle-ended-*.md"))
+    reports = list((ws / ".codemitra" / "reports").glob("kaggle-ended-*.md"))
     assert reports and "build the paddle" in reports[0].read_text(encoding="utf-8")
 
 
@@ -364,7 +364,7 @@ def _fake_runner(monkeypatch, calls):
 
 def test_where_did_we_stop_is_answered_from_the_records_without_the_model(harness, monkeypatch, capsys):
     state, ws = harness
-    runs = ws / ".mitra" / "runs"
+    runs = ws / ".codemitra" / "runs"
     runs.mkdir(parents=True)
     (runs / "chat-20261109.jsonl").write_text(
         '{"kind": "session"}\n{"kind": "turn_start", "turn": 1, "t": 1, "user": "add the score counter please"}\n'
@@ -379,7 +379,7 @@ def test_where_did_we_stop_is_answered_from_the_records_without_the_model(harnes
 
 def test_a_big_request_is_planned_then_built_after_go(harness, monkeypatch, capsys):
     state, ws = harness
-    (ws / "mitra.toml").write_text('architecture = "router"\n', encoding="utf-8")  # D-071: router paths
+    (ws / "codemitra.toml").write_text('architecture = "router"\n', encoding="utf-8")  # D-071: router paths
     _planning_llm(state, monkeypatch)
     runs = []
     _fake_runner(monkeypatch, runs)
@@ -391,7 +391,7 @@ def test_a_big_request_is_planned_then_built_after_go(harness, monkeypatch, caps
     assert "planning it first" in out and "Feature: score counter" in out
     assert asked and asked[-1][0] == "Build this plan?" and asked[-1][2] == "go"
     assert runs and runs[0]["git"] is False and "### T1: score class" in runs[0]["text"]
-    resume_note = (ws / ".mitra" / "resume.md").read_text(encoding="utf-8")
+    resume_note = (ws / ".codemitra" / "resume.md").read_text(encoding="utf-8")
     assert "T1 ✓ score class: 2 passed" in resume_note and "all tasks passed" in resume_note
     assert list(ws.glob("*.plan.md"))
 

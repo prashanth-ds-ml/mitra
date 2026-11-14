@@ -1,4 +1,4 @@
-"""The user's live session 2026-11-11 evening (feature list with Mitra): E-102 look-up phase, E-103 Mitra knows
+"""The user's live session 2026-11-11 evening (feature list with CodeMitra): E-102 look-up phase, E-103 CodeMitra knows
 itself, E-104 a correction is a signal, E-105 no false "could not write a summary"."""
 from langchain_core.messages import AIMessage
 
@@ -32,7 +32,7 @@ def test_mitra_knows_what_it_already_can_do():
     """E-103: "do you know about you?" -> "no fixed identity"; it proposed features it already has."""
     for prompt in (C.PHASED_PROMPT, C.ONE_PROMPT):
         assert C.ABOUT_MITRA in prompt
-    for fact in ("Kaggle", "run the tests", "MCP servers", "skills", "mitra improve", "say which ones you already have"):
+    for fact in ("Kaggle", "run the tests", "MCP servers", "skills", "codemitra improve", "say which ones you already have"):
         assert fact in C.ABOUT_MITRA
 
 
@@ -50,7 +50,7 @@ def test_being_corrected_for_not_following_is_a_signal():
 
 def test_a_report_written_at_start_up_has_no_summary_part(tmp_path):
     """E-105: every start-up report said "the laptop model could not write a summary" although none was tried."""
-    text = HO.build(reason="the Kaggle GPU ended while Mitra was closed", workspace=tmp_path, turns=[], laptop="m",
+    text = HO.build(reason="the Kaggle GPU ended while CodeMitra was closed", workspace=tmp_path, turns=[], laptop="m",
                     summary=None)
     assert "could not write" not in text and "## Summary" not in text
     tried = HO.build(reason="r", workspace=tmp_path, turns=[], laptop="m", summary="")
@@ -119,10 +119,10 @@ def test_the_screen_shows_the_last_turns_the_file_keeps_all(tmp_path):
 
 
 def test_start_up_gets_one_line_naming_changed_files(tmp_path):
-    report = tmp_path / ".mitra" / "reports" / "kaggle-ended-1.md"
+    report = tmp_path / ".codemitra" / "reports" / "kaggle-ended-1.md"
     line = HO.startup_line(_turns(30), tmp_path, 111, report)
-    assert line == ("☁ Kaggle ended while Mitra was closed · last session 111 min, 30 turns, no files changed · "
-                    "report in .mitra/reports/")
+    assert line == ("☁ Kaggle ended while CodeMitra was closed · last session 111 min, 30 turns, no files changed · "
+                    "report in .codemitra/reports/")
     changed = HO.startup_line(_turns(2, files=[str(tmp_path / "game.py")]), tmp_path, None, report)
     assert "last session, 2 turns, 1 file changed: game.py" in changed
 

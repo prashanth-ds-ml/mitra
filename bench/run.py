@@ -247,7 +247,7 @@ def measure_overhead(cfg: AgentConfig, model: str, ollama: str, facts: dict, out
         shutil.rmtree(out)
     out.mkdir(parents=True)
     (task,) = bench.load_tasks("T01")
-    with tempfile.TemporaryDirectory(prefix="mitra-overhead-", ignore_cleanup_errors=True) as tmp:
+    with tempfile.TemporaryDirectory(prefix="codemitra-overhead-", ignore_cleanup_errors=True) as tmp:
         ws, home = Path(tmp) / "work", Path(tmp) / "home"
         home.mkdir()
         bench.prepare(task, ws)

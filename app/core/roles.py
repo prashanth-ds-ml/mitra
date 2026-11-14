@@ -2,7 +2,7 @@
 
 Defaults follow D-051 and D-072 (deepseek-r1:8b thinks, qwen3.5:latest does; mimo-v2.6:9b replaced on
 2026-11-11, it turned conversation into builds); the live chat keeps the model you picked last.
-Your choices (`/model role <role> <model>`) are kept in ~/.mitra/roles.json and win over the defaults; mitra.toml
+Your choices (`/model role <role> <model>`) are kept in ~/.codemitra/roles.json and win over the defaults; codemitra.toml
 `[roles]` wins over both. A role whose model is not installed falls back to the chat model, so nothing breaks
 before a download. Every switch is recorded, so the dashboard can compare models per role.
 """
@@ -70,8 +70,8 @@ THINKING: dict[str, str | None] = {
     "reviewer": "off", "deployer": "off", "reporter": "off",
 }
 def thinking_for(role: str, cfg: dict | None = None) -> bool | str:
-    """True / False / "auto" for a role. Your explicit `thinking = "on"|"off"` in mitra.toml wins for every role;
-    otherwise the table above (review 2026-11-11: the table silently overrode mitra.toml)."""
+    """True / False / "auto" for a role. Your explicit `thinking = "on"|"off"` in codemitra.toml wins for every role;
+    otherwise the table above (review 2026-11-11: the table silently overrode codemitra.toml)."""
     from app.llm import thinking_setting
 
     mine = str((cfg or {}).get("thinking") or "").strip().lower()
@@ -86,7 +86,7 @@ READ_ONLY: dict[str, tuple[str, ...]] = {"builder": ("tests",)}
 
 def context_for(model: str, cfg: dict | None = None) -> int:
     """Roles run every model at its own maximum context for the first days (user, 2026-11-08, D-052);
-    a number in mitra.toml or your /context choice still wins. Data decides any limit later."""
+    a number in codemitra.toml or your /context choice still wins. Data decides any limit later."""
     cfg = cfg or {}
     if cfg.get("num_ctx"):
         return int(cfg["num_ctx"])
@@ -152,7 +152,7 @@ def save_choice(role: str, model: str | None) -> None:
 
 def use_for_chat(model: str) -> None:
     """`/model use X`: X becomes the chat model now and next time. Saved as the chat role's choice too, because a
-    choice beats mitra.toml `local_model` and the last model in `resolve` (E-054: the switch silently did nothing)."""
+    choice beats codemitra.toml `local_model` and the last model in `resolve` (E-054: the switch silently did nothing)."""
     config.save_last_model(model)
     save_choice("chat", model)
 
@@ -170,11 +170,11 @@ def chat_model(cfg: dict | None = None) -> str:
 
 
 def resolve(role: str, cfg: dict | None = None, have: set[str] | None = None) -> tuple[str, str]:
-    """(model, where it came from) for a role: mitra.toml [roles] > your choice > default > the chat model."""
+    """(model, where it came from) for a role: codemitra.toml [roles] > your choice > default > the chat model."""
     cfg = cfg or {}
     have = installed() if have is None else have
     toml_roles = cfg.get("roles") if isinstance(cfg.get("roles"), dict) else {}
-    for source, model in (("mitra.toml", toml_roles.get(role)), ("your choice", load_choices().get(role)),
+    for source, model in (("codemitra.toml", toml_roles.get(role)), ("your choice", load_choices().get(role)),
                           ("default", DEFAULTS.get(role))):
         if model:
             if model in have or not have:

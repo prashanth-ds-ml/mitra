@@ -26,7 +26,7 @@ class TestGetLocalLlm:
         assert "client_kwargs" not in captured
 
     def test_thinking_models_get_reasoning_on_so_thinking_is_not_dropped(self, monkeypatch):
-        """E-016: with reasoning unset, langchain-ollama drops a thinking model's reasoning; Mitra looked frozen."""
+        """E-016: with reasoning unset, langchain-ollama drops a thinking model's reasoning; CodeMitra looked frozen."""
         captured = {}
         monkeypatch.setattr(llm, "ChatOllama", lambda **kw: captured.update(kw) or kw)
         monkeypatch.setattr("app.config.get_model_facts", lambda name: {"capabilities": ("completion", "tools", "thinking")})

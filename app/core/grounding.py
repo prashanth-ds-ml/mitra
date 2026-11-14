@@ -44,7 +44,7 @@ _ASKS = re.compile(r"\?$|\b(i'?ll|i will|i can|i could|let me|should i|shall i|w
                    r"needs? to be|to be (fixed|added|applied))\b", re.IGNORECASE)
 _NUMBER = re.compile(r"\d[\d,.]*\d|\d")
 _NAME = re.compile(r"(?<![.!?]\s)(?<!^)\b[A-Z][A-Za-z0-9]{2,}\b")
-_COMMON = {"The", "This", "That", "These", "Those", "Mitra", "Here", "There", "Yes", "Also", "And", "But", "For",
+_COMMON = {"The", "This", "That", "These", "Those", "CodeMitra", "Here", "There", "Yes", "Also", "And", "But", "For",
            "With", "From", "Your", "You", "Our", "Its", "What", "Which", "When", "Confirmed", "Verified", "Found",
            "Checked", "According", "Search", "Searches", "Results", "Tests", "Test", "All", "Key", "Note", "Why"}
 MAX_SHOWN = 3

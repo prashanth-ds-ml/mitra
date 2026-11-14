@@ -1,4 +1,4 @@
-"""`mitra score`: the measuring set (D-068 step 3, docs/BUILD_ORDER.md). The judge of every later change.
+"""`codemitra score`: the measuring set (D-068 step 3, docs/BUILD_ORDER.md). The judge of every later change.
 
 Six kinds of checks, all automatic, all from files in score/:
 - sorting   how a request is sorted (intent.classify), no model                         score/sorting.toml
@@ -8,8 +8,8 @@ Six kinds of checks, all automatic, all from files in score/:
 - small     one clear change; hidden tests decide                                         score/tasks.toml
 - medium    a feature; hidden tests decide
 
-Every run appends one row to results/scores.jsonl (Mitra version, harness version, notes version, model, machine,
-each case) and keeps each case's full record in ~/.mitra/data/score-runs/<stamp>/ for the coach.
+Every run appends one row to results/scores.jsonl (CodeMitra version, harness version, notes version, model, machine,
+each case) and keeps each case's full record in ~/.codemitra/data/score-runs/<stamp>/ for the coach.
 The model paths are the chat's own: ChatSession.reply / .explain / .turn, with your harness, thinking off.
 """
 from __future__ import annotations
@@ -40,7 +40,7 @@ SET = ROOT / "score"
 RESULTS = ROOT / "results" / "scores.jsonl"
 CATEGORIES = ("sorting", "behaviour", "writing", "explain", "ideas", "real", "small", "medium")
 QUICK = ("sorting", "behaviour", "writing", "explain", "ideas", "real")
-HELD_OUT = ("real",)  # D-078 step 6: your real failures, scored but never learned from (`mitra improve`)
+HELD_OUT = ("real",)  # D-078 step 6: your real failures, scored but never learned from (`codemitra improve`)
 ARCHITECTURES = ("router", "one", "phased")  # D-071: routed paths (D-068), one loop, or decide-then-act      # no coding tasks: a few minutes
 SHELL_TIMEOUT_S = 120
 GRADE_TIMEOUT_S = 120
@@ -70,7 +70,7 @@ def _timed(fn, seconds: float, session=None):
     return box["v"]
 
 
-_IGNORE = shutil.ignore_patterns("__pycache__", ".pytest_cache", "*.pyc", ".mitra")
+_IGNORE = shutil.ignore_patterns("__pycache__", ".pytest_cache", "*.pyc", ".codemitra", ".mitra")
 
 
 @dataclass
@@ -218,7 +218,7 @@ class Runner:
     backend: str = "laptop"
     max_steps: int = 0                  # coding: 0 = the harness's chat_max_steps
     arch: str = "router"                # D-071: "router" (D-068 paths) or "one" (one conversational loop)
-    threads_root: Path | None = None    # one Mitra's conversation memory for a case (a temp folder, seeded)
+    threads_root: Path | None = None    # one CodeMitra's conversation memory for a case (a temp folder, seeded)
 
     def session(self, ws: Path, case_id: str):
         from app.core import chat as C
@@ -272,7 +272,7 @@ class Runner:
 
 def _digest(root: Path) -> dict[str, str]:
     return {p.relative_to(root).as_posix(): hashlib.sha1(p.read_bytes()).hexdigest() for p in root.rglob("*")
-            if p.is_file() and ".mitra" not in p.parts and "__pycache__" not in p.parts}
+            if p.is_file() and ".codemitra" not in p.parts and "__pycache__" not in p.parts}
 
 
 def _changed(before: dict, after: dict) -> list[str]:
@@ -284,7 +284,7 @@ def run_writing(r: Runner, on_case: Callable[[Case], None] = lambda c: None, onl
     for c in data["case"]:
         if only and c["id"] not in only:
             continue
-        with tempfile.TemporaryDirectory(prefix="mitra-score-", ignore_cleanup_errors=True) as tmp:
+        with tempfile.TemporaryDirectory(prefix="codemitra-score-", ignore_cleanup_errors=True) as tmp:
             s = r.session(Path(tmp), c["id"])
             messages = [r.system(data["notes"]), HumanMessage(content=c["request"])]
             t0 = time.monotonic()
@@ -307,7 +307,7 @@ def run_explain(r: Runner, on_case: Callable[[Case], None] = lambda c: None, cat
     for c in data["case"]:
         if c["category"] not in categories or (only and c["id"] not in only):
             continue
-        with tempfile.TemporaryDirectory(prefix="mitra-score-", ignore_cleanup_errors=True) as tmp:
+        with tempfile.TemporaryDirectory(prefix="codemitra-score-", ignore_cleanup_errors=True) as tmp:
             ws = Path(tmp) / data["project"]
             shutil.copytree(project, ws, ignore=_IGNORE)
             before = _digest(ws)
@@ -411,7 +411,7 @@ def run_behaviour(r: Runner, on_case: Callable[[Case], None] = lambda c: None, o
     for c in data["case"]:
         if only and c["id"] not in only:
             continue
-        with tempfile.TemporaryDirectory(prefix="mitra-score-", ignore_cleanup_errors=True) as tmp:
+        with tempfile.TemporaryDirectory(prefix="codemitra-score-", ignore_cleanup_errors=True) as tmp:
             ws = Path(tmp) / data["project"]
             shutil.copytree(project, ws, ignore=_IGNORE)
             before = _digest(ws)
@@ -441,7 +441,7 @@ def run_behaviour(r: Runner, on_case: Callable[[Case], None] = lambda c: None, o
 
 
 def real_cases() -> dict | None:
-    """D-078 step 6: ~/.mitra/score/real.toml, the cases you kept from your /bad turns (private, held out)."""
+    """D-078 step 6: ~/.codemitra/score/real.toml, the cases you kept from your /bad turns (private, held out)."""
     from app.core import cases as cases_mod
     try:
         data = tomllib.loads(cases_mod.real_path().read_text(encoding="utf-8"))
@@ -464,7 +464,7 @@ def _validate_behaviour() -> list[str]:
         changed: list[str] = []
         err = ""
         if c["expect"] == "change":
-            with tempfile.TemporaryDirectory(prefix="mitra-validate-", ignore_cleanup_errors=True) as tmp:
+            with tempfile.TemporaryDirectory(prefix="codemitra-validate-", ignore_cleanup_errors=True) as tmp:
                 ws = Path(tmp) / "p"
                 shutil.copytree(project, ws, ignore=_IGNORE)
                 if _run_check(c["check"], ws) == "":
@@ -520,7 +520,7 @@ class Task:
                     or (ws / "tests" / t.name).read_bytes() != t.read_bytes()]
         if tampered:  # fails whatever the tests say: no need to run them
             return False, "changed the tests: " + ", ".join(tampered)
-        with tempfile.TemporaryDirectory(prefix=f"mitra-grade-{self.id}-") as tmp:
+        with tempfile.TemporaryDirectory(prefix=f"codemitra-grade-{self.id}-") as tmp:
             copy = Path(tmp) / "ws"
             shutil.copytree(ws, copy, ignore=_IGNORE)
             (copy / "tests").mkdir(exist_ok=True)
@@ -558,7 +558,7 @@ def load_tasks(sizes=("small", "medium"), only: set | None = None) -> list[Task]
 def run_coding(r: Runner, tasks: list[Task], on_case: Callable[[Case], None] = lambda c: None) -> list[Case]:
     out = []
     for task in tasks:
-        with tempfile.TemporaryDirectory(prefix=f"mitra-score-{task.id}-", ignore_cleanup_errors=True) as tmp:
+        with tempfile.TemporaryDirectory(prefix=f"codemitra-score-{task.id}-", ignore_cleanup_errors=True) as tmp:
             ws = Path(tmp) / "ws"
             task.prepare(ws)
             s = r.session(ws, task.id)
@@ -603,7 +603,7 @@ def validate() -> list[str]:
             if not (project / f).is_file():
                 problems.append(f"{c['id']}: cites {f}, which is not in the project")
     for task in load_tasks():
-        with tempfile.TemporaryDirectory(prefix=f"mitra-validate-{task.id}-") as tmp:
+        with tempfile.TemporaryDirectory(prefix=f"codemitra-validate-{task.id}-") as tmp:
             start = Path(tmp) / "start"
             task.prepare(start)
             if task.grade(start)[0]:

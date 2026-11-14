@@ -88,7 +88,7 @@ def test_night_run_with_a_fake_solve_writes_the_report(tmp_path, monkeypatch):
     (tmp_path / "plan.md").write_text("### T1: x\n- Done when: `python -c 1` passes\n", encoding="utf-8")
     fake = {"passed_tasks": 1, "total_tasks": 1, "final_tests": "1 passed", "final_tests_passed": True,
             "tasks": {"T1": {"status": "passed", "tests": "1 passed", "summary": "ok"}}, "needs_help": []}
-    res = tmp_path / ".mitra" / "runs" / "x" / "result.json"
+    res = tmp_path / ".codemitra" / "runs" / "x" / "result.json"
     script = (f"import pathlib; p = pathlib.Path(r'{res}'); p.parent.mkdir(parents=True, exist_ok=True); "
               f"p.write_text({json.dumps(json.dumps(fake))}); print('working on T1')")
     monkeypatch.setattr(N, "solve_command", lambda *a: ["python", "-c", script])
@@ -104,7 +104,7 @@ def test_run_command_is_wired_in_the_chat():
     src = inspect.getsource(main._chat)
     assert "night_mod.check_plan(plan_path)" in src and "night_mod.launch(plan_path, project" in src
     assert "project = plan_path.parent" in src and 'if cmd == "/night":' in src
-    assert "proc\"].poll() is not None" in src  # an early failure is shown in Mitra
+    assert "proc\"].poll() is not None" in src  # an early failure is shown in CodeMitra
 
 
 def test_plans_without_tasks_or_tests_are_refused(tmp_path):

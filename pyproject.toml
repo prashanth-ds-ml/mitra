@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mitra"
+name = "codemitra"
 version = "0.7.0"
 description = "Local-first coding agent built for small models"
 license = "MIT"
@@ -21,9 +21,9 @@ dependencies = [
     "numpy>=2.3,<3",
     "PyYAML>=6.0,<7",
     "mcp>=2.3.0,<3",
-    "pytest>=9,<10",  # run_tests falls back to Mitra's own Python for projects without a venv (E-028)
+    "pytest>=9,<10",  # run_tests falls back to CodeMitra's own Python for projects without a venv (E-028)
     "pyflakes>=3.2,<5",  # check_code: undefined names / unbound locals before a program runs (E4)
-    "kaggle>=2.2.5,<3",  # mitra kaggle start/stop/status: your Kaggle GPU hours (D-061)
+    "kaggle>=2.2.5,<3",  # codemitra kaggle start/stop/status: your Kaggle GPU hours (D-061)
     "six>=1.16,<2",  # kaggle 2.2.5 imports six without declaring it (E-065)
 ]
 
@@ -31,7 +31,7 @@ dependencies = [
 dev = ["pytest", "ruff", "fastapi", "httpx"]
 
 [project.scripts]
-mitra = "app.main:cli"
+codemitra = "app.main:cli"
 
 [tool.setuptools]
 include-package-data = true

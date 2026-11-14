@@ -9,7 +9,7 @@ from app.config import (
     load,
 )
 
-MITRA_NOTES = str(pathlib.Path(".mitra") / "instructions.md")
+MITRA_NOTES = str(pathlib.Path(".codemitra") / "instructions.md")
 COPILOT_NOTES = str(pathlib.Path(".github") / "copilot-instructions.md")
 
 
@@ -47,7 +47,7 @@ def test_small_files_are_kept_whole_and_in_config_order(tmp_path):
 
 
 def test_broad_file_is_dropped_first(tmp_path):
-    # .mitra (5K) + root files (3K each) = 11K; copilot file (3K) does not fit.
+    # .codemitra (5K) + root files (3K each) = 11K; copilot file (3K) does not fit.
     _write_all(tmp_path, {"AGENTS.md": 3000, "CLAUDE.md": 3000, MITRA_NOTES: 5000, COPILOT_NOTES: 3000})
     cfg = load(cwd=str(tmp_path))
     by_path = {item["path"]: item["content"] for item in cfg["project_instructions"]}

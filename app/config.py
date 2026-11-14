@@ -24,11 +24,11 @@ try:
 except ImportError:
     tomli_w = None
 
-_TOML_NAME = "mitra.toml"
+_TOML_NAME = "codemitra.toml"
 _LOCAL_TOML_NAME = "local.toml"
-_RULES_NAME = "MITRA.md"
-_USER_CONFIG_DIR = pathlib.Path.home() / ".config" / "mitra"
-_USER_CONFIG_FILE = _USER_CONFIG_DIR / "mitra.toml"
+_RULES_NAME = "CODEMITRA.md"
+_USER_CONFIG_DIR = pathlib.Path.home() / ".config" / "codemitra"
+_USER_CONFIG_FILE = _USER_CONFIG_DIR / "codemitra.toml"
 _PROJECT_ROOT_MARKERS = (
     _TOML_NAME,
     "pyproject.toml",
@@ -37,21 +37,21 @@ _PROJECT_ROOT_MARKERS = (
 _DEFAULT_INSTRUCTION_FILES = [
     "AGENTS.md",
     "CLAUDE.md",
-    ".mitra/instructions.md",
+    ".codemitra/instructions.md",
     ".github/copilot-instructions.md",
 ]
 _DEFAULT_SKILL_DIRS = [
     "skills",
-    ".mitra/skills",
+    ".codemitra/skills",
 ]
 _DEFAULT_PLUGIN_DIRS = [
     "plugins",
-    ".mitra/plugins",
+    ".codemitra/plugins",
 ]
 # Total size of all project notes put in the prompt. Small models have small
 # contexts, so notes share one budget; the most specific files win it.
 PROJECT_NOTES_BUDGET_BYTES = 12_000
-_NOTES_CUT_LINE = "[... cut: Mitra's project-notes budget is 12,000 bytes]"
+_NOTES_CUT_LINE = "[... cut: CodeMitra's project-notes budget is 12,000 bytes]"
 _BYTES_PER_GIB = 1024 ** 3
 
 _DEFAULTS: dict = {
@@ -86,7 +86,7 @@ _DEFAULTS: dict = {
     "policy_path": "",
     "instruction_files": list(_DEFAULT_INSTRUCTION_FILES),
     "skill_dirs": list(_DEFAULT_SKILL_DIRS),
-    "playbook_dirs": ["playbooks", ".mitra/playbooks"],
+    "playbook_dirs": ["playbooks", ".codemitra/playbooks"],
     "plugin_dirs": list(_DEFAULT_PLUGIN_DIRS),
 }
 
@@ -100,7 +100,7 @@ class LocalModelInfo:
     placement: str = "gpu"   # "gpu" | "split" | "cpu"
     capabilities: tuple[str, ...] = ()
     compatible: bool = True  # a chat model with native tool calling (or unknown)
-    context: int = 0         # num_ctx Mitra uses for it (D-033)
+    context: int = 0         # num_ctx CodeMitra uses for it (D-033)
 
 
 @dataclass(frozen=True)
@@ -185,12 +185,12 @@ def _load_project_instructions(root: pathlib.Path, entries) -> list[dict[str, st
 def _notes_rank(path: str) -> int:
     """Lower = more specific, kept first when the budget is tight.
 
-    .mitra/ files are written for Mitra itself; files at the workspace root
+    .codemitra/ files are written for CodeMitra itself; files at the workspace root
     (AGENTS.md, CLAUDE.md) are for any agent on this project; files in other
     folders (.github/copilot-instructions.md) target other tools and go first.
     """
     parts = pathlib.PurePath(path).parts
-    if parts and parts[0] == ".mitra":
+    if parts and parts[0] == ".codemitra":
         return 0
     if len(parts) == 1:
         return 1
@@ -491,7 +491,7 @@ def list_local_ai_processes() -> list[ProcessInfo]:
 
 
 def list_reclaimable_processes() -> list[ProcessInfo]:
-    """Return processes Mitra can stop to reclaim local CPU/GPU resources."""
+    """Return processes CodeMitra can stop to reclaim local CPU/GPU resources."""
     combined: dict[int, ProcessInfo] = {}
     for process in list_local_ai_processes():
         combined[process.pid] = process
@@ -568,7 +568,7 @@ def get_recommended_model_budget_gib() -> float | None:
     return round(max(2.0, total_gib * 0.5), 1)
 
 
-# Mitra is built and tested on qwen3.5 4B and 9B (D-015, D-029); the picker lists only the official qwen3.5 tags,
+# CodeMitra is built and tested on qwen3.5 4B and 9B (D-015, D-029); the picker lists only the official qwen3.5 tags,
 # not custom variants such as qwen3.5-32k (D-032, D-033).
 SUPPORTED_FAMILIES = ("qwen35",)
 SUPPORTED_BASE_NAMES = ("qwen3.5",)
@@ -589,7 +589,8 @@ DEFAULT_MODELS = ("qwen3.5:4b", "qwen3.5:9b", "qwen3.5:latest")  # first install
 
 
 def _mitra_home() -> pathlib.Path:
-    return pathlib.Path(os.environ.get("MITRA_HOME") or pathlib.Path.home() / ".mitra")
+    from app import migrate  # D-080: ~/.codemitra, or ~/.mitra until it has moved
+    return migrate.resolve_home()
 
 
 def load_last_model() -> str:
@@ -647,21 +648,21 @@ def parse_context_choice(text: str, max_ctx: int = 0) -> tuple[int, str]:
     if not n:
         return 0, f"Unknown size `{text.strip()}`. Use one of: {', '.join(CONTEXT_CHOICES)}, or auto."
     if n < MIN_CONTEXT:
-        return 0, f"At least {MIN_CONTEXT // 1024}K: Mitra's prompt, code and tool results need room."
+        return 0, f"At least {MIN_CONTEXT // 1024}K: CodeMitra's prompt, code and tool results need room."
     if max_ctx and n > max_ctx:
         return 0, f"This model supports at most {max_ctx // 1024}K."
     return n, ""
 
 
 def compact_threshold(cfg: dict, num_ctx: int) -> int:
-    """Prompt size at which the chat compacts: 80% of the context, or lower if mitra.toml caps it (E-046)."""
+    """Prompt size at which the chat compacts: 80% of the context, or lower if codemitra.toml caps it (E-046)."""
     cap = int(cfg.get("auto_compact_threshold") or 0)
     full = int(num_ctx * 0.8)
     return min(cap, full) if cap > 0 else full
 
 
 def context_for_model(name: str) -> int:
-    """num_ctx Mitra uses for a model when mitra.toml does not set one: the /context choice, else measured."""
+    """num_ctx CodeMitra uses for a model when codemitra.toml does not set one: the /context choice, else measured."""
     facts = get_model_facts(name) or {}
     native = int(facts.get("context") or 0)  # e.g. deepseek-r1:8b supports 128K: never ask for more
     chosen = load_context_choice(name)
@@ -671,7 +672,7 @@ def context_for_model(name: str) -> int:
     measured = LARGE_MODEL_CONTEXT if params >= LARGE_MODEL_PARAMETERS else SMALL_MODEL_CONTEXT
     return min(measured, native) if native else measured
 MIN_PARAMETERS = 4_000_000_000   # qwen3.5:2b and smaller cannot drive a coding agent
-MIN_CONTEXT = 32_768             # Mitra's prompt + code + tool results need room
+MIN_CONTEXT = 32_768             # CodeMitra's prompt + code + tool results need room
 _facts_cache: dict[str, dict | None] = {}
 
 
@@ -716,7 +717,7 @@ def get_model_facts(name: str) -> dict | None:
 
 
 def compatibility_problem(facts: dict | None, name: str | None = None) -> str | None:
-    """Why a model cannot run Mitra, or None if it can (unknown facts get the benefit of the doubt)."""
+    """Why a model cannot run CodeMitra, or None if it can (unknown facts get the benefit of the doubt)."""
     if not facts:
         return None
     caps = facts.get("capabilities") or ()
@@ -728,7 +729,7 @@ def compatibility_problem(facts: dict | None, name: str | None = None) -> str | 
     if not allowed and facts.get("family") and facts["family"] not in SUPPORTED_FAMILIES:
         return f"not qwen3.5 (family {facts['family']})"
     if not allowed and name and name.split(":", 1)[0] not in SUPPORTED_BASE_NAMES:
-        return "custom qwen3.5 variant (Mitra sets the context itself)"
+        return "custom qwen3.5 variant (CodeMitra sets the context itself)"
     if facts.get("parameters") and facts["parameters"] < MIN_PARAMETERS:
         return f"too small ({facts['parameters'] / 1e9:.1f}B parameters)"
     if facts.get("context") and facts["context"] < MIN_CONTEXT:
@@ -743,7 +744,7 @@ def is_compatible_model(facts: dict | None, name: str | None = None) -> bool:
 def get_local_model_inventory(*, include_incompatible: bool = False) -> list[LocalModelInfo]:
     """Return local Ollama models with parsed sizes and hardware guidance.
 
-    Only models Mitra can run (chat + native tool calling) are returned unless include_incompatible is True;
+    Only models CodeMitra can run (chat + native tool calling) are returned unless include_incompatible is True;
     embedding, OCR and other models that cannot call tools are left out.
     """
     try:
@@ -868,7 +869,7 @@ def get_config_paths(workspace: str | os.PathLike | None = None) -> dict[str, pa
     return {
         "user": _USER_CONFIG_FILE,
         "project": root / _TOML_NAME,
-        "local": root / ".mitra" / _LOCAL_TOML_NAME,
+        "local": root / ".codemitra" / _LOCAL_TOML_NAME,
         "rules": root / _RULES_NAME,
     }
 
@@ -876,9 +877,9 @@ def get_config_paths(workspace: str | os.PathLike | None = None) -> dict[str, pa
 def load(cwd: str | None = None, cli_overrides: dict | None = None) -> dict:
     """
     Load layered configuration with precedence:
-    1. User defaults (~/.config/mitra/mitra.toml)
-    2. Project settings (mitra.toml in workspace)
-    3. Local overrides (.mitra/local.toml, gitignored)
+    1. User defaults (~/.config/codemitra/codemitra.toml)
+    2. Project settings (codemitra.toml in workspace)
+    3. Local overrides (.codemitra/local.toml, gitignored)
     4. CLI/session overrides (passed via cli_overrides dict)
     5. Environment variables (.env, OLLAMA_API_KEY)
     """
@@ -894,7 +895,7 @@ def load(cwd: str | None = None, cli_overrides: dict | None = None) -> dict:
     cfg = _deep_merge(cfg, project_cfg)
 
     # Layer 3: Local overrides (gitignored)
-    local_cfg = _load_config_layer(root / ".mitra" / _LOCAL_TOML_NAME)
+    local_cfg = _load_config_layer(root / ".codemitra" / _LOCAL_TOML_NAME)
     cfg = _deep_merge(cfg, local_cfg)
 
     # Layer 4: CLI/session overrides

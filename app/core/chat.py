@@ -25,7 +25,7 @@ from app.core import signals as SIG
 from app.core import tools as T
 from app.core.parse import text_tool_calls
 
-CHAT_PROMPT = """You are Mitra, a local coding assistant working in the user's project folder.
+CHAT_PROMPT = """You are CodeMitra, a local coding assistant working in the user's project folder.
 
 Answer questions directly when you can. For work on the project, use the tools and keep going until it is done:
 look first (list_files, read_file, search), make small changes (edit_file, write_file), check them (run_tests or
@@ -41,21 +41,21 @@ levels, so do not copy them unless the user asks for a level.
 When the work is done, or you need the user, reply in a few short lines: what you did, what is left. Do not describe
 changes you did not make."""
 
-# E-103 (live 2026-11-11): asked "do you know about you?" Mitra said it had no fixed identity, and when the user
+# E-103 (live 2026-11-11): asked "do you know about you?" CodeMitra said it had no fixed identity, and when the user
 # planned its features it proposed ones it already has (tools, MCP, Kaggle, tests, learning from feedback)
-ABOUT_MITRA = """## About you (Mitra)
-You are Mitra, the user's own coding assistant: they build you (github.com/prashanth-ds-ml/mitra) to work with
-small local models, on this laptop (Ollama, qwen3.5, 64K context) or on a free Kaggle T4 GPU (256K; `mitra kaggle
+ABOUT_MITRA = """## About you (CodeMitra)
+You are CodeMitra, the user's own coding assistant: they build you (github.com/prashanth-ds-ml/codemitra) to work with
+small local models, on this laptop (Ollama, qwen3.5, 64K context) or on a free Kaggle T4 GPU (256K; `codemitra kaggle
 start`). What you can already do: talk things through; read and explain code; make changes and run the tests (after each
-change the project's tests run by themselves and you see the result; a "done" without a passing run is flagged); plan bigger work (plan.md) and build it task by task with tests (run_plan, `mitra night`
+change the project's tests run by themselves and you see the result; a "done" without a passing run is flagged); plan bigger work (plan.md) and build it task by task with tests (run_plan, `codemitra night`
 overnight); search the web and read pages; MCP servers (git, github, context7, semgrep); skills from skills/ folders
 (/skills); draft mails and summaries in the user's voice from their notes (me.md); keep short summaries of earlier
-conversations as threads. Every turn is recorded; /good and /bad mark answers; `mitra score` measures you;
-`mitra improve` learns rules you keep only if the score improves (`mitra harness` shows them).
+conversations as threads. Every turn is recorded; /good and /bad mark answers; `codemitra score` measures you;
+`codemitra improve` learns rules you keep only if the score improves (`codemitra harness` shows them).
 Not built yet (D-078, being built): web search reaches only
 Wikipedia, GitHub, arXiv, Hugging Face and the Ollama library (no news, blogs or company sites); you cannot read
 files outside this project folder; thread summaries can lose details such as links; a /good or /bad changes you
-only after `mitra improve` tests a rule, not straight away; no tests written before code, no charts.
+only after `codemitra improve` tests a rule, not straight away; no tests written before code, no charts.
 When asked what you can do, never claim a "not built yet" item.
 When the user plans your features, say which ones you already have."""
 
@@ -66,13 +66,13 @@ PARTNER = ("Be honest with the user: agree only when they are right, and say why
 
 # E-116, E-117 (live 2026-11-12): "tell me about you in detail" and "about the model qwen3.5" were answered by
 # searching the project's files (a plan, a night report); E-119: a WhatsApp draft got a Subject line and **bold**
-SELF_AND_TECH = """Questions about you (Mitra), such as what you are, what you can and cannot do yet and how you
+SELF_AND_TECH = """Questions about you (CodeMitra), such as what you are, what you can and cannot do yet and how you
 are built: answer yourself from "About you" below, in detail when asked (no phase needed). Questions about a model,
 library, tool or technology that is not part of this project (qwen3.5, pandas, Ollama): look_up, or answer from
 what you know. A WhatsApp or chat message: no Subject line and no Markdown; WhatsApp bold is *one star*."""
 
-# D-071 one Mitra: one conversational loop; the model decides whether to talk, look or change (all tools offered)
-ONE_PROMPT ="""You are Mitra, the user's thinking partner and coder, running on their own machine, in their project
+# D-071 one CodeMitra: one conversational loop; the model decides whether to talk, look or change (all tools offered)
+ONE_PROMPT ="""You are CodeMitra, the user's thinking partner and coder, running on their own machine, in their project
 folder (its files are listed below).
 
 Talk like a person and react to what the user actually said. Most messages are conversation: greetings,
@@ -97,18 +97,18 @@ Use tools only when the answer needs them:
 If it is unclear what to look at or change, ask one short question instead of searching.
 """ + SELF_AND_TECH + """
 
-A mail or message the user wants drafted: you write it FOR the user, as the user, never as Mitra. A mail has a
+A mail or message the user wants drafted: you write it FOR the user, as the user, never as CodeMitra. A mail has a
 'Subject:' line, then the body, then the user's mail signature copied exactly from their notes, word for word,
 with no other closing (no signature in the notes: end with [your name]). Use only facts the user gave or that are
 in this conversation; write [placeholder] for anything missing. Output only the text itself, as plain text
 with no Markdown (it is copied into a mail).""" + "\n\n" + ABOUT_MITRA
 OUTLINE_MAX_FILES = 60
-_OUTLINE_SKIP = {".git", ".mitra", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "dist", "build",
+_OUTLINE_SKIP = {".git", ".codemitra", ".mitra", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "dist", "build",
                  ".idea", ".vscode"}
 
 
 def project_outline(root: Path, max_files: int = OUTLINE_MAX_FILES) -> str:
-    """'## This project folder: snake' and its files (two levels), so one Mitra knows what 'the snake' or 'the API'
+    """'## This project folder: snake' and its files (two levels), so one CodeMitra knows what 'the snake' or 'the API'
     refers to (A/B 2026-11-11: asked how the snake grows, it explained real snakes)."""
     import os
 
@@ -132,7 +132,7 @@ def project_outline(root: Path, max_files: int = OUTLINE_MAX_FILES) -> str:
 # D-071 phased (decide, then act): the first call has no real tools, only these three phase switches; the model
 # answers in text (talk) or picks a phase, and only then gets that phase's tools (A/B 2026-11-11: with every tool
 # from the first step, a 9B built a whole app from "either the snake game or a web app").
-PHASED_PROMPT = """You are Mitra, the user's thinking partner and coder, running on their own machine, in their project
+PHASED_PROMPT = """You are CodeMitra, the user's thinking partner and coder, running on their own machine, in their project
 folder (its files are listed below).
 
 Talk like a person and react to what the user actually said. Most messages are conversation: greetings,
@@ -158,21 +158,21 @@ Deciding between options, opinions and ideas are conversation: answer them yours
 this project's code (make the game harder, improve the API, review it) need look_at_code first.
 """ + SELF_AND_TECH + """
 
-A mail or message the user wants drafted: you write it FOR the user, as the user, never as Mitra. A mail has a
+A mail or message the user wants drafted: you write it FOR the user, as the user, never as CodeMitra. A mail has a
 'Subject:' line, then the body, then the user's mail signature copied exactly from their notes, word for word,
 with no other closing (no signature in the notes: end with [your name]). Use only facts the user gave or that are
 in this conversation; write [placeholder] for anything missing. A summary keeps every name, number and date exactly
 as written. Output only the text itself, with no preamble; a mail or message is plain text with no Markdown
 (it is copied into a mail).""" + "\n\n" + ABOUT_MITRA
 
-DECIDE_NOTE = ("[Mitra: small talk gets one or two friendly sentences that do not mention the project or its files. "
+DECIDE_NOTE = ("[CodeMitra: small talk gets one or two friendly sentences that do not mention the project or its files. "
                "If the user is thinking out loud or deciding, end with one short question.]")
 # E-125: the yes and pasted-spec rules live in PHASED_PROMPT and in code (is_go_ahead), not in this reminder: a
 # longer reminder cost B2 its ask-back on the first live score
 
-# E-125 (live 2026-11-13, a pasted Neon Chomp PRD): Mitra asked "Should I create all the initial files now?" and the
+# E-125 (live 2026-11-13, a pasted Neon Chomp PRD): CodeMitra asked "Should I create all the initial files now?" and the
 # user said yes six times ("yes", "ok start and go ahead", "yes to all go to auto mode", ...). Every decide call
-# talked and asked the same question again, word for word, so nothing was ever built. A yes to work Mitra offered
+# talked and asked the same question again, word for word, so nothing was ever built. A yes to work CodeMitra offered
 # now starts that work with no decide call, and a decide answer that repeats the last one is not accepted.
 _GO = re.compile(r"\b(yes|yeah|yep|yup|sure|ok|okay|alright|go|proceed|start|continue|do it|build it|carry on|"
                  r"go for it|sounds good|absolutely|of course|please do|haan)\b", re.IGNORECASE)
@@ -195,12 +195,12 @@ _ASKS_CHANGE = re.compile(r"\b(fix|fixes|fixing|add|build|create|make|write|impl
 _ASKS_ONLY = re.compile(r"\b(first tell me|just tell me|only tell me|don'?t (change|fix|edit)|do not (change|fix|edit)|"
                         r"without changing|explain|review .* (first|only)|tell me where)\b", re.IGNORECASE)
 REPEAT_RATIO = 0.8  # a decide answer this close to the last answer repeats it
-CLAIM_NOTE = ("[Mitra: your last answer said {claims}, but this turn's tool results do not back it: {facts}. If "
+CLAIM_NOTE = ("[CodeMitra: your last answer said {claims}, but this turn's tool results do not back it: {facts}. If "
               "an earlier turn did it, say which; otherwise, in your next answer, first correct it plainly for the "
               "user.]")
-GO_NOTE = ("[Mitra: the user said yes to what you offered: \"{offer}\". Do it now, all of it, without asking "
+GO_NOTE = ("[CodeMitra: the user said yes to what you offered: \"{offer}\". Do it now, all of it, without asking "
            "again.]")
-REPEAT_NOTE = ("[Mitra: you just repeated your last answer and the user already answered it: \"{user}\". Do not ask "
+REPEAT_NOTE = ("[CodeMitra: you just repeated your last answer and the user already answered it: \"{user}\". Do not ask "
                "again. Act on their answer now (choose a phase), or say something new.]")
 
 
@@ -211,7 +211,7 @@ def is_go_ahead(text: str) -> bool:
 
 
 def offered_phase(answer: str) -> tuple[str, str] | None:
-    """The work Mitra offered at the end of `answer` ("Should I create all the initial files now?") ->
+    """The work CodeMitra offered at the end of `answer` ("Should I create all the initial files now?") ->
     (phase, the offer), or None when it did not end by offering to do something."""
     # E-126: live answers end in bold ("**Should I start building now?**"); the fix missed every one of them
     tail = _MARKDOWN.sub("", (answer or "")).strip()[-500:]
@@ -245,7 +245,7 @@ def asks_change(text: str) -> bool:
 
 
 def _last_answer(messages: list, before: int) -> str:
-    """Mitra's last answer in text before message `before`."""
+    """CodeMitra's last answer in text before message `before`."""
     for m in reversed(messages[:before]):
         if isinstance(m, AIMessage) and isinstance(m.content, str) and m.content.strip():
             return m.content
@@ -271,22 +271,22 @@ PHASE_SPECS = [
 ]
 PHASES = {
     "look_at_code": dict(tools=("list_files", "read_file", "search", "run_tests"), budget="explain_max_steps",
-                         note="[Mitra: look phase. Find what answers the question: search for a name or list_files, "
+                         note="[CodeMitra: look phase. Find what answers the question: search for a name or list_files, "
                               "read only the part you need, run_tests if the question is whether tests pass. Then "
                               "answer clearly (Markdown), citing each point as path:line with the file path "
                               "(for example snake/game.py:40). Asked for ideas: 3-5 options, each tied to the code it "
                               "would change (path:line). Never state a number you did not check. Change nothing.]"),
     # E-102: "pull information on self improving coding agents" was answered from memory: no phase had the web
     "look_up": dict(tools=("web_search", "fetch_url"), budget="explain_max_steps",
-                    note="[Mitra: look-up phase. Search the web (web_search), open the 1-3 best results "
+                    note="[CodeMitra: look-up phase. Search the web (web_search), open the 1-3 best results "
                          "(fetch_url), then answer clearly (Markdown) with what you found and where (name or "
                          "link for each point). Say plainly when the search found nothing useful.]"),
     "make_change": dict(tools=None, budget="chat_max_steps",
-                        note="[Mitra: change phase. Read the file before you edit it, make small changes, run the "
+                        note="[CodeMitra: change phase. Read the file before you edit it, make small changes, run the "
                              "tests right after, fix what fails, stop when it works. Then tell the user in two or "
                              "three lines what you changed (path:line) and the test result.]"),
     "propose_plan": dict(tools=(), budget=None,
-                         note="[Mitra: plan phase. Write a short plan: the goal in one line, then 3-6 steps, each with "
+                         note="[CodeMitra: plan phase. Write a short plan: the goal in one line, then 3-6 steps, each with "
                               "the files it touches and how it is checked. End by asking the user whether to build "
                               "it. Do not build anything yet.]"),
 }
@@ -294,7 +294,7 @@ PHASES = {
 _DEEP = re.compile(r"\b(deep[ -]?dive|dig (deep|deeper)|go deeper|in[ -]depth|thorough(ly)?|comprehensive|"
                    r"proper research|research (it |this )?properly|all the sources|every source|everything you can)\b",
                    re.IGNORECASE)
-DEEP_NOTE = ("[Mitra: deep look-up. The user asked you to dig deep. Search at least {searches} times with different "
+DEEP_NOTE = ("[CodeMitra: deep look-up. The user asked you to dig deep. Search at least {searches} times with different "
              "words (search each name or project on its own, then the topic with other words), open the {pages}-5 "
              "best results (fetch_url), then answer clearly (Markdown) with what you found and where (link for each "
              "point), and say what you could not find. Say plainly when a search found nothing useful.]")
@@ -303,7 +303,7 @@ DEEP_NOTE = ("[Mitra: deep look-up. The user asked you to dig deep. Search at le
 # E-118 (live 2026-11-12): "can you do a deep dive on the model once again" got "Would you like me to search?"
 _WEB_ASK = re.compile(r"\b(search (the )?(web|internet|online)|web ?search|look (it )?up online|on the (web|internet)|"
                       r"in (the )?web|google it)\b", re.IGNORECASE)
-DECIDE_SEARCH_NOTE = ("[Mitra: the user asked you to search or dig deep: do it now (look_up, or look_at_code if it is "
+DECIDE_SEARCH_NOTE = ("[CodeMitra: the user asked you to search or dig deep: do it now (look_up, or look_at_code if it is "
                       "about this project's files); do not ask whether to search.]")
 
 
@@ -312,10 +312,10 @@ def is_deep(message: str) -> bool:
     return bool(_DEEP.search(message or ""))
 
 
-EMPTY_ANSWER_NOTE = ("[Mitra: you have not said anything to the user. Tell them now, in a few plain sentences, what "
+EMPTY_ANSWER_NOTE = ("[CodeMitra: you have not said anything to the user. Tell them now, in a few plain sentences, what "
                      "you found or changed. Do not call tools.]")
 
-ONE_LAST_STEP_NOTE = ("[Mitra: this is your last step. Answer the user now from what you have; say what you could not "
+ONE_LAST_STEP_NOTE = ("[CodeMitra: this is your last step. Answer the user now from what you have; say what you could not "
                       "finish or check. Do not call tools.]")
 
 # D-068 step 1: the one-call reply path (small talk, writing, general questions): no tools, thinking off
@@ -323,7 +323,7 @@ REPLY_NOTES = {
     "chat": "This is small talk. Reply in one or two friendly sentences. If it is the start of the conversation and "
             "the 'where we stopped' brief above has something, add one short line on it. Do not call tools.",
     "writing": "This is a writing task (a mail, message, summary, rewrite or translation). You are drafting it FOR "
-               "the user, as the user: write in their voice and tone from their notes, and never sign as Mitra. "
+               "the user, as the user: write in their voice and tone from their notes, and never sign as CodeMitra. "
                "For a mail: a 'Subject:' line, then the body, then the user's mail signature copied exactly from "
                "their notes (no signature in the notes: end with [your name]). Use only facts the user gave or that "
                "are in this conversation: do not add claims, offers, numbers or advice they did not mention; write "
@@ -342,13 +342,13 @@ EXPLAIN_NOTE = (
     "plain. Review or opinion: what is good, what is risky, what you would change, and why. Ideas: 3-5 options that "
     "fit this code, each with its cost and trade-off, then your pick; the user says which one to build. Do not change "
     "anything. Only if the question is too vague to start, ask at most 2 short questions instead of searching.")
-LAST_STEP_NOTE = ("[Mitra: this is your last step. Answer the question now from what you have read, with path:line "
+LAST_STEP_NOTE = ("[CodeMitra: this is your last step. Answer the question now from what you have read, with path:line "
                   "references; say what you could not check. Do not call tools.]")
 _CITE = re.compile(r"(?<![\w/.\\-])([\w./\\-]*[A-Za-z_][\w-]*\.[A-Za-z]\w*)(?![\w(])")
 _LINE_REF = re.compile(r"\.[A-Za-z]\w*:\d+|\blines? \d+")
 
 
-_SKIP_DIRS = {".git", ".mitra", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "dist", "build"}
+_SKIP_DIRS = {".git", ".codemitra", ".mitra", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "dist", "build"}
 
 
 def _project_files(root: Path, cap: int = 20_000) -> list[str]:
@@ -393,7 +393,7 @@ NO_TEST_EXT = (".md", ".txt", ".rst")                      # notes and docs: no 
 # tokens, ~6 minutes on the laptop) and answers nothing. A reply that shows nothing for this many chunks is stopped,
 # the model is told to answer now, and it gets one more try.
 RUNAWAY_HIDDEN_CHUNKS = 1500
-RUNAWAY_NOTE = ("[Mitra: your last reply produced nothing visible for a long time and was stopped. Answer the user "
+RUNAWAY_NOTE = ("[CodeMitra: your last reply produced nothing visible for a long time and was stopped. Answer the user "
                 "now, directly and briefly, or call one tool. No long reasoning.]")
 
 
@@ -422,7 +422,7 @@ def guard_runaway(chunks, limit: int = RUNAWAY_HIDDEN_CHUNKS):
 # back as an exception, not a reply (E-044). The model is told and tries again in smaller parts.
 MAX_BAD_TOOL_CALLS = 2
 BAD_TOOL_CALL_NOTE = (
-    "[Mitra: your last tool call could not be read ({error}). It was probably too long and ended before it was "
+    "[CodeMitra: your last tool call could not be read ({error}). It was probably too long and ended before it was "
     "closed. Nothing was run and nothing was written. Try again in smaller parts: write_file with the first ~100 "
     "lines, then append_file for the rest. Keep a report short, or write it to a file in parts the same way.]"
 )
@@ -441,7 +441,7 @@ def _rel(path: str, root: Path) -> str:
 
 
 def _read_small(p: Path) -> str | None:
-    """Text of a file Mitra may compare; None for missing, binary, big or private-looking files."""
+    """Text of a file CodeMitra may compare; None for missing, binary, big or private-looking files."""
     name = p.name.lower()
     if any(name == x or name.startswith(x) or name.endswith(x) for x in _PRIVATE):
         return None
@@ -455,7 +455,7 @@ def _read_small(p: Path) -> str | None:
 
 def _short_diff(rel: str, old: str | None, new: str | None) -> tuple[str, int, int]:
     a, b = (old or "").splitlines(), (new or "").splitlines()
-    lines = list(difflib.unified_diff(a, b, f"mitra/{rel}", f"you/{rel}", lineterm="", n=2))
+    lines = list(difflib.unified_diff(a, b, f"codemitra/{rel}", f"you/{rel}", lineterm="", n=2))
     added = sum(1 for x in lines if x.startswith("+") and not x.startswith("+++"))
     removed = sum(1 for x in lines if x.startswith("-") and not x.startswith("---"))
     text = "\n".join(lines)
@@ -490,7 +490,7 @@ def is_remote_slow(exc: BaseException) -> bool:
     return getattr(exc, "status_code", None) == 524 or "error 524" in text or "a timeout occurred" in text
 
 
-SLOW_NOTE = ("[Mitra: your last step took too long and was cut off before it reached the user. Do the same work in "
+SLOW_NOTE = ("[CodeMitra: your last step took too long and was cut off before it reached the user. Do the same work in "
              "smaller steps: write long files in parts (write_file with the first ~150 lines, then append_file), "
              "and edit one block at a time.]")
 
@@ -643,9 +643,9 @@ class ChatSession:
         self.llm, self.hooks, self.mode, self.num_ctx = llm, hooks, mode, num_ctx
         self.harness = harness if harness is not None else H.load()
         self.ws = T.Workspace(Path(workspace), read_only=())  # in the chat the user may ask for test edits
-        self.ws.spill_dir = self.ws.root / ".mitra" / "output"
+        self.ws.spill_dir = self.ws.root / ".codemitra" / "output"
         # every step of every turn, scrubbed, one file per day: follow a session live, replay it later (D-022)
-        self.rec = core_loop.Recorder(self.ws.root / ".mitra" / "runs" / f"chat-{time.strftime('%Y%m%d')}.jsonl",
+        self.rec = core_loop.Recorder(self.ws.root / ".codemitra" / "runs" / f"chat-{time.strftime('%Y%m%d')}.jsonl",
                                       traces=traces)  # + full model calls for the fine-tune (D-041)
         self.turn_no = 0
         self.backend_kind = "laptop"  # laptop | remote: a remote that drops raises RemoteGone (D-062)
@@ -654,7 +654,7 @@ class ChatSession:
         self._last_user = ""  # start of the last turn's message, named when you mark it (E-052)
         self.last_night: dict | None = None  # a /run started after the last turn: /good /bad judge it (E-052)
         self.approve_all = False  # "yes to all" for the rest of this turn
-        self._left: dict[str, str | None] = {}  # file -> content Mitra left at the end of a turn (corrections, item 0)
+        self._left: dict[str, str | None] = {}  # file -> content CodeMitra left at the end of a turn (corrections, item 0)
         # role routing (D-049..D-051): which tools and MCP servers this role may use; None = all
         self.noticed: list[str] = []  # your corrections found at the start of the last turn (shown once)
         self.role = "chat"
@@ -701,9 +701,9 @@ class ChatSession:
                        mcp=list(self.allowed_mcp) if self.allowed_mcp is not None else "all",
                        thinking=route.get("thinking"), read_only=list(self.ws.read_only), num_ctx=self.num_ctx)
 
-    # ── what you think of Mitra's work (item 0: the strongest self-improvement signals) ────────────────────────
+    # ── what you think of CodeMitra's work (item 0: the strongest self-improvement signals) ────────────────────────
     def note_session(self, **info) -> None:
-        """One row per chat session: model, context, memory fit, free RAM/VRAM, Mitra version."""
+        """One row per chat session: model, context, memory fit, free RAM/VRAM, CodeMitra version."""
         from app.core import runinfo
         self.rec.write("session", code_version=runinfo.code_version(), workspace=str(self.ws.root), **info)
 
@@ -713,7 +713,7 @@ class ChatSession:
             self.rec.write("session_rating", stars=int(stars), turns=self.turn_no, author="user")
 
     def feedback(self, verdict: str, note: str = "", via: str = "command") -> str:
-        """`/good` / `/bad`: your verdict on the last thing Mitra did: a /run night started after the last turn, else
+        """`/good` / `/bad`: your verdict on the last thing CodeMitra did: a /run night started after the last turn, else
         the last turn (the last verdict given counts). The reply names what was marked (E-052)."""
         mark = "👍 good" if verdict == "good" else "👎 bad"
         tail = f": {note}" if note else ""
@@ -772,7 +772,7 @@ class ChatSession:
             return []
         try:
             return sorted(d.name for d in self.ws.root.iterdir() if d.is_dir() and not d.name.startswith((".", "_"))
-                          and d.name not in T._TEST_SKIP and d.name != "mitra-home")
+                          and d.name not in T._TEST_SKIP and d.name not in ("mitra-home", "codemitra-home"))
         except OSError:
             return []
 
@@ -800,7 +800,7 @@ class ChatSession:
         others = [d for d in self._projects() if d != self.focus]
         if not self.focus or not others:
             return ""
-        return (f"[Mitra: we are working on {self.focus}/ (the project changed or named last). Read and change "
+        return (f"[CodeMitra: we are working on {self.focus}/ (the project changed or named last). Read and change "
                 f"files there; {', '.join(o + '/' for o in others[:4])} are other projects: touch them only if the "
                 "user names them.]")
 
@@ -847,7 +847,7 @@ class ChatSession:
             self._left[path] = _read_small(Path(path))
 
     def _check_corrections(self, of_turn: int) -> int:
-        """Files Mitra changed that differ now from what it left: you corrected them. Recorded with a short diff."""
+        """Files CodeMitra changed that differ now from what it left: you corrected them. Recorded with a short diff."""
         found = 0
         for path, left in list(self._left.items()):
             now = _read_small(Path(path))
@@ -889,7 +889,7 @@ class ChatSession:
         if self.mode in ("plan", "read-only") and name not in READ_ONLY_TOOLS:
             return f"✗ {name} is not available in plan mode (read-only). Describe the change instead.", False
         if self.allowed_tools is not None and name not in self.allowed_tools:  # the role's promise, enforced (E-055)
-            if self.path == "phased" and self.last_phase:  # E-126: a phase, not a limit of Mitra or the "interface"
+            if self.path == "phased" and self.last_phase:  # E-126: a phase, not a limit of CodeMitra or the "interface"
                 nxt = " or ".join(PHASE_NEXT.get(self.last_phase, ())) or "a different phase"
                 return (f"✗ {name} is not part of this {self.last_phase.replace('_', ' ')} step. If the user asked "
                         f"for it, call {nxt} to switch; never tell the user you cannot change files. "
@@ -959,7 +959,7 @@ class ChatSession:
         _, tasks = core_loop.parse_plan(text)
         if self.mode == "approve" and not self.hooks.confirm(
                 f"Run plan {self.ws.rel(path)}", "\n".join(f"{t.id}: {t.title}" for t in tasks),
-                f"Build {len(tasks)} tasks in {folder}? Mitra edits files without asking during the run."):
+                f"Build {len(tasks)} tasks in {folder}? CodeMitra edits files without asking during the run."):
             return "✗ The user declined to run the plan.", False
         if self.ws.journal is None:
             self.ws.journal = []
@@ -970,7 +970,7 @@ class ChatSession:
         try:
             out = core_loop.run_plan(text, ws, self.llm,
                                      full_test_command=test_command, on_event=self.hooks.on_plan_event,
-                                     record_dir=ws.root / ".mitra" / "runs" / "plan", num_ctx=self.num_ctx,
+                                     record_dir=ws.root / ".codemitra" / "runs" / "plan", num_ctx=self.num_ctx,
                                      harness=self.harness)
         finally:
             ws.before_write = saved_hook
@@ -1025,7 +1025,7 @@ class ChatSession:
         before = _last_answer(messages, at)
         offered = offered_phase(before)
         go_note = ""
-        if offered and is_go_ahead(user):  # E-125: a yes to work Mitra offered starts it, no decide call
+        if offered and is_go_ahead(user):  # E-125: a yes to work CodeMitra offered starts it, no decide call
             self.deciding = False
             name, offer = offered
             self.phase_request = {"name": name, "args": {"what": offer}, "id": None}
@@ -1142,7 +1142,7 @@ class ChatSession:
             if self._no_tests_said:
                 return ""
             self._no_tests_said = True
-            return (f"[Mitra: {where} has no tests, so your change was not checked by running tests. Tell the "
+            return (f"[CodeMitra: {where} has no tests, so your change was not checked by running tests. Tell the "
                     "user plainly that it is untested.]")
         out, ok = self._run("run_tests", {"folder": folder} if folder else {}, self._run_plan)
         if out.startswith("✗") and "not available" in out:
@@ -1158,14 +1158,14 @@ class ChatSession:
         self._last_auto = (out, ok)
         if ok:
             self._test_fails = 0
-            return (f"[Mitra: the tests ran after your change and passed ({summary}). When you are done, tell the "
+            return (f"[CodeMitra: the tests ran after your change and passed ({summary}). When you are done, tell the "
                     "user what you changed and this result.]")
         self._test_fails += 1
         if self._test_fails >= rounds:
-            return (f"[Mitra: the tests still fail after {self._test_fails} rounds of fixes ({summary}). Stop "
+            return (f"[CodeMitra: the tests still fail after {self._test_fails} rounds of fixes ({summary}). Stop "
                     "changing code. Tell the user honestly what still fails, why you think it fails, and what you "
                     "would try next.]")
-        return (f"[Mitra: the tests ran after your change and failed ({summary}). Round {self._test_fails} of "
+        return (f"[CodeMitra: the tests ran after your change and failed ({summary}). Round {self._test_fails} of "
                 f"{rounds}. The failures:\n{out.strip()[:1500]}\nRead the failing line, fix the cause, and the tests "
                 "run again after your next change.]")
 
@@ -1180,7 +1180,7 @@ class ChatSession:
         if not (empty or missing):
             return ""
         what = "This folder is empty" if empty else "That file does not exist yet"
-        return (f"\n\n[Mitra: {what}. If the user asked you to write or create it, call make_change now: it gives "
+        return (f"\n\n[CodeMitra: {what}. If the user asked you to write or create it, call make_change now: it gives "
                 "you the tools to create files.]")
 
     def _deep_progress(self, name: str, ok: bool) -> str:
@@ -1191,15 +1191,15 @@ class ChatSession:
             return ""
         deep["searches" if name == "web_search" else "pages"] += 1
         if deep["min_searches"] > 1 and deep["searches"] < deep["min_searches"]:
-            return (f"\n\n[Mitra: deep dive: {deep['searches']} of {deep['min_searches']} searches done. Search again "
+            return (f"\n\n[CodeMitra: deep dive: {deep['searches']} of {deep['min_searches']} searches done. Search again "
                     "with different words (try each name on its own) before you answer.]")
         if deep["min_pages"] > 1 and deep["pages"] < deep["min_pages"]:
-            return (f"\n\n[Mitra: deep dive: {deep['pages']} of {deep['min_pages']} pages read. Open the best results "
+            return (f"\n\n[CodeMitra: deep dive: {deep['pages']} of {deep['min_pages']} pages read. Open the best results "
                     "with fetch_url before you answer.]")
         return ""
 
     def converse(self, messages: list, notes: str = "") -> TurnResult:
-        """One Mitra (D-071): the model decides whether to talk, look or change; every tool the role allows is
+        """One CodeMitra (D-071): the model decides whether to talk, look or change; every tool the role allows is
         offered; the step budget ends with an answer (the last step has no tools). Recorded as path "one". `notes`:
         your notes again, only when they changed since the start (they are in the system prompt)."""
         saved = (self.path, self.answer_on_last_step, self.last_step_note)
@@ -1542,7 +1542,7 @@ class ChatSession:
         if self.cancelled:  # nobody is waiting for this turn any more: no wrap-up call
             return res
         messages.append(HumanMessage(content=(
-            f"[Mitra stopped the tools: {reason}.] Tell the user in a few short lines what you did, "
+            f"[CodeMitra stopped the tools: {reason}.] Tell the user in a few short lines what you did, "
             "what failed and what is left. Do not call tools.")))
         streamed = self._stream(self.llm.stream(messages), res.steps + 1)
         reply = streamed.message if streamed.message is not None else AIMessage(content=streamed.text)

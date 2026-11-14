@@ -31,15 +31,15 @@ def _specs_text(specs: list[dict]) -> str:
 
 
 def views() -> dict[str, list[tuple[str, str]]]:
-    """{view name: [(part name, text), ...]} for the chat and `mitra solve`."""
+    """{view name: [(part name, text), ...]} for the chat and `codemitra solve`."""
     from app.core import chat, loop, tools
 
     return {
-        "Chat (`mitra`)": [
+        "Chat (`codemitra`)": [
             ("System prompt (`app.core.chat.CHAT_PROMPT`)", chat.CHAT_PROMPT),
             ('Tool specs (`app.core.chat.tool_specs("approve")`)', _specs_text(chat.tool_specs("approve"))),
         ],
-        "Solve (`mitra solve`)": [
+        "Solve (`codemitra solve`)": [
             ("System prompt (`app.core.loop.SYSTEM_PROMPT`)", loop.SYSTEM_PROMPT),
             ("Tool specs (`app.core.tools.TOOL_SPECS`)", _specs_text(tools.TOOL_SPECS)),
         ],

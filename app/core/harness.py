@@ -1,12 +1,12 @@
-"""The harness settings Mitra can tune itself (Harness²-style self-improvement, step 1).
+"""The harness settings CodeMitra can tune itself (Harness²-style self-improvement, step 1).
 
 Everything the improve loop may change lives here, not in code:
     rules   extra lines added to the chat and solve prompts ("learned rules")
     tools   replacement descriptions for tools, by name
     limits  step limits and guard settings
 
-Active file: ~/.mitra/harness.toml (or $MITRA_HARNESS). Every save also writes a copy to ~/.mitra/harness/history/,
-so each change can be traced and reverted. A missing or broken file means the built-in defaults: Mitra never breaks
+Active file: ~/.codemitra/harness.toml (or $CODEMITRA_HARNESS). Every save also writes a copy to ~/.codemitra/harness/history/,
+so each change can be traced and reverted. A missing or broken file means the built-in defaults: CodeMitra never breaks
 because of this file.
 """
 from __future__ import annotations
@@ -52,11 +52,12 @@ class Harness:
 
 
 def home() -> Path:
-    return Path(os.environ.get("MITRA_HOME") or Path.home() / ".mitra")
+    from app import migrate  # D-080: ~/.codemitra, or ~/.mitra until it has moved
+    return migrate.resolve_home()
 
 
 def active_path() -> Path:
-    return Path(os.environ.get("MITRA_HARNESS") or home() / "harness.toml")
+    return Path(os.environ.get("CODEMITRA_HARNESS") or home() / "harness.toml")
 
 
 def _clean(h: Harness) -> Harness:

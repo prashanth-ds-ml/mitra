@@ -1,13 +1,13 @@
 """Builds the Kaggle notebook (D-060, D-061) with proxy.py embedded as is (a test checks they match).
 
 Two uses, one notebook:
-- by hand (`mitra_kaggle_server.ipynb`, imported in the browser): prints the `mitra remote set ...` line, runs until you
+- by hand (`codemitra_kaggle_server.ipynb`, imported in the browser): prints the `codemitra remote set ...` line, runs until you
   stop the session;
-- by Mitra (`mitra kaggle start`): `build(auto={...})` puts Mitra's settings and token in the first cell, the notebook
-  runs in the background, and Mitra reads its progress from the live log: lines `MITRA|<stage>|key=value|...`.
-  It stops itself when Mitra says `mitra kaggle stop` (POST /<token>/mitra/stop) or after IDLE_MIN minutes unused.
+- by CodeMitra (`codemitra kaggle start`): `build(auto={...})` puts CodeMitra's settings and token in the first cell, the notebook
+  runs in the background, and CodeMitra reads its progress from the live log: lines `MITRA|<stage>|key=value|...`.
+  It stops itself when CodeMitra says `mitra kaggle stop` (POST /<token>/mitra/stop) or after IDLE_MIN minutes unused.
 
-    python remote/kaggle/build_notebook.py      (rewrites mitra_kaggle_server.ipynb)
+    python remote/kaggle/build_notebook.py      (rewrites codemitra_kaggle_server.ipynb)
 """
 from __future__ import annotations
 
@@ -16,24 +16,24 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-INTRO = """# Mitra on a Kaggle GPU
+INTRO = """# CodeMitra on a Kaggle GPU
 
-Runs Ollama on this notebook's GPU so Mitra on your laptop can use a bigger GPU at full context (Mitra D-060).
+Runs Ollama on this notebook's GPU so CodeMitra on your laptop can use a bigger GPU at full context (CodeMitra D-060).
 
-**Easiest:** you do not need to open this at all: `mitra kaggle start` on your laptop uploads and runs it for you.
+**Easiest:** you do not need to open this at all: `codemitra kaggle start` on your laptop uploads and runs it for you.
 
 **By hand:** Settings (right panel) → *Accelerator* **GPU T4 x2** · *Internet* **On** (needs a verified phone).
 Then **Run All** and keep this tab open. The tunnel cell prints one line to paste on your laptop:
 
-    mitra remote set https://<name>.trycloudflare.com/<token> --ctx 262144
+    codemitra remote set https://<name>.trycloudflare.com/<token> --ctx 262144
 
 **When you are done:** stop the session (power button, top right) to save your weekly GPU hours, and on the laptop
-run `mitra remote off`. A session ends by itself after 12 hours; the URL changes every session.
+run `codemitra remote off`. A session ends by itself after 12 hours; the URL changes every session.
 
 The token is new every session and is part of the URL: anyone without it gets 404. Your code and prompts pass through
 this Kaggle machine and Cloudflare's tunnel."""
 
-SETTINGS_MANUAL = """# Settings: the model and the context Mitra will use (qwen3.5's maximum is 256K)
+SETTINGS_MANUAL = """# Settings: the model and the context CodeMitra will use (qwen3.5's maximum is 256K)
 MODEL = "qwen3.5:latest"
 CONTEXT = 262144
 PORT = 8000
@@ -43,17 +43,17 @@ import secrets
 TOKEN = secrets.token_urlsafe(24)
 """
 
-SETTINGS_AUTO = """# Settings from Mitra (`mitra kaggle start`): this private notebook holds this session's token
+SETTINGS_AUTO = """# Settings from CodeMitra (`codemitra kaggle start`): this private notebook holds this session's token
 MODEL = {model!r}
 CONTEXT = {ctx}
 PORT = 8000
-IDLE_MIN = {idle_min}  # stops itself when Mitra has not used it for this long (saves your GPU hours)
+IDLE_MIN = {idle_min}  # stops itself when CodeMitra has not used it for this long (saves your GPU hours)
 TOKEN = {token!r}
 """
 
 SAY = """
 def say(stage, **kw):
-    # one line Mitra reads from the live log: MITRA|stage|key=value (no quotes, pipes or backslashes in values)
+    # one line CodeMitra reads from the live log: MITRA|stage|key=value (no quotes, pipes or backslashes in values)
     clean = lambda v: str(v).replace("|", "/").replace('"', "'").replace("\\\\", "/").replace("\\n", " ")
     print("MITRA|" + stage + "".join(f"|{k}={clean(v)}" for k, v in kw.items()), flush=True)
 
@@ -91,7 +91,7 @@ else:
     say("error", detail="Ollama did not start")
     raise SystemExit("Ollama did not start: see /kaggle/working/ollama.log")"""
 
-PULL = """# Download the model (a few minutes) and load it once at the full context, so Mitra's first call is fast
+PULL = """# Download the model (a few minutes) and load it once at the full context, so CodeMitra's first call is fast
 say("pulling", model=MODEL)
 !ollama pull {MODEL}
 say("loading", model=MODEL, context=CONTEXT)
@@ -143,21 +143,21 @@ for _ in range(30):  # a new tunnel name takes a few seconds to resolve
         time.sleep(3)
 else:
     print("⚠ the tunnel did not answer yet; try the line below anyway in a minute")
-say("ready", url=public, model=MODEL, context=CONTEXT)  # the token is not printed: Mitra already has it
+say("ready", url=public, model=MODEL, context=CONTEXT)  # the token is not printed: CodeMitra already has it
 print()
 print("On your laptop, run:")
 print()
-print(f"    mitra remote set {URL} --ctx {CONTEXT}")
+print(f"    codemitra remote set {URL} --ctx {CONTEXT}")
 print()
-print("then start Mitra. Keep this tab open.")"""
+print("then start CodeMitra. Keep this tab open.")"""
 
-WATCH = """# Keep the session alive and show its state every 5 minutes. Stops when Mitra says `mitra kaggle stop`, or after
+WATCH = """# Keep the session alive and show its state every 5 minutes. Stops when CodeMitra says `codemitra kaggle stop`, or after
 # IDLE_MIN minutes without a model request (0 = never), and then shuts everything down: the Kaggle run ends.
 started = last_seen = time.time()
 reason, next_report = "", 0.0
 while not reason:
     if os.path.exists("/kaggle/working/stop"):
-        reason = "mitra kaggle stop"
+        reason = "codemitra kaggle stop"
     elif os.path.exists("/kaggle/working/last_request"):
         last_seen = max(last_seen, os.path.getmtime("/kaggle/working/last_request"))
     if not reason and IDLE_MIN and time.time() - last_seen > IDLE_MIN * 60:
@@ -189,7 +189,7 @@ def _code(src: str) -> dict:
 
 
 def build(auto: dict | None = None) -> dict:
-    """The notebook. `auto` = {"model", "ctx", "token", "idle_min"} when Mitra starts it (`mitra kaggle start`)."""
+    """The notebook. `auto` = {"model", "ctx", "token", "idle_min"} when CodeMitra starts it (`codemitra kaggle start`)."""
     proxy = (HERE / "proxy.py").read_text(encoding="utf-8")
     settings = (SETTINGS_AUTO.format(model=auto["model"], ctx=int(auto["ctx"]), token=auto["token"],
                                      idle_min=int(auto.get("idle_min", 30)))
@@ -204,6 +204,6 @@ def build(auto: dict | None = None) -> dict:
 
 
 if __name__ == "__main__":
-    out = HERE / "mitra_kaggle_server.ipynb"
+    out = HERE / "codemitra_kaggle_server.ipynb"
     out.write_text(json.dumps(build(), indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     print("wrote", out)

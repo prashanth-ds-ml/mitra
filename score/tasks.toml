@@ -1,4 +1,4 @@
-# The measuring set (D-068 step 3): coding tasks, graded by hidden tests Mitra never sees.
+# The measuring set (D-068 step 3): coding tasks, graded by hidden tests CodeMitra never sees.
 # bench = a task in bench/tasks (the payments app); dir = a task folder here (start/, solution/, visible/, hidden/).
 # size: small (one clear change) or medium (a feature, several files or functions).
 tasks = [

@@ -1,4 +1,4 @@
-"""Tell the user when Mitra needs them or has finished (D-035): window title + terminal bell.
+"""Tell the user when CodeMitra needs them or has finished (D-035): window title + terminal bell.
 
 The bell flashes the taskbar in Windows Terminal, so a long task can run while the user works elsewhere.
 """
@@ -25,22 +25,22 @@ def bell(console) -> None:
 
 
 def ready(console) -> None:
-    set_title(console, "Mitra · ready")
+    set_title(console, "CodeMitra · ready")
 
 
 def working(console) -> None:
-    set_title(console, "⏳ Mitra · working")
+    set_title(console, "⏳ CodeMitra · working")
 
 
 def waiting(console) -> None:
-    set_title(console, "❓ Mitra · waiting for you")
+    set_title(console, "❓ CodeMitra · waiting for you")
     bell(console)
 
 
 def done(console, seconds: float) -> None:
     """After a turn: ring when it took long enough that the user may have looked away."""
     if seconds >= LONG_TURN_SECONDS:
-        set_title(console, "✓ Mitra · done")
+        set_title(console, "✓ CodeMitra · done")
         bell(console)
     else:
         ready(console)

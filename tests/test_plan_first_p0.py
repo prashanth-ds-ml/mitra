@@ -13,7 +13,7 @@ def test_commands_are_not_stored_or_loaded_as_topics(tmp_path):
     memory.update_context(ws, "!dir")
     text = memory.load_context(ws)
     assert "build the brick breaker" in text and "/logs" not in text and "!dir" not in text
-    path = tmp_path / ".mitra" / "context.md"  # a topic stored by an older Mitra is ignored when loaded
+    path = tmp_path / ".codemitra" / "context.md"  # a topic stored by an older CodeMitra is ignored when loaded
     path.write_text(path.read_text(encoding="utf-8") + "- `2026-11-08 01:28` /logs\n", encoding="utf-8")
     assert "/logs" not in memory.load_context(ws)
 

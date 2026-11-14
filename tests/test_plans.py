@@ -1,4 +1,4 @@
-"""D-055: a plan template, one check, and a note when Mitra writes a plan, so its plans run with /run."""
+"""D-055: a plan template, one check, and a note when CodeMitra writes a plan, so its plans run with /run."""
 import inspect
 
 from app.core import plans as P

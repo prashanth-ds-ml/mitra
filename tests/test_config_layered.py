@@ -27,9 +27,9 @@ class TestDeepMerge:
 class TestLayeredConfig:
     def test_user_defaults_layer(self, tmp_path, monkeypatch):
         # Create user config
-        user_dir = tmp_path / ".config" / "mitra"
+        user_dir = tmp_path / ".config" / "codemitra"
         user_dir.mkdir(parents=True)
-        user_file = user_dir / "mitra.toml"
+        user_file = user_dir / "codemitra.toml"
         user_file.write_text('local_model = "user-model"\ntemperature = 0.5\n')
 
         monkeypatch.setattr(config, "_USER_CONFIG_FILE", user_file)
@@ -40,15 +40,15 @@ class TestLayeredConfig:
 
     def test_project_overrides_user(self, tmp_path, monkeypatch):
         # Create user config
-        user_dir = tmp_path / ".config" / "mitra"
+        user_dir = tmp_path / ".config" / "codemitra"
         user_dir.mkdir(parents=True)
-        user_file = user_dir / "mitra.toml"
+        user_file = user_dir / "codemitra.toml"
         user_file.write_text('local_model = "user-model"\n')
 
         monkeypatch.setattr(config, "_USER_CONFIG_FILE", user_file)
 
         # Create project config
-        project_file = tmp_path / "mitra.toml"
+        project_file = tmp_path / "codemitra.toml"
         project_file.write_text('local_model = "project-model"\n')
 
         cfg = config.load(str(tmp_path))
@@ -56,19 +56,19 @@ class TestLayeredConfig:
 
     def test_local_overrides_project(self, tmp_path, monkeypatch):
         # Create user config
-        user_dir = tmp_path / ".config" / "mitra"
+        user_dir = tmp_path / ".config" / "codemitra"
         user_dir.mkdir(parents=True)
-        user_file = user_dir / "mitra.toml"
+        user_file = user_dir / "codemitra.toml"
         user_file.write_text('local_model = "user-model"\n')
 
         monkeypatch.setattr(config, "_USER_CONFIG_FILE", user_file)
 
         # Create project config
-        project_file = tmp_path / "mitra.toml"
+        project_file = tmp_path / "codemitra.toml"
         project_file.write_text('local_model = "project-model"\n')
 
         # Create local override
-        local_dir = tmp_path / ".mitra"
+        local_dir = tmp_path / ".codemitra"
         local_dir.mkdir(parents=True)
         local_file = local_dir / "local.toml"
         local_file.write_text('local_model = "local-model"\n')
@@ -78,19 +78,19 @@ class TestLayeredConfig:
 
     def test_cli_overrides_all(self, tmp_path, monkeypatch):
         # Create user config
-        user_dir = tmp_path / ".config" / "mitra"
+        user_dir = tmp_path / ".config" / "codemitra"
         user_dir.mkdir(parents=True)
-        user_file = user_dir / "mitra.toml"
+        user_file = user_dir / "codemitra.toml"
         user_file.write_text('local_model = "user-model"\n')
 
         monkeypatch.setattr(config, "_USER_CONFIG_FILE", user_file)
 
         # Create project config
-        project_file = tmp_path / "mitra.toml"
+        project_file = tmp_path / "codemitra.toml"
         project_file.write_text('local_model = "project-model"\n')
 
         # Create local override
-        local_dir = tmp_path / ".mitra"
+        local_dir = tmp_path / ".codemitra"
         local_dir.mkdir(parents=True)
         local_file = local_dir / "local.toml"
         local_file.write_text('local_model = "local-model"\n')
@@ -101,9 +101,9 @@ class TestLayeredConfig:
 
     def test_env_var_overrides_all(self, tmp_path, monkeypatch):
         # Create user config
-        user_dir = tmp_path / ".config" / "mitra"
+        user_dir = tmp_path / ".config" / "codemitra"
         user_dir.mkdir(parents=True)
-        user_file = user_dir / "mitra.toml"
+        user_file = user_dir / "codemitra.toml"
         user_file.write_text('ollama_api_key = "from-config"\n')
 
         monkeypatch.setattr(config, "_USER_CONFIG_FILE", user_file)
@@ -114,9 +114,9 @@ class TestLayeredConfig:
         assert cfg["ollama_api_key"] == "from-env"
 
     def test_dotenv_overrides_config(self, tmp_path, monkeypatch):
-        user_dir = tmp_path / ".config" / "mitra"
+        user_dir = tmp_path / ".config" / "codemitra"
         user_dir.mkdir(parents=True)
-        user_file = user_dir / "mitra.toml"
+        user_file = user_dir / "codemitra.toml"
         user_file.write_text('ollama_api_key = "from-config"\n')
 
         monkeypatch.setattr(config, "_USER_CONFIG_FILE", user_file)
@@ -129,14 +129,14 @@ class TestLayeredConfig:
 
     def test_nested_config_merge(self, tmp_path, monkeypatch):
         """Test that nested dicts are merged, not replaced."""
-        user_dir = tmp_path / ".config" / "mitra"
+        user_dir = tmp_path / ".config" / "codemitra"
         user_dir.mkdir(parents=True)
-        user_file = user_dir / "mitra.toml"
+        user_file = user_dir / "codemitra.toml"
         user_file.write_text('custom_section = { key1 = "user", key2 = "user2" }\n')
 
         monkeypatch.setattr(config, "_USER_CONFIG_FILE", user_file)
 
-        project_file = tmp_path / "mitra.toml"
+        project_file = tmp_path / "codemitra.toml"
         project_file.write_text('custom_section = { key2 = "project", key3 = "project3" }\n')
 
         cfg = config.load(str(tmp_path))

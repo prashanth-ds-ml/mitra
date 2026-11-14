@@ -1,7 +1,7 @@
-"""The resume brief (D-065 P1): "where did we stop?" from Mitra's own records, no exploring.
+"""The resume brief (D-065 P1): "where did we stop?" from CodeMitra's own records, no exploring.
 
 Put in the system prompt at start (capped) and shown directly when you ask where we stopped (P3). Sources, newest
-first: `.mitra/resume.md` (written when a plan finishes, P5), the last session's requests and outcomes, the latest
+first: `.codemitra/resume.md` (written when a plan finishes, P5), the last session's requests and outcomes, the latest
 "Kaggle ended" report, night reports, and git (last commits, uncommitted files).
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ MAX_CHARS = 2500
 OUTCOMES = {"tests_passed": "✓ tests passed", "tests_failed": "✗ tests failed", "answered": "answered",
             "stopped": "stopped", "stopped_by_user": "stopped by you", "interrupted": "interrupted",
             "error": "error", "kaggle_ended": "cut off: Kaggle ended"}
-SKIP = {".git", ".venv", "venv", "node_modules", "__pycache__", ".mitra"}
+SKIP = {".git", ".venv", "venv", "node_modules", "__pycache__", ".codemitra", ".mitra"}
 
 
 def _git(root: Path, *args: str) -> str:
@@ -52,7 +52,7 @@ def recent_turns(root: Path, files: int = 3) -> list[dict]:
     """Work turns from the last few chat records, oldest first: {t, user, outcome, files}. Resume questions and
     interrupted turns that changed nothing are left out (they say nothing about the work)."""
     import json
-    runs = root / ".mitra" / "runs"
+    runs = root / ".codemitra" / "runs"
     recs = sorted(runs.glob("chat-*.jsonl"), key=lambda p: p.stat().st_mtime)[-files:] if runs.is_dir() else []
     out: list[dict] = []
     for rec in recs:
@@ -88,9 +88,9 @@ def brief(workspace: Path, max_chars: int = MAX_CHARS) -> str:
     """Markdown, '' when there is nothing to say (a new project)."""
     root = Path(workspace)
     out: list[str] = []
-    resume = root / ".mitra" / "resume.md"
+    resume = root / ".codemitra" / "resume.md"
     if resume.is_file():
-        out += [f"**Last plan** ({_when(resume.stat().st_mtime)}, .mitra/resume.md):"]
+        out += [f"**Last plan** ({_when(resume.stat().st_mtime)}, .codemitra/resume.md):"]
         out += _first_lines(resume.read_text(encoding="utf-8", errors="replace"), 12, lambda l: not l.startswith("# "))
     turns = recent_turns(root)
     if turns:
@@ -101,9 +101,9 @@ def brief(workspace: Path, max_chars: int = MAX_CHARS) -> str:
             said = " ".join(t["user"].split())
             out.append(f"- {said[:110]}{'…' if len(said) > 110 else ''}" + (f" → {outcome}" if outcome else "")
                        + (f" ({', '.join(files[:4])})" if files else ""))
-    reports = sorted((root / ".mitra" / "reports").glob("kaggle-ended-*.md"), key=lambda p: p.stat().st_mtime)
+    reports = sorted((root / ".codemitra" / "reports").glob("kaggle-ended-*.md"), key=lambda p: p.stat().st_mtime)
     if reports:
-        out += ["", f"**Kaggle ended report:** .mitra/reports/{reports[-1].name}"]
+        out += ["", f"**Kaggle ended report:** .codemitra/reports/{reports[-1].name}"]
     for night in _night_reports(root):
         text = night.read_text(encoding="utf-8", errors="replace")
         tasks = _first_lines(text, 1, lambda l: l.startswith("## Tasks"))
@@ -122,4 +122,4 @@ def brief(workspace: Path, max_chars: int = MAX_CHARS) -> str:
     text = "\n".join(out).strip()
     if len(text) > max_chars:
         text = text[:max_chars].rsplit("\n", 1)[0] + "\n…"
-    return "## Where we stopped last time (from Mitra's records)\n" + text
+    return "## Where we stopped last time (from CodeMitra's records)\n" + text

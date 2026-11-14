@@ -43,7 +43,7 @@ def test_follow_ups_depend_on_the_last_request():
     assert classify("make it shorter", previous="writing") == "writing"
     assert classify("more formal please", previous="writing") == "writing"
     assert classify("make it shorter") == "small"                      # no mail before: a code change
-    assert classify("ok", previous="small") == "small"                 # answers Mitra's question: keep working
+    assert classify("ok", previous="small") == "small"                 # answers CodeMitra's question: keep working
     assert classify("yes go ahead", previous="question") == "small"
     assert classify("ok") == "chat" and classify("thanks", previous="small") == "chat"
 
@@ -69,12 +69,12 @@ def test_notes_text_drops_empty_template_fields_and_keeps_yours(tmp_path):
     assert "Tone: concise" in empty
     (H.home() / "me.md").write_text("# About me\nName: Prashanth\nStack:\nMail signature:\n    Regards,\n"
                                     "    Prashanth\n", encoding="utf-8")
-    (tmp_path / ".mitra").mkdir()
-    (tmp_path / ".mitra" / "notes.md").write_text("Use uv, never pip.", encoding="utf-8")
+    (tmp_path / ".codemitra").mkdir()
+    (tmp_path / ".codemitra" / "notes.md").write_text("Use uv, never pip.", encoding="utf-8")
     text = SIG.notes_text(tmp_path)
     assert "Name: Prashanth" in text and "Mail signature:\n    Regards,\n    Prashanth" in text
     assert "Stack:" not in text and text.index("me.md") < text.index("Use uv, never pip.")
-    (tmp_path / ".mitra" / "notes.md").write_text("x" * 5000, encoding="utf-8")
+    (tmp_path / ".codemitra" / "notes.md").write_text("x" * 5000, encoding="utf-8")
     assert len(SIG.notes_text(tmp_path)) <= SIG.NOTES_MAX_CHARS
 
 
@@ -103,7 +103,7 @@ def test_thinking_is_off_by_default_except_planner_and_debugger():
 
 def test_everyday_chat_end_to_end(harness, monkeypatch, capsys):  # noqa: F811
     state, ws = harness
-    (ws / "mitra.toml").write_text('architecture = "router"\n', encoding="utf-8")  # D-071: router paths
+    (ws / "codemitra.toml").write_text('architecture = "router"\n', encoding="utf-8")  # D-071: router paths
     H.home().mkdir(parents=True, exist_ok=True)
     (H.home() / "me.md").write_text("Name: Prashanth\nMail signature:\n    Regards,\n    Prashanth\n",
                                     encoding="utf-8")
@@ -132,7 +132,7 @@ def test_everyday_chat_end_to_end(harness, monkeypatch, capsys):  # noqa: F811
                      "fix the failing test in test_x.py", "exit"]
     main._chat()
     out = " ".join(capsys.readouterr().out.split())
-    rows = [json.loads(x) for f in (ws / ".mitra" / "runs").glob("chat-*.jsonl")
+    rows = [json.loads(x) for f in (ws / ".codemitra" / "runs").glob("chat-*.jsonl")
             for x in f.read_text(encoding="utf-8").splitlines() if x.strip()]
     starts = [r for r in rows if r["kind"] == "turn_start"]
     assert [(r["path"], r["request_kind"]) for r in starts] == [

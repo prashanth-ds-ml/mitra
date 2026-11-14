@@ -3,7 +3,7 @@ Pure functions over record and trace files, so every number is testable from fix
 
 - sessions():     each session as turns and steps, with your verdicts, corrections, declines and crashes
 - tool_stats():   calls, failures and time per tool / MCP server; model_stats(): speed, context, prompt time, reloads
-- improvement():  signals per harness version, or per Mitra code version + harness version
+- improvement():  signals per harness version, or per CodeMitra code version + harness version
 - trends():       the same signals day by day; breakdown(): by project / model / kind of task
 - training():     usable turns for the fine-tune and why the rest are out; export_training()
 """
@@ -20,7 +20,7 @@ from app.core.loop import rebuild_calls
 
 MIN_TURNS_TO_JUDGE = 20   # below this a version's numbers are shown as "not enough data"
 TRAINING_TARGET = 300     # SCOPE: a few hundred passing runs before any fine-tune
-USABLE_OUTCOMES = {"tests_passed", "passed"}  # chat turns / mitra solve runs whose tests passed
+USABLE_OUTCOMES = {"tests_passed", "passed"}  # chat turns / codemitra solve runs whose tests passed
 TESTED_OUTCOMES = USABLE_OUTCOMES | {"tests_failed", "failed"}
 EDIT_TOOLS = {"write_file", "edit_file", "append_file"}
 USER_KINDS = {"feedback", "user_edit", "declined", "signal"}  # your judgment: never makes a turn "written by someone else"
@@ -169,7 +169,7 @@ def sessions(files: list[Path]) -> list[Session]:
             tool_dt = dt if prev_kind in ("model", "tool") else None  # a tool runs right after the model's reply
             prev_t, prev_kind = t, k
             if k == "session":
-                if s.turns:  # the chat file is per day: each Mitra start begins a new session
+                if s.turns:  # the chat file is per day: each CodeMitra start begins a new session
                     out.append(s)
                     s = Session(project=s.project, file=s.file, kind=kind, started=t)
                     cur = None
@@ -493,7 +493,7 @@ def _turns(sess: list[Session]):
 
 
 def improvement(sess: list[Session], by: str = "harness") -> list[Signals]:
-    """by="harness": one group per harness version; by="code": per Mitra code version + harness version."""
+    """by="harness": one group per harness version; by="code": per CodeMitra code version + harness version."""
     groups: dict = {}
     for s, t in _turns(sess):
         if by == "code":
@@ -540,7 +540,7 @@ def project_kind(project_dir: Path | None) -> str:
         for p in project_dir.rglob("*"):
             if seen > 400:
                 break
-            if any(part in (".git", ".venv", "node_modules", ".mitra", "__pycache__") for part in p.parts):
+            if any(part in (".git", ".venv", "node_modules", ".codemitra", "__pycache__") for part in p.parts):
                 continue
             if not p.is_file():
                 continue
@@ -570,7 +570,7 @@ def project_kind(project_dir: Path | None) -> str:
 
 
 def _project_dirs() -> dict[str, Path]:
-    """Display name -> folder, from the projects Mitra ran in (projects.json)."""
+    """Display name -> folder, from the projects CodeMitra ran in (projects.json)."""
     out = {}
     for p in store.known_projects():
         out.setdefault(store.project_name(store.project_slug(p)), p)

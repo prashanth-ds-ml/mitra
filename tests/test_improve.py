@@ -1,4 +1,4 @@
-"""`mitra improve` (self-improvement step 3): proposal parsing, A/B decision, keep/drop, attempts log."""
+"""`codemitra improve` (self-improvement step 3): proposal parsing, A/B decision, keep/drop, attempts log."""
 import json
 import pathlib
 import sys
@@ -62,8 +62,8 @@ def _fake_eval(results):
 
 
 def test_improve_keeps_a_better_change_and_logs_it(tmp_path, monkeypatch):
-    monkeypatch.setenv("MITRA_HOME", str(tmp_path))
-    monkeypatch.setenv("MITRA_HARNESS", str(tmp_path / "harness.toml"))
+    monkeypatch.setenv("CODEMITRA_HOME", str(tmp_path))
+    monkeypatch.setenv("CODEMITRA_HARNESS", str(tmp_path / "harness.toml"))
     ev, calls = _fake_eval([I.Score(1, 5, 1000), I.Score(3, 5, 1100)])
     monkeypatch.setattr(I, "evaluate", ev)
     prop = Proposer("not json", '{"kind": "rule", "text": "Change a failing command before running it again.", '
@@ -79,8 +79,8 @@ def test_improve_keeps_a_better_change_and_logs_it(tmp_path, monkeypatch):
 
 
 def test_improve_drops_a_change_that_does_not_help(tmp_path, monkeypatch):
-    monkeypatch.setenv("MITRA_HOME", str(tmp_path))
-    monkeypatch.setenv("MITRA_HARNESS", str(tmp_path / "harness.toml"))
+    monkeypatch.setenv("CODEMITRA_HOME", str(tmp_path))
+    monkeypatch.setenv("CODEMITRA_HARNESS", str(tmp_path / "harness.toml"))
     monkeypatch.setattr(I, "evaluate", _fake_eval([I.Score(2, 5, 1000), I.Score(2, 5, 900)])[0])
     prop = Proposer('{"kind": "limit", "name": "max_failures", "value": 3, "why": "stop sooner"}')
     entry = I.improve(_report(), proposer=prop, builder=None, bench=object(), say=lambda t: None)
@@ -89,7 +89,7 @@ def test_improve_drops_a_change_that_does_not_help(tmp_path, monkeypatch):
 
 
 def test_dry_run_and_no_problems_change_nothing(tmp_path, monkeypatch):
-    monkeypatch.setenv("MITRA_HOME", str(tmp_path))
+    monkeypatch.setenv("CODEMITRA_HOME", str(tmp_path))
     monkeypatch.setattr(I, "evaluate", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no benchmark")))
     prop = Proposer('{"kind": "rule", "text": "Run tests after writing code.", "why": "x"}')
     assert I.improve(_report(), proposer=prop, builder=None, dry_run=True, say=lambda t: None)["result"] == "dry_run"
@@ -133,9 +133,9 @@ def test_the_real_bench_loads_and_has_a_tune_half():
 
 
 def test_a_broken_grader_stops_the_ab_and_changes_nothing(tmp_path, monkeypatch):
-    """E-035: grading ran in Mitra's own Python (no fastapi), so every task 'failed' and the A/B meant nothing."""
-    monkeypatch.setenv("MITRA_HOME", str(tmp_path))
-    monkeypatch.setenv("MITRA_HARNESS", str(tmp_path / "harness.toml"))
+    """E-035: grading ran in CodeMitra's own Python (no fastapi), so every task 'failed' and the A/B meant nothing."""
+    monkeypatch.setenv("CODEMITRA_HOME", str(tmp_path))
+    monkeypatch.setenv("CODEMITRA_HARNESS", str(tmp_path / "harness.toml"))
 
     class Bench:
         def prepare(self, task, dest):
@@ -176,8 +176,8 @@ def test_a_failed_model_call_is_a_bench_error_not_a_model_fail(tmp_path, monkeyp
 
 
 def test_the_proposer_is_unloaded_and_candidate_records_carry_the_next_version(tmp_path, monkeypatch):
-    monkeypatch.setenv("MITRA_HOME", str(tmp_path))
-    monkeypatch.setenv("MITRA_HARNESS", str(tmp_path / "harness.toml"))
+    monkeypatch.setenv("CODEMITRA_HOME", str(tmp_path))
+    monkeypatch.setenv("CODEMITRA_HARNESS", str(tmp_path / "harness.toml"))
     unloaded, versions = [], []
     monkeypatch.setattr(I, "unload", lambda llm: unloaded.append(llm))
 

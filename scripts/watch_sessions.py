@@ -1,8 +1,8 @@
-"""Follow live Mitra chat sessions: one line per turn, plus every problem as it happens.
+"""Follow live CodeMitra chat sessions: one line per turn, plus every problem as it happens.
 
     python scripts/watch_sessions.py [root ...]     # default root: the parent of the parent of this repo
 
-Watches every `.mitra/runs/chat-*.jsonl` and `.mitra/errors.log` under the roots (new files are picked up), from
+Watches every `.codemitra/runs/chat-*.jsonl` and `.codemitra/errors.log` under the roots (new files are picked up), from
 their current end. Prints only lines worth acting on:
   TURN  one summary per turn (steps, seconds, tokens, files changed, stopped?)
   FAIL  a tool call failed          STOP  a turn was stopped (limit, repeats, esc)
@@ -30,9 +30,9 @@ def find_logs() -> list[Path]:
                 dirnames[:] = []
                 continue
             p = Path(dirpath)
-            if p.name == "runs" and p.parent.name == ".mitra":
+            if p.name == "runs" and p.parent.name == ".codemitra":
                 found += [p / f for f in filenames if f.startswith("chat-") and f.endswith(".jsonl")]
-            if p.name == ".mitra" and "errors.log" in filenames:
+            if p.name == ".codemitra" and "errors.log" in filenames:
                 found.append(p / "errors.log")
     return found
 

@@ -12,7 +12,7 @@ from app.core import score as S
 
 @pytest.fixture(autouse=True)
 def home(tmp_path, monkeypatch):
-    monkeypatch.setenv("MITRA_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("CODEMITRA_HOME", str(tmp_path / "home"))
     return tmp_path / "home"
 
 
@@ -77,7 +77,7 @@ def test_the_coach_drafts_and_a_bad_draft_falls_back_to_the_template(tmp_path):
 def test_drafts_are_written_once_and_kept_cases_go_to_the_private_real_set(tmp_path, home):
     f = _chat(tmp_path, LIVE)
     [p] = K.write_drafts([f])
-    assert p.parent == home / "cases" / "drafts" and "Mitra answered: Would you like me to search?" in p.read_text(
+    assert p.parent == home / "cases" / "drafts" and "CodeMitra answered: Would you like me to search?" in p.read_text(
         encoding="utf-8")
     assert K.write_drafts([f]) == []                                          # not drafted twice
     case = K.keep(p)

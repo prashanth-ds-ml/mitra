@@ -1,6 +1,6 @@
 """D-078 Phase 1: 1b partner basics (must-have 13) and 1c honest self-description (must-have 7). From the user's live
 session 2026-11-12: "You're absolutely right!" opened 5 of 10 answers; a "deep dive" was 1 search and 2 pages
-("you are still missing some"); asked what it can do, Mitra said "I validate changes with tests before applying
+("you are still missing some"); asked what it can do, CodeMitra said "I validate changes with tests before applying
 them", which is not built yet."""
 from langchain_core.messages import AIMessage, ToolMessage
 

@@ -6,7 +6,7 @@ def test_compaction_point_follows_the_context():
     assert C.compact_threshold({}, 262_144) == 209_715          # was 120,000: half the 256K never used
     assert C.compact_threshold({}, 131_072) == 104_857          # unchanged for 128K
     assert C.compact_threshold({"auto_compact_threshold": 0}, 262_144) == 209_715
-    assert C.compact_threshold({"auto_compact_threshold": 50_000}, 262_144) == 50_000  # a cap in mitra.toml still wins
+    assert C.compact_threshold({"auto_compact_threshold": 50_000}, 262_144) == 50_000  # a cap in codemitra.toml still wins
     assert C.compact_threshold({"auto_compact_threshold": 500_000}, 131_072) == 104_857  # never past 80%
 
 
