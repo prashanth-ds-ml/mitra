@@ -5,8 +5,9 @@ your code, edits files (asking first), runs your tests and fixes what fails, usi
 through [Ollama](https://ollama.com). No API key, no subscription, your code stays on your machine. If your laptop is
 too small, it can borrow a free Kaggle GPU for a few hours.
 
-> **Preview (v0.1.0).** It works for everyday tasks on 4-9B models, and it is still rough. I am asking colleagues to
+> **Preview (v0.8.0).** It works for everyday tasks on 4-9B models, and it is still rough. I am asking friends to
 > try it on their own projects and tell me what breaks: see [Feedback](#feedback).
+> Until v0.7 it was called **Mitra**; if you installed that, see [Upgrading from Mitra](#upgrading-from-mitra).
 
 ## Quick start (about 15 minutes)
 
@@ -50,6 +51,17 @@ too small, it can borrow a free Kaggle GPU for a few hours.
 **Update later:** `cd codemitra && git pull` (the install follows the folder; restart `codemitra`). **Remove:**
 `uv tool uninstall codemitra`.
 
+### Upgrading from Mitra
+Mitra was renamed CodeMitra in v0.8.0 (the command is now `codemitra`). In the folder you cloned it into:
+```
+uv tool uninstall mitra
+git remote set-url origin https://github.com/prashanth-ds-ml/codemitra.git
+git pull
+uv tool install -e . --python 3.12
+```
+On the first `codemitra` run your `~/.mitra` moves to `~/.codemitra` (nothing is lost), and each project's `.mitra/`
+moves to `.codemitra/` the first time you open it.
+
 ## Using it
 
 **How CodeMitra works on a request** (built for small models with little context):
@@ -87,7 +99,8 @@ switches between asking, auto-edit and plan-only).
 | `/free` | Close programs to make RAM room for the model |
 | `/plan template` · `/plan check` · `/run plan.md 4` | Write a task plan, check it, let CodeMitra build it unattended (up to 4 h) |
 | `/undo` | Undo CodeMitra's last changes |
-| `/good` · `/bad <why>` | Tell CodeMitra how the last answer was (it learns from these) |
+| `+` · `-` | Right after an answer, on the empty prompt: rate it with one key (no Enter) |
+| `/good` · `/bad <why>` | The same, with a reason |
 | `/kaggle start\|stop\|status` | Run on a free Kaggle GPU (below) |
 | `! <command>` | Run a shell command yourself |
 | `codemitra dashboard` | A local page with your sessions, what worked, what failed |
@@ -157,7 +170,12 @@ just message me). Things worth trying:
 5. If your laptop struggles: `codemitra kaggle start`.
 
 Something broke? A [bug report](https://github.com/prashanth-ds-ml/codemitra/issues/new?template=bug.yml) with what you
-typed and what you saw (copy the terminal) helps most. `/good` and `/bad <why>` in the chat help too.
+typed and what you saw (copy the terminal) helps most.
+
+**Feedback in the chat costs you nothing:** your next message already tells CodeMitra how the last answer went
+("why don't you…", "did you do that?", a pasted error = it went wrong; "thanks", "works" = it went right), and it
+records that by itself. Press `+` or `-` after an answer if you want to say more, and rate the session 1-5 when you
+`exit` (any other key skips). All of it stays on your machine.
 
 ## Why
 

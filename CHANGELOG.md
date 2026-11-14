@@ -2,7 +2,27 @@
 
 All notable changes, newest first. Versions follow the milestones in [docs/PLAN.md](docs/PLAN.md).
 
-## [Unreleased]
+## [0.8.0] - 2026-11-14 · CodeMitra (renamed from Mitra), trust fixes, feedback on every turn
+- **Mitra is now CodeMitra (D-080).** The command is `codemitra`; `~/.mitra`, `~/.config/mitra`, each project's
+  `.mitra/`, `mitra.toml` and `MITRA.md` move to the new names once, on the first `codemitra` run, with nothing lost
+  (a folder Windows keeps open is moved on a later run; old `MITRA_*` env names still work). Upgrading: see the
+  README. The GitHub repo is now `prashanth-ds-ml/codemitra` (the old link redirects).
+- **Feedback on every turn, no extra work (D-079):** your next message is read as the verdict on the last answer
+  ("why don't you…", "did you do that?", a pasted error → went wrong; "thanks", "works", a yes to its offer → went
+  right); `+` / `-` on the empty prompt rates with one key; a rare "worked?" line after changes; a 1-5 key at exit.
+  These feed `codemitra improve` and the coach.
+- **A yes starts the work (E-125, E-126):** after CodeMitra offers ("**Should I start building now?**") a short yes
+  starts it at once, without another "should I?"; a repeated answer is not accepted; a pasted spec or PRD is planned.
+- **Change requests stay changes (E-126):** "fix it" that begins by reading a file now gets the tools to change it
+  (it no longer says "I can't edit files, apply it manually").
+- **The right tests (E-126):** in a folder of several projects, the tests after a change run in the project that
+  changed, never another project's.
+- **Honest answers (E-126):** "fixed" when nothing changed, or "running successfully" while tests fail, is caught;
+  the next answer corrects it. CodeMitra stays on the project you are working on.
+- **Kaggle (E-126):** one model call over 120 s (Cloudflare 524) is retried in smaller steps instead of ending the
+  Kaggle session.
+
+**Also in 0.8.0 (built since 0.7.0):**
 - **`codemitra practice` (D-078 step 5):** `codemitra practice --download` builds 100 Python (MBPP+, HumanEval+) and 50
   SQL (Spider) tasks in ~/.codemitra/practice once (works offline after that); `codemitra practice --n 20 [--kind sql]
   [--split held_out] [--remote]` lets CodeMitra solve each in a fresh folder with its own tests, and a hidden check
