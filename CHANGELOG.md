@@ -2,7 +2,14 @@
 
 All notable changes, newest first. Versions follow the milestones in [docs/PLAN.md](docs/PLAN.md).
 
-## [0.8.1] - 2026-11-14 · share your sessions
+## [0.8.1] - 2026-11-14 · one-command setup, share your sessions
+- **One command after cloning (D-083):** `setup.ps1` (Windows) / `setup.sh` (macOS, Linux) installs uv and CodeMitra,
+  then `codemitra setup` does the rest, asking before each step: Ollama (winget / Homebrew / the official script) and
+  its memory saver, the model that fits your machine (4B or 9B, read from your GPU and RAM; a model you chose is
+  kept), the free Kaggle GPU (it opens the page, says what to click, takes the token, checks hours and phone), your
+  name for mails, sharing. Run it again any time: it only does what is missing.
+- **Clean README and guides:** the README is clone + one command + first steps; details in `docs/guide/` (SETUP,
+  USING, KAGGLE, SHARING) with a troubleshooting table.
 - **`codemitra share` (D-081):** share a session so CodeMitra learns from everyone's. `--setup` once (your name,
   the private logs repo `prashanth-ds-ml/codemitra-logs`, ask at exit: ask / always / never); `--push` shows a preview
   and pushes the light, scrubbed copy (messages, answers, which tools ran and failed, test summaries, labels; never
