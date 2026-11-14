@@ -1,10 +1,28 @@
 # Status
 
-**Now:** first overnight build (brick breaker, 2026-11-08) + experiments registry next · **Last updated:** 2026-11-08 · **Repo:** https://github.com/prashanth-ds-ml/codemitra
+**Now:** v0.8.1 published for friends; next: their sessions + the D-082 learn-first plan · **Last updated:** 2026-11-14 · **Repo:** https://github.com/prashanth-ds-ml/codemitra
 **Plan:** [PLAN.md](PLAN.md) · **Scope:** [SCOPE.md](SCOPE.md) · **Decisions:** [DECISIONS.md](DECISIONS.md) ·
 **Lessons:** [LESSONS.md](LESSONS.md) · **Open errors:** [ERROR_LOG.md](ERROR_LOG.md)
 
-## Next session starts here (handoff 2026-11-08)
+## Next session starts here (handoff 2026-11-14)
+**Where it stands:** v0.8.1 is public (pre-release) at github.com/prashanth-ds-ml/codemitra, CI green on Windows +
+Linux, 1,092 tests. Friends clone and run one command (`setup.ps1` / `setup.sh` → `codemitra setup`). The user's
+installed `codemitra` runs from ~/projects/codemitra-stable (0.8.1). Owner and push account: prashanth-ds-ml (run
+`gh` for this project with `GH_TOKEN=$(gh auth token -u prashanth-ds-ml)`; the global active account may differ).
+
+**Open, in order:**
+1. **The user's Neon Chomp live check** (USER_TESTS 2026-11-14): the E-125 / E-126 fixes are proven by tests only.
+   Then pull the session log and check it (as on 2026-11-13).
+2. **Friends:** the user sends the message; each friend's GitHub username → invite to the private
+   prashanth-ds-ml/codemitra-logs (`gh api -X PUT repos/prashanth-ds-ml/codemitra-logs/collaborators/<user>`).
+   `codemitra share --pull` brings their sessions into the store.
+3. **D-082 plan (waiting for go):** CodeMitra learns by itself first, a coach only guides when it is measurably
+   stuck (SELF_IMPROVEMENT.md §14): fair test → replay cases from 👎 turns → "same mistake twice" + stuck trigger →
+   coach as guide only → CodeMitra acts on guidance.
+4. Old Kaggle notebook `mitra-gpu-server` can be deleted on kaggle.com (the next start makes codemitra-gpu-server);
+   `~/.codemitra-before-rename` (July notes) can be deleted when the user wants.
+
+**History (newest first):**
 00000000000000000000000000000000. **2026-11-14, v0.8.1 PUBLISHED (pre-release, CI green on Windows + Linux):** one-command setup (D-083: setup.ps1 / setup.sh → `codemitra setup`; end-to-end on a fresh Windows clone: Ready), clean README + docs/guide/, `codemitra share` + private logs repo prashanth-ds-ml/codemitra-logs (D-081). 1,092 tests. D-082 (learn by itself first, coach only guides) is a plan waiting for go. **Waiting for:** friends' GitHub usernames for the logs repo.
 0000000000000000000000000000000. **2026-11-14, v0.8.0 PUBLISHED (pre-release):** github.com/prashanth-ds-ml/codemitra (renamed from mitra; the old link redirects) and codemitra-playground; tag v0.8.0 + release page; description + topics; M1 title. Local folders now 05-codemitra, 05-codemitra-ui, codemitra-stable (the installed `codemitra`), codemitra-playground; worktrees repaired; mitra-try kept (user's choice). A clone from GitHub installs and runs 0.8.0. **Next:** your Neon Chomp live check, then send friends the link; the self-improvement + shared-logs plan waits for your go. Old Kaggle notebook `mitra-gpu-server` can be deleted on kaggle.com (the next start makes codemitra-gpu-server).
 000000000000000000000000000000. **2026-11-14, D-080 renamed to CodeMitra:** the command is `codemitra`; your ~/.mitra and each project's .mitra/ move to the new names on the first `codemitra` run (nothing lost). Records keep their format. **Not done yet (with v0.8.0):** GitHub repo rename, local folder rename (05-mitra, mitra-stable), push and tag. Older entries below say Mitra.

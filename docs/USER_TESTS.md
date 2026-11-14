@@ -12,6 +12,15 @@ machine or your judgment. Updated every release.
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
 
+## 2026-11-14 · v0.8.1 for friends (D-081, D-083)
+
+- [ ] A friend (or a spare Windows user account) clones and runs `setup.ps1`: Ollama, the model, Kaggle guidance,
+      "Ready" at the end, without your help
+- [ ] The Kaggle step with a new account: the page opens, the pasted token signs in, the hours show
+- [ ] After the friend's invite: `codemitra share --push` lands in people/<name>/ of codemitra-logs; then
+      `codemitra share --pull` on your side and `codemitra dashboard` shows it
+- [ ] `exit` with at-exit = ask: "share this session?" appears; `y` pushes, any other key skips
+
 ## 2026-11-14 · Feedback on every turn (D-079)
 
 - [ ] After an answer, press `+` (or `-`) on the empty prompt: "Turn N … marked 👍" at once, no Enter
