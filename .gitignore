@@ -19,10 +19,15 @@ results/ollama-bench.log
 
 # CodeMitra runtime files (logs, trimmed MCP outputs)
 .codemitra/logs/
+.mitra/logs/
 .codemitra/mcp-output/
+.mitra/mcp-output/
 
 # agent worktrees and local Claude Code state
 .claude/
 .codemitra/health/
+.mitra/health/
 .codemitra/runs/
+.mitra/runs/
 .codemitra/output/
+.mitra/output/
