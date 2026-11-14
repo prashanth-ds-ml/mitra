@@ -2287,6 +2287,32 @@ def cmd_share(
 cli.command("share")(cmd_share)
 
 
+def cmd_setup(
+    auto: bool = typer.Option(False, "--yes", "-y", help="Take every default (installs Ollama and the model)."),
+    model: str = typer.Option("", "--model", help="Use this model instead of the one picked for this machine."),
+    kaggle: str = typer.Option("", "--kaggle", help="yes | no: set up the free Kaggle GPU without asking."),
+    share: str = typer.Option("", "--share", help="yes | no: set up sharing without asking."),
+) -> None:
+    """Everything after `git clone` (D-083): Ollama, the model that fits this machine, the free Kaggle GPU, your name,
+    sharing. Each step checks first, so running it again only does what is still missing."""
+    from app import setup_wizard as W
+
+    def flag(v: str) -> bool | None:
+        return {"yes": True, "y": True, "no": False, "n": False}.get(v.lower()) if v else None
+
+    io = W.IO(say=lambda t: console.print(Text(t, style="m.text")),
+              ask=lambda q, d="": typer.prompt(q, default=d, show_default=bool(d)) if d else
+              (typer.prompt(q, default="", show_default=False) or ""))
+    console.print(Text("CodeMitra setup · each step checks first; run it again any time", style="m.tool"))
+    results = W.run(io, auto=auto, model=model, kaggle=flag(kaggle), share=flag(share))
+    console.print()
+    console.print(Text(W.summary(results), style="m.text"))
+    raise typer.Exit(0 if all(r.ok is not False for r in results if r.step in ("Ollama", "Model")) else 1)
+
+
+cli.command("setup")(cmd_setup)
+
+
 def cmd_cases(
     action: str = typer.Argument("draft", help="draft (new /bad turns), review (keep / edit / drop) or list."),
     no_coach: bool = typer.Option(False, "--no-coach", help="Draft from the template only (no Claude call)."),
