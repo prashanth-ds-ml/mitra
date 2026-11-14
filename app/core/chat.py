@@ -666,6 +666,8 @@ class ChatSession:
         self.thinking: bool | None = None  # the model's thinking setting for this role (None = model default)
         self._prev_user_full = ""   # the last request in full, to notice when you ask the same thing again
         self.focus = ""             # E-126: the project folder this conversation works on (several in one folder)
+        self._last_answer_text = ""  # D-079: the last answer and whether it worked on files, for the next verdict
+        self._last_did_work = False
         self.answer_on_last_step = False  # D-068 step 2: the last step gets no tools, so a turn always ends answered
         self.last_step_note = LAST_STEP_NOTE  # what the model is told on that last step
         self.deciding = False       # D-071 phased: the first call offers only the phase switches (PHASE_SPECS)
@@ -705,7 +707,12 @@ class ChatSession:
         from app.core import runinfo
         self.rec.write("session", code_version=runinfo.code_version(), workspace=str(self.ws.root), **info)
 
-    def feedback(self, verdict: str, note: str = "") -> str:
+    def rate_session(self, stars: int) -> None:
+        """D-079: one keypress at exit, 1-5, for the whole session (D-078 phase 3's session rating)."""
+        if 1 <= int(stars) <= 5:
+            self.rec.write("session_rating", stars=int(stars), turns=self.turn_no, author="user")
+
+    def feedback(self, verdict: str, note: str = "", via: str = "command") -> str:
         """`/good` / `/bad`: your verdict on the last thing Mitra did: a /run night started after the last turn, else
         the last turn (the last verdict given counts). The reply names what was marked (E-052)."""
         mark = "👍 good" if verdict == "good" else "👎 bad"
@@ -717,7 +724,7 @@ class ChatSession:
             return f"Night run {Path(n.get('plan', '')).name} marked {mark}{tail}"
         if not self.turn_no:
             return "No turn yet to mark."
-        self.rec.write("feedback", of_turn=self.turn_no, verdict=verdict, note=note[:1000], author="user")
+        self.rec.write("feedback", of_turn=self.turn_no, verdict=verdict, note=note[:1000], author="user", via=via)
         said = f' ("{self._last_user}")' if self._last_user else ""
         return f"Turn {self.turn_no}{said} marked {mark}{tail}"
 
@@ -742,8 +749,15 @@ class ChatSession:
     def _new_turn(self, user: str) -> None:
         """Count a turn; if you asked the same thing again, the turn before gets a rephrase signal."""
         self.turn_no += 1
-        if self._prev_user_full and SIG.is_rephrase(self._prev_user_full, str(user)):
+        rephrased = bool(self._prev_user_full and SIG.is_rephrase(self._prev_user_full, str(user)))
+        if rephrased:
             self.signal("rephrase", of_turn=self.turn_no - 1)
+        elif self.turn_no > 1:  # D-079: the next message is the verdict on the last answer, with no extra work
+            said = SIG.implicit_label(self._last_answer_text, str(user), self._last_did_work)
+            if said is None and is_go_ahead(str(user)) and offered_phase(self._last_answer_text):
+                said = ("happy", "said yes to the offer")
+            if said:
+                self.signal(said[0], of_turn=self.turn_no - 1, why=said[1], auto=True)
         self._prev_user_full = str(user)
         named = self._named_project(str(user))
         if named and named != self.focus:  # "we are talking about neon chomp": the focus follows the user
@@ -1287,6 +1301,7 @@ class ChatSession:
         self._remember_left(res.journal)
         self.turn_log.append({"no": self.turn_no, "user": str(user)[:300], "outcome": turn_outcome(res),
                               "files": [e["path"] for e in res.journal]})
+        self._last_answer_text, self._last_did_work = res.text or "", bool(res.journal or res.tests_run)
         return res
 
     def _turn(self, messages: list, res: TurnResult, max_steps: int) -> TurnResult:

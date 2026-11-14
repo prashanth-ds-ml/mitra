@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from prompt_toolkit import PromptSession
+from prompt_toolkit.application.current import get_app
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.history import FileHistory, InMemoryHistory
 from prompt_toolkit.key_binding import KeyBindings
@@ -36,6 +37,7 @@ from app.ui.theme import prompt_style
 MODES = ("approve", "auto", "plan")
 MODE_LABELS = {"approve": "ask", "auto": "auto-edit", "plan": "plan", "read-only": "plan"}
 
+RATE_GOOD, RATE_BAD = "\x00rate:good", "\x00rate:bad"  # what prompt() returns for the + / - key (never typed text)
 PASTE_FOLD_LINES = 12
 PASTE_FOLD_CHARS = 1500
 _PASTE_TOKEN = re.compile(r"\[pasted text #(\d+): \d+ lines\]")
@@ -80,6 +82,7 @@ class UiState:
     last_ctrl_c: float = 0.0
     folded: Folded = field(default_factory=Folded)
     pastes: dict[int, str] = field(default_factory=dict)
+    can_rate: bool = False  # D-079: right after an answer, + / - on the empty prompt rates it (one key, no Enter)
 
     def say(self, text: str, seconds: float = 3.0) -> None:
         self.notice, self.notice_until = text, time.monotonic() + seconds
@@ -285,6 +288,21 @@ def make_key_bindings(state: UiState, *, print_folded: Callable[[], None] | None
     @kb.add(Keys.BracketedPaste)
     def _(event):
         event.current_buffer.insert_text(fold_paste(state, event.data))
+
+    # D-079: one key rates the last answer, only on an empty prompt right after it; anything else types as usual
+    from prompt_toolkit.filters import Condition
+
+    rate_now = Condition(lambda: state.can_rate and not get_app().current_buffer.text)
+
+    @kb.add("+", filter=rate_now)
+    def _(event):
+        state.can_rate = False
+        event.app.exit(result=RATE_GOOD)
+
+    @kb.add("-", filter=rate_now)
+    def _(event):
+        state.can_rate = False
+        event.app.exit(result=RATE_BAD)
 
     return kb
 

@@ -12,6 +12,14 @@ machine or your judgment. Updated every release.
 | U-005 | M4 | Fresh-eyes read of README and CASE_STUDY | Needs someone who did not write them | open |
 | U-006 | M0 | Free RAM before model runs: close Edge, Chrome and the ChatGPT app, or reboot and open nothing else | Your apps and tabs | open again: done 2026-10-26 for the model check (~6 GB free), but the idle bench server was then stopped for low memory; needed before the baselines |
 
+## 2026-11-14 · Feedback on every turn (D-079)
+
+- [ ] After an answer, press `+` (or `-`) on the empty prompt: "Turn N … marked 👍" at once, no Enter
+- [ ] `+1 for this` typed as a message still types normally (only a first key on an empty prompt rates)
+- [ ] After a turn that changed files: a dim "worked? + yes · − no" line (not after every turn)
+- [ ] `exit` after 3+ turns: "rate this session 1–5"; a digit is noted, any other key skips
+- [ ] Say "why dont you do that" after an answer: `mitra coach` / the records show it as unhappy for that turn
+
 ## 2026-11-14 · Neon Chomp live check (E-125, E-126)
 
 Restart Mitra in mitra-try (header: the new commit). On Kaggle or the laptop.

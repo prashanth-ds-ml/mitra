@@ -30,7 +30,7 @@ JUDGE_CATEGORIES = ("behaviour", "writing", "explain", "ideas")
 MIN_GAIN = 2            # one run per arm is noisy (A/B 2026-11-11: the same setup moved by 1-3 cases)
 MAX_FAILURES = 12
 MAX_SIGNALS = 12
-EVIDENCE_SIGNALS = ("rephrase", "interrupt", "undo")
+EVIDENCE_SIGNALS = ("rephrase", "interrupt", "undo", "unhappy")  # D-079: unhappy = your next message
 
 PROPOSER_PROMPT = """You improve a local assistant's conversation behaviour by adding ONE short rule to its
 instructions, never by changing its code. You get its instructions, cases it failed (what the user said and why the
@@ -114,9 +114,10 @@ def conversation_signals(files: list[Path], limit: int = MAX_SIGNALS) -> list[di
                 if not you or you.startswith("/") or " ".join(you.split()) in held_out:
                     continue
                 found.append({"t": float(r.get("t") or 0), "signal": name, "you": you[:300],
-                              "mitra": answered.get(turn, "")[:300], "note": str(r.get("note", ""))[:300],
-                              "next": said.get(turn + 1, "")[:300] if isinstance(turn, int) and name == "rephrase"
-                              else ""})
+                              "mitra": answered.get(turn, "")[:300],
+                              "note": str(r.get("note") or r.get("why") or "")[:300],
+                              "next": said.get(turn + 1, "")[:300] if isinstance(turn, int)
+                              and name in ("rephrase", "unhappy") else ""})
     found.sort(key=lambda x: -x["t"])
     unique, seen = [], set()
     for s in found:  # one conversation can be in its project and in the store: count it once

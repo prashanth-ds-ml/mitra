@@ -10,7 +10,26 @@ from pathlib import Path
 from app.core import harness as H
 
 # rows of kind "signal": signal = one of these
-SIGNALS = ("rephrase", "interrupt", "undo", "copy")
+SIGNALS = ("rephrase", "interrupt", "undo", "copy", "unhappy", "happy")
+
+# D-079 (feedback every turn, no extra work): your next message is the verdict on the last answer. Live 2026-11-13
+# (Neon Chomp): "i thought neon chomp...???", "why dont you do that", "did you do that fix" and a pasted traceback
+# after "running successfully" were all verdicts; none was recorded
+_UNHAPPY = re.compile(
+    # "...???" alone is the user's emphasis, also in plain questions ("can we add these features...???"): not a verdict
+    r"^\s*i thought\b|\bwhy (dont|don'?t|didn'?t|did not|can'?t|cant|won'?t|aren'?t|are you not|"
+    r"is it not)\b|\bdid you (really )?(do|fix|make|change|add|run|test|check) (that|it|this|the|those|them)\b|"
+    r"\byou (said|told me)\b.*\bbut\b|"
+    r"\b(still|again) (not|broken|failing|wrong|the same)\b|\b(not|isn'?t|doesn'?t|does not|don'?t) (working|work)\b|"
+    r"\b(unable|cant|can'?t|cannot) (to )?(move|play|run|start|open|launch|see|use|find)\b|\bnothing (happens|changed)\b|"
+    r"\b(that'?s|this is|it'?s) (wrong|not right|incorrect|broken)\b|\bwe are talking about\b",
+    re.IGNORECASE)
+_PASTED_ERROR = re.compile(r"Traceback \(most recent call last\)|^\w*(Error|Exception): |\bexit code [1-9]",
+                           re.MULTILINE)
+_HAPPY = re.compile(
+    r"^\W*(thanks|thank you|thx|great|perfect|nice|awesome|cool|excellent|good job|well done|works|it works|"
+    r"working now|looks good|lgtm|love it|that'?s it|exactly|correct|super|brilliant)\b",
+    re.IGNORECASE)
 
 # the user says the last answer was not what they wanted
 _AGAIN = re.compile(r"^\s*(no\b|nope\b|not (that|this|what)|i meant\b|i mean\b|that'?s (wrong|not)|wrong\b|"
@@ -61,6 +80,24 @@ def is_rephrase(previous: str, now: str) -> bool:
     if len(cur.split()) < 4:
         return False
     return difflib.SequenceMatcher(None, prev, cur).ratio() >= REPHRASE_RATIO
+
+
+def implicit_label(previous_answer: str, now: str, did_work: bool = False) -> tuple[str, str] | None:
+    """D-079: what your next message says about the last answer -> ("unhappy" | "happy", why), or None when it does
+    not say (most messages: a new task, a follow-up). Never a guess: only clear words, or an error pasted right
+    after a turn that worked on files. A rephrase is recorded on its own (is_rephrase), not here too."""
+    cur = (now or "").strip()
+    if not cur or cur.startswith("/") or not (previous_answer or "").strip():
+        return None
+    if _PASTED_ERROR.search(cur):  # live turn 14: the traceback came right after "I've fixed all the issues"
+        return "unhappy", "pasted an error after the change" if did_work else "pasted an error"
+    m = _UNHAPPY.search(cur)
+    if m:
+        return "unhappy", m.group(0).strip()[:40]
+    m = _HAPPY.search(cur)
+    if m and not re.search(r"\bbut\b", cur, re.IGNORECASE):
+        return "happy", m.group(0).strip(" .!,")[:40]
+    return None
 
 
 # ── your notes, read every turn (D-068 step 1) ──────────────────────────────────

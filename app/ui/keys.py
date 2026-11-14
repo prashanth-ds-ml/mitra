@@ -69,3 +69,23 @@ def _is_console() -> bool:
         return sys.stdin.isatty()
     except Exception:
         return False
+
+
+def one_key(allowed: str, timeout: float = 20.0, getch=None, kbhit=None) -> str:
+    """D-079: wait for one key in `allowed` (Enter, esc or any other key skips; nothing after `timeout` s skips).
+    Returns the key, or '' when skipped or when this is not an interactive Windows console."""
+    if getch is None:
+        if sys.platform != "win32" or not _is_console():
+            return ""
+        import msvcrt
+        getch, kbhit = msvcrt.getwch, msvcrt.kbhit
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        if kbhit():
+            ch = getch()
+            if ch in ("\x00", "\xe0"):
+                getch()
+                return ""
+            return ch if ch in allowed else ""
+        time.sleep(0.05)
+    return ""

@@ -506,6 +506,10 @@ def cmd_report(
 cli.command("report")(cmd_report)
 
 
+RATE_HINT_EVERY = 5           # D-079: the 'worked? + / -' hint at most once in this many turns
+SESSION_RATING_MIN_TURNS = 3  # D-079: the 1-5 question at exit only after a real session
+
+
 def _score_model(model: str, remote: bool, ctx: int, arch: str):
     """The model a score run uses -> (llm, model name, num_ctx, backend). Shared by `mitra score` and
     `mitra improve --chat`, so the judge runs exactly as a score does."""
@@ -2890,6 +2894,7 @@ def _chat():
         current_task = label or "Ready"
 
     ui_state = ui.UiState(mode=session_mode)
+    _rate_hint = {"last": -RATE_HINT_EVERY}  # D-079: the turn the 'worked?' hint was last shown
 
     def _print_folded() -> None:
         console.print()
@@ -3360,6 +3365,12 @@ def _chat():
         except (EOFError, KeyboardInterrupt):
             user_input = "exit"
         typed_ahead = ""
+        ui_state.can_rate = False
+        if user_input in (ui.input.RATE_GOOD, ui.input.RATE_BAD):  # D-079: + / - on the empty prompt
+            _verdict = "good" if user_input == ui.input.RATE_GOOD else "bad"
+            console.print(Text("  " + chat.feedback(_verdict, via="key")
+                               + ("  ·  `/bad <why>` adds a reason" if _verdict == "bad" else ""), style="m.faint"))
+            continue
         if ui_state.mode != session_mode:   # shift+tab while typing
             session_mode = ui_state.mode
             _apply_session_mode(cfg, session_mode)
@@ -3396,6 +3407,12 @@ def _chat():
                                            f"round, ~20 min on the GPU · log: {_log}", style="m.tool"))
                 except Exception as _exc:  # noqa: BLE001 - learning must never block leaving
                     console.print(Text(f"  could not start learning: {str(_exc)[:120]}", style="m.faint"))
+            if chat.turn_no >= SESSION_RATING_MIN_TURNS:  # D-079: one key for the whole session, never required
+                console.print(Text("  rate this session 1–5 (any other key skips)", style="m.faint"))
+                _stars = ui.keys.one_key("12345")
+                if _stars:
+                    chat.rate_session(int(_stars))
+                    console.print(Text(f"  thanks: {_stars}/5 noted", style="m.faint"))
             console.print(Text("  Bye.", style="m.dim"))
             break
 
@@ -3986,6 +4003,11 @@ def _chat():
                     files=len({e["path"] for e in turn.journal}), tests_run=turn.tests_run,
                     last_test_ok=turn.last_test_ok, tokens_in=turn_in, tokens_out=turn_out))
             ui.notify.done(console, time.monotonic() - turn_started)
+            if ai_reply:  # D-079: + / - now rates this answer; a rare hint after a turn that changed files
+                ui_state.can_rate = True
+                if turn.journal and chat.turn_no - _rate_hint["last"] >= RATE_HINT_EVERY:
+                    _rate_hint["last"] = chat.turn_no
+                    console.print(Text("  worked?  + yes  ·  − no   (or just keep typing)", style="m.faint"))
             last_test_summary = turn.last_test_summary or last_test_summary
             if turn.remote_gone:  # D-062 B3: the remote stopped in the middle of the turn
                 _kaggle_ended("the Kaggle GPU stopped answering in the middle of the turn")

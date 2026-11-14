@@ -127,8 +127,8 @@ def turns_since(files: list[Path], since_t: float) -> list[dict]:
                 for r in rs:
                     if r.get("kind") == "feedback" and r.get("verdict") == "bad":
                         flags.append("you marked it /bad" + (f": {r.get('note')}" if r.get("note") else ""))
-                    elif r.get("kind") == "signal" and r.get("signal") in ("rephrase", "interrupt", "undo"):
-                        flags.append(f"signal: {r.get('signal')}")
+                    elif r.get("kind") == "signal" and r.get("signal") in ("rephrase", "interrupt", "undo", "unhappy"):
+                        flags.append(f"signal: {r.get('signal')}" + (f" ({r.get('why')})" if r.get("why") else ""))
                     elif r.get("kind") == "grounding":  # E-110: claimed a check no tool result backed
                         flags.append("unverified claim: " + "; ".join(str(c)[:120] for c in (r.get("claims") or [])[:2]))
                 text = str(end.get("text", "") or "")
